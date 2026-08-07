@@ -72,11 +72,18 @@ Address these in the design, not the discussion section.
 ### C1 — Compensation (the big one)
 When you remove agent i and re-run, the survivors reorganize and absorb its function. A small drop is then ambiguous: *"i did nothing"* or *"i's role was real but fungible."* Both look identical in a scalar metric.
 
-**Fix: run two ablation modes and treat their difference as a result.**
+**Fix: run three ablation modes and treat their differences as results.**
 - **Live ablation** — delete agent i, re-run the episode from scratch with N−1 agents. Measures *necessity of the agent*. Compensation is allowed.
-- **Frozen-transcript ablation** — replay the recorded episode, but excise agent i's messages from the context every other agent sees at each step, and re-generate downstream turns. Compensation is blocked. Measures *the informational contribution of what i actually said*.
+- **Frozen-replay** — keep the recorded schedule, drop agent i's turns, and regenerate the surviving agents' turns against the modified context. Compensation is allowed within a turn slot but not across the schedule. **This is the primary frozen measure.**
+- **Frozen-excise** — delete agent i's messages from the recorded transcript and re-read the answer from what remains. Costs *zero model calls*, so it can run over the entire corpus for free — but see the caveat below.
 
-`Δ(frozen) − Δ(live)` **is your fungibility/redundancy metric.** This is a genuine contribution beyond the base idea and it turns your worst confound into a headline number.
+`Δ(frozen_replay) − Δ(live)` **is your fungibility/redundancy metric.**
+
+> ⚠️ **Propagation caveat — measured, not predicted.** I originally expected plain excision to give the *largest* drop, since it blocks compensation completely. Implemented and measured against the mock, it gave nearly the *smallest*: ~0.002 against live drops of 0.03–0.23, a hundredfold underestimate.
+>
+> The cause is content propagation. Agents restate the whole working answer every turn, so a contribution is copied into everyone else's messages almost as soon as it is made. Deleting the originating messages removes the words but not the content. Read naively this reports "agent contributed nothing" when the truth is "this measurement does not work on this transcript."
+>
+> `ablation.propagation_index()` measures how much of an agent's content is echoed by others later in the episode, and decides which frozen mode to trust. **Run it before reporting any excision-based number.** Whether real 7–8B agents restate as aggressively as the mock is an open empirical question for Phase 2 — but the diagnostic is now in place to answer it rather than assume.
 
 ### C2 — Position, not identity
 The most likely deflating explanation of the entire phenomenon: agent 1 "plans" only because it speaks first. Roles attach to *turn position*, not to *agent identity* — and that is not specialization, it is protocol.
