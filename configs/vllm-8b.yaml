@@ -1,0 +1,39 @@
+# Real-run config for a 24 GB card serving one 7-8B model.
+#
+# Start the server first:
+#   vllm serve Qwen/Qwen3-8B \
+#     --max-model-len 8192 \
+#     --max-num-seqs 64 \
+#     --gpu-memory-utilization 0.90
+#
+# Then:
+#   collabengine baseline --config configs/vllm-8b.yaml
+#   collabengine ablate   --config configs/vllm-8b.yaml
+#   collabengine analyze  --config configs/vllm-8b.yaml
+#
+# One model serves every agent. That is not just convenient -- identical weights
+# across agents is the control that rules out model heterogeneity as the source
+# of any differentiation we observe.
+name: qwen3-8b-baseline
+seed_start: 0
+n_episodes: 100
+out_dir: runs
+max_concurrency: 64        # keep at or just under the server's --max-num-seqs
+
+backend:
+  kind: openai
+  model: Qwen/Qwen3-8B
+  base_url: http://localhost:8000/v1
+  max_concurrency: 64
+  timeout_s: 600
+  max_retries: 4
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: medium       # set from `collabengine calibrate` output, not by guess
+  symmetry: name_seed
+  randomize_turn_order: true   # the C2 control; do not disable without a reason
+  max_tokens: 512
+  temperature: 0.8
+  top_p: 0.95

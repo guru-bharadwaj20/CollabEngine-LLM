@@ -1,0 +1,22 @@
+# Laptop config. No GPU, no model server -- exercises the whole pipeline
+# against the deterministic mock so the harness can be debugged for free.
+name: mock-smoke
+seed_start: 0
+n_episodes: 20
+out_dir: runs
+max_concurrency: 8
+
+backend:
+  kind: mock
+  mock_mode: specialized   # specialized | null | positional | inert
+  mock_competence: 0.5
+  mock_off_focus: 0.0
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: hard
+  symmetry: name_seed      # name_only | name_seed | name_seed_scratch
+  randomize_turn_order: true
+  max_tokens: 512
+  temperature: 0.8
