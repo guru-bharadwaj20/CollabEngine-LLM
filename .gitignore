@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Experiment outputs — transcripts are large and regenerable from seeds.
+runs/
+out/
+*.jsonl
+*.jsonl.gz
+!tests/fixtures/*.jsonl
+
+# Local model weights
+models/
+*.gguf
+*.safetensors
