@@ -20,7 +20,7 @@ out_dir: runs
 # The runner fans this many episodes at the backend at once; the backend batches
 # whatever turns are waiting. Higher than max_batch_size on purpose -- the queue
 # should never be empty when a forward pass finishes.
-max_concurrency: 48
+max_concurrency: 80
 
 backend:
   kind: hf
@@ -29,15 +29,31 @@ backend:
   dtype: bfloat16
   # Two ceilings, and the token one is the real constraint: KV cache scales with
   # tokens, not requests. A high sequence cap lets short round-one turns pack in;
-  # the token budget is what stops sixteen full-transcript turns from OOMing.
-  # Measured, not derived. A theoretical 144 KiB/token of KV says ~43k tokens
-  # fit beside the weights; benchmarking says otherwise -- batch 8 at a
-  # 1200-token context peaks at 22.0 GiB against 15.3 GiB of weights, i.e.
-  # ~490 KiB per token once transient prefill allocations are counted. Budgeting
-  # on the theoretical figure is what drove batches into OOM-halving, which
-  # looks like a healthy 100%-utilization run from outside and runs 3x slower.
-  max_batch_size: 16
-  max_batch_tokens: 11000
+  # the token budget holds peak memory roughly constant as contexts grow, which
+  # is what stops a batch of full-transcript turns from OOMing.
+  #
+  # Both numbers come from sweeping batch size at a realistic 1600-token context
+  # (scratchpad bench.py), not from head-count arithmetic:
+  #
+  #     batch  8   72.6 tok/s   16.8 GiB
+  #     batch 16   94.1 tok/s   18.3 GiB
+  #     batch 24  102.8 tok/s   19.8 GiB
+  #     batch 32  108.1 tok/s   21.4 GiB   <- best
+  #     batch 48   71.1 tok/s   24.4 GiB   <- collapses
+  #
+  # The batch-48 row is the important one: throughput falls by a third at the
+  # point peak memory approaches the 24 GiB card. Windows does not OOM there, it
+  # pages to host memory over PCIe and keeps reporting 100% utilization, so the
+  # failure is invisible from nvidia-smi and looks exactly like a healthy run.
+  # Staying near 21 GiB is therefore a throughput decision, not a safety margin.
+  #
+  # Marginal cost measured across those rows is ~123 KiB/token, close to the
+  # 144 KiB/token GQA arithmetic predicts (36 layers x 8 kv-heads x 128 dim x 2 x
+  # bf16). An earlier sweep inferred ~490 KiB/token and set the budget to 11000;
+  # that figure was taken inside the paging regime, and the resulting batch of
+  # ~7 ran the card at roughly 40% of its throughput.
+  max_batch_size: 32
+  max_batch_tokens: 44000
   batch_window_s: 0.05     # invisible next to a multi-second generation
   max_model_len: 8192
   enable_thinking: false   # a <think> block would consume the whole turn budget
@@ -48,6 +64,13 @@ team:
   difficulty: medium       # set from `collabengine calibrate`, not by guess
   symmetry: name_seed
   randomize_turn_order: true   # the C2 control; do not disable without a reason
-  max_tokens: 512
+  # 512 was not enough to answer this task. In the first real corpus 72% of
+  # agent turns hit the cap and were cut off mid-sentence, and every episode in
+  # which *all* turns were cut off graded 0.0 -- the model spends its budget
+  # walking 16 jobs through 29 constraints and never reaches the answer block.
+  # That is not a slow-agent problem, it is a measurement problem: truncation
+  # scales with how much an agent writes, which is the emergent behaviour under
+  # study, so the cap was quietly scoring the verbose agents lowest.
+  max_tokens: 1024
   temperature: 0.8
   top_p: 0.95
