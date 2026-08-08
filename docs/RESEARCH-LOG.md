@@ -7,9 +7,9 @@ from **instrument history** (things learned about measuring them) — and is
 explicit about the several occasions where the second was mistaken for the
 first.
 
-**Status at time of writing: 2026-08-08 21:45.** 44 commits, 277 passing tests,
+**Status at time of writing: 2026-08-08 23:00.** 45 commits, 277 passing tests,
 one completed Phase 1 measurement, no Phase 3 results yet. A `hard`-difficulty
-run is in progress.
+run is in progress; its solo arm is in and reported in §4.2.
 
 ---
 
@@ -299,6 +299,12 @@ contributes nothing measures its own noise floor.
 about 8B agent teams on constraint-satisfaction tasks, and as the difficulty
 curve Phase 1 asked for. The corpus is archived, not deleted.
 
+**Read this together with §4.2.** Under `fraction` the medium gap is +0.026;
+under whole-instance feasibility the same transcripts give 0.250 vs 0.417 --
+teams produce a fully feasible schedule 1.7x as often. The gate verdict does
+not change (that gap is still inside its error at n=12), but the headline
+metric was hiding the largest signal in the corpus.
+
 Action taken: operating point moved to `hard` (24 jobs vs 16, 6 workers vs 5, 6
 exclusions vs 4, 5 synthesis constraints vs 3, capacity slack 1.1 vs 1.2, value
 floor 0.72 vs 0.65).
@@ -307,7 +313,54 @@ floor 0.72 vs 0.65).
 that an 8B model has no band in this task where collaboration pays — a Phase 1
 result, and not a licence to run Phase 3 anyway.
 
-### 4.2 Throughput characterisation
+### 4.2 The scoring metric hides difficulty but is not what limits discrimination
+
+Solo scored 0.879 at `medium` and 0.842 at `hard` — a 50% increase in instance
+size moved the score by 0.037. The hypothesis was that
+fraction-of-constraints-satisfied cannot discriminate, since extra constraints
+add to numerator and denominator together.
+
+Instances are deterministic in `(seed, difficulty)`, so this was testable
+against solutions already on disk at **zero GPU cost** (`scripts/rescore.py`).
+Three metrics, same transcripts:
+
+| medium, n=12 each | solo | team | gap | Cohen's *d* |
+|---|---|---|---|---|
+| `fraction` (current) | 0.879 | 0.905 | +0.026 | +0.27 |
+| `strict` (all-or-nothing per component) | 0.616 | 0.689 | +0.074 | +0.25 |
+| `feasible` (whole instance) | 0.250 | 0.417 | +0.167 | +0.36 |
+
+**The hypothesis was half right, and the wrong half was the important one.**
+Strict scoring exposes large headroom — solo falls from 0.879 to 0.616, and only
+a quarter of solo answers are fully feasible — but **Cohen's *d* barely moves**
+(0.27 → 0.25 → 0.36). Changing the metric changes the numbers without changing
+the separation. On the medium corpus the team genuinely is not much better than
+one agent; that is not a measurement artifact and re-grading does not rescue it.
+
+What the experiment does establish is more useful: **`hard` is genuinely hard,
+and the fraction metric conceals it.**
+
+| hard, solo, n=12 | value |
+|---|---|
+| `fraction` | 0.842 |
+| `strict` | 0.490 |
+| `feasible` | **0.083** (1 of 12) |
+| arithmetic, fraction → strict | 0.74 → **0.08** |
+
+A single agent produces a fully feasible schedule in one episode out of twelve
+and gets every capacity constraint right in one out of twelve. Under `fraction`
+that reads as 0.842 and looks near ceiling. **The Phase 1 gate should therefore
+be evaluated on all three metrics**, not on `fraction` alone — a conclusion that
+applies retroactively to the medium result in §4.1, whose `feasible` gap
+(0.250 → 0.417, teams 1.7× as often feasible) is the largest signal in that
+corpus and was invisible in the headline number.
+
+Two caveats for the paper. An effect of *d* = 0.36 needs roughly 120 episodes
+per group for 80% power, so a real effect of that size cannot reach significance
+at N = 12. And a `hard` team result will be read against a solo baseline of
+1/12, where single episodes move the proportion substantially.
+
+### 4.3 Throughput characterisation
 
 Batch sweep, 1600-token context, 192 new tokens:
 
@@ -344,7 +397,7 @@ WSL2 instance on this machine is broken (`Wsl/Service/E_UNEXPECTED`, persisting
 after `--shutdown`), needing a reboot or reinstall not undertaken unilaterally.
 Realistic expected gain: **3–5×**, not the 5–10× claimed earlier.
 
-### 4.3 Judge availability — pivot, and what it costs
+### 4.4 Judge availability — pivot, and what it costs
 
 PLAN.md assumed a paid frontier judge (~$5 for 14k messages). No paid API was
 available. Measurement of the free Gemini tier found the binding limit is
@@ -367,7 +420,7 @@ untrustworthy on these labels, and that is itself reportable.
 (2.5-flash and 3-flash-preview), not two families. Correlated errors are likelier
 between them, so their agreement is an **upper bound** on true reliability.
 
-### 4.4 Propagation diagnostic — a prediction that was wrong
+### 4.5 Propagation diagnostic — a prediction that was wrong
 
 Plain excision was expected to give the *largest* ablation drop, since it blocks
 compensation entirely. Measured against the mock it gave nearly the *smallest*:
