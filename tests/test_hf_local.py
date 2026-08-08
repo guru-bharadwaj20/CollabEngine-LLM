@@ -336,3 +336,25 @@ def test_release_reclaims_between_chunks() -> None:
     t = FakeTorch()
     _release(t)
     assert t.emptied == 1
+
+
+def test_long_prompts_lose_their_oldest_messages_not_their_instructions() -> None:
+    """Right truncation would delete the answer contract and keep the history.
+
+    A transcript outgrows max_model_len in the final round of a large instance.
+    The tokenizer's default truncation_side is "right", which for a chat prompt
+    removes the newest teammate turns, the final-round banner and the
+    answer-format contract, while preserving the oldest messages. The agent is
+    then asked to answer with the instructions on how to answer deleted, and the
+    unparseable turn that follows is indistinguishable from a team that failed
+    the task.
+    """
+    from transformers import AutoTokenizer  # noqa: PLC0415 - optional dependency
+
+    tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-8B")
+    text = " ".join(f"w{i}" for i in range(400)) + " ANSWER-CONTRACT-SENTINEL"
+
+    tok.truncation_side = "left"
+    kept = tok(text, truncation=True, max_length=64)["input_ids"]
+
+    assert "ANSWER-CONTRACT-SENTINEL" in tok.decode(kept)
