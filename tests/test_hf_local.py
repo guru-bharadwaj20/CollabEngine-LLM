@@ -21,6 +21,7 @@ from collabengine.backends.hf_local import (
     HFLocalBackend,
     _batch_seed,
     _group_by_sampling,
+    _sorted_chunks,
     _split_by_token_budget,
     _Waiter,
 )
@@ -158,6 +159,38 @@ def test_token_budget_preserves_order() -> None:
     )
     flat = [w.request.seed for c in chunks for w in c]
     assert flat == [0, 1, 2, 3, 4, 5]
+
+
+def test_length_sorting_groups_similar_contexts() -> None:
+    """Left-padding computes every sequence at the longest one's width, so a
+    round-one turn batched with a round-three turn is mostly padding."""
+    waiters = [_Waiter(_req(i), None) for i in range(6)]
+    lengths = [5000, 100, 4800, 120, 4900, 90]
+
+    chunks, _ = _sorted_chunks(waiters, lengths, budget=11000, max_new_tokens=256)
+
+    # All three short turns ride one pass; the long ones pack two then one.
+    # Unsorted, each short turn would have been padded up to a ~5000-token
+    # neighbour and computed at that width.
+    assert [len(c) for c in chunks] == [3, 2, 1]
+    assert {w.request.seed for w in chunks[0]} == {1, 3, 5}
+
+
+def test_sorting_permutation_inverts_to_the_original_order() -> None:
+    """Callers map responses back positionally. If the inverse is wrong, one
+    episode receives another episode's turn -- a corruption that yields a
+    plausible transcript rather than an error."""
+    waiters = [_Waiter(_req(i), None) for i in range(7)]
+    lengths = [900, 100, 700, 50, 800, 60, 400]
+
+    chunks, order = _sorted_chunks(waiters, lengths, budget=2000, max_new_tokens=100)
+
+    produced = [w.request.seed for chunk in chunks for w in chunk]
+    restored = [None] * len(waiters)
+    for position, original in enumerate(order):
+        restored[original] = produced[position]
+
+    assert restored == list(range(7))
 
 
 def test_a_single_oversized_request_is_not_dropped() -> None:

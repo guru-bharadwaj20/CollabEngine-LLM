@@ -222,17 +222,29 @@ class HFLocalBackend(LLMBackend):
         # what keeps a batch of long contexts from reserving more KV cache than
         # the card has.
         if len(batch) > 1:
-            chunks = _split_by_token_budget(
+            lengths = [
+                len(ids) for ids in tok(prompts, add_special_tokens=False)["input_ids"]
+            ]
+            # Group similar lengths before chunking. Left-padding brings every
+            # sequence in a pass up to the longest one, so a round-one turn
+            # batched with a round-three turn is computed at round-three width
+            # and most of that work is padding. Sorting costs nothing and makes
+            # each chunk roughly uniform; the ordering is undone before
+            # returning, because callers map results back positionally.
+            chunks, order = _sorted_chunks(
                 batch,
-                [len(ids) for ids in tok(prompts, add_special_tokens=False)["input_ids"]],
+                lengths,
                 budget=self.max_batch_tokens,
                 max_new_tokens=sample.max_tokens,
             )
             if len(chunks) > 1:
-                out: list[GenResponse] = []
+                produced: list[GenResponse] = []
                 for chunk in chunks:
-                    out.extend(self._generate_batch(chunk))
-                return out
+                    produced.extend(self._generate_batch(chunk))
+                responses: list[GenResponse] = [None] * len(batch)  # type: ignore[list-item]
+                for position, original in enumerate(order):
+                    responses[original] = produced[position]
+                return responses
 
         encoded = tok(
             prompts,
@@ -325,6 +337,31 @@ class HFLocalBackend(LLMBackend):
                 torch.cuda.empty_cache()
             except Exception:  # noqa: BLE001
                 pass
+
+
+def _sorted_chunks(
+    batch: list[_Waiter],
+    lengths: list[int],
+    *,
+    budget: int,
+    max_new_tokens: int,
+) -> tuple[list[list[_Waiter]], list[int]]:
+    """Length-sorted chunks, plus the permutation needed to undo the sort.
+
+    Returns `(chunks, order)` where `order[k]` is the index in the original
+    batch of the k-th element in chunk order. Callers must invert it before
+    returning results: they map responses back positionally, so leaving the
+    batch sorted would hand one episode another episode's turn -- a corruption
+    that produces a plausible transcript rather than an error.
+    """
+    order = sorted(range(len(batch)), key=lambda i: lengths[i])
+    chunks = _split_by_token_budget(
+        [batch[i] for i in order],
+        [lengths[i] for i in order],
+        budget=budget,
+        max_new_tokens=max_new_tokens,
+    )
+    return chunks, order
 
 
 def _split_by_token_budget(
