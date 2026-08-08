@@ -126,6 +126,35 @@ Avoid SWE-bench-style tasks at this model scale; the failure floor swamps the ef
 - Calibration: single-agent baseline and 4-agent baseline across difficulty, to find the band where the task is hard enough to need collaboration but not so hard the model floors out. **If there is no such band, stop and redesign the task — everything downstream depends on it.**
 - **Deliverable:** difficulty curve plot; a chosen operating point.
 
+> **Measured, 2026-08-08 — `medium` fails this gate.** Qwen3-8B, 12 episodes per
+> condition, 4 agents × 3 rounds against 1 agent × 3 rounds on identical
+> instances:
+>
+> | condition | n | mean | sd |
+> |---|---|---|---|
+> | baseline (4 agents) | 12 | 0.905 | 0.095 |
+> | solo (1 agent) | 12 | 0.879 | 0.100 |
+>
+> A gap of **+0.026 against a standard error of ~0.029** — nothing. This is the
+> stop condition above, and it stops Phase 3 rather than Phase 1: an ablation
+> grid measured at an operating point where the team contributes nothing is
+> measuring its own noise floor, because every drop is taken against a baseline
+> the extra agents were not lifting. The run moved to `hard`.
+>
+> **The calibration was wrong for a reason worth generalising.** `medium` was
+> chosen by a `calibrate` pass run while `team.max_tokens` was 512, which cut
+> off 72% of agent turns before they reached the answer block and held solo at
+> 0.55. At that number medium looked correctly pitched. The operating point was
+> therefore a measurement of the token cap, and raising the cap invalidated the
+> difficulty choice in the same stroke that it fixed the scores. **A calibration
+> is only as trustworthy as the instrument settings in force when it ran, and
+> nothing in the output says which those were** — hence the `finish_reason`
+> accounting now printed by `analyze` before any number that depends on it.
+>
+> Whether `hard` clears the gate is open. If it does not, the honest reading is
+> that an 8B model has no band in this task where collaboration pays, which is a
+> Phase 1 result and a publishable one — not a licence to run Phase 3 anyway.
+
 ### Phase 2 — Emergence measurement (local GPU, ~1 week)
 - Local 24 GB + 7–8B (Qwen3-8B or Llama-3.1-8B-Instruct). Batch aggressively — this is the difference between hours and days, whether the batching happens in vLLM or in `hf_local`.
 - Run the symmetry-breaking sweep (C3) × baseline episodes.
