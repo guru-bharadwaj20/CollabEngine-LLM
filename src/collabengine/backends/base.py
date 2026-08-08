@@ -66,6 +66,16 @@ class LLMBackend(abc.ABC):
 
     name: str = "backend"
 
+    honors_request_seed: bool = True
+    """Whether `GenRequest.seed` actually controls that request's sampling.
+
+    A batching engine that seeds per sequence (vLLM) honors it; one that draws
+    the whole batch from a single global RNG does not. This is not a performance
+    detail -- `SymmetryBreaking.NAME_ONLY` and `NAME_SEED` differ *only* by
+    per-agent seed, so on a backend that ignores seeds they are the same
+    condition, and running both spends the card to produce a duplicate.
+    """
+
     @abc.abstractmethod
     async def generate(self, request: GenRequest) -> GenResponse:
         """Complete a single request."""

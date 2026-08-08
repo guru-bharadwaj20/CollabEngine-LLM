@@ -92,6 +92,9 @@ class HFLocalBackend(LLMBackend):
     enable_thinking: bool = False
     trust_remote_code: bool = False
     name: str = "hf_local"
+    honors_request_seed: bool = False
+    """`generate` samples the whole batch from one global RNG -- see the module
+    docstring. Per-request seeds are recorded but do not steer sampling."""
 
     _model: Any = field(default=None, init=False, repr=False)
     _tokenizer: Any = field(default=None, init=False, repr=False)
