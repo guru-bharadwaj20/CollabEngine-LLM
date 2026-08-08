@@ -22,6 +22,7 @@ import sys
 import time
 from dataclasses import replace
 from pathlib import Path
+from typing import Iterable, Iterator
 
 from collabengine.ablation import (
     capacity_control,
@@ -45,6 +46,7 @@ from collabengine.analysis import (
     summarize,
 )
 from collabengine.analysis.coding import CodingStats, JudgeUnavailable
+from collabengine.analysis.integrity import audit, is_instrument_failure
 from collabengine.backends.mock import MockBackend, MockMode
 from collabengine.config import ExperimentConfig
 from collabengine.orchestrator import run_episode
@@ -52,7 +54,7 @@ from collabengine.orchestrator.team import TeamConfig, build_team
 from collabengine.runner import RunPlan, run_plan
 from collabengine.tasks.generator import PRESETS
 from collabengine.tasks.schema import ALL_COMPONENTS, Component
-from collabengine.transcripts.store import TranscriptReader
+from collabengine.transcripts.store import EpisodeRecord, TranscriptReader
 
 BASELINE = "baseline.jsonl"
 ABLATION = "ablation.jsonl"
@@ -445,6 +447,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
             print(f"missing {path}", file=sys.stderr)
             return 2
 
+    _report_integrity(baseline_path, ablation_path)
+
     matrix = _live_matrix(baseline_path, ablation_path)
     if matrix is None:
         print("no live-ablation records found", file=sys.stderr)
@@ -465,6 +469,46 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     _report_modes(baseline_path, ablation_path)
     _report_mixed(ablation_path)
     return 0
+
+
+def _report_integrity(baseline_path: Path, ablation_path: Path) -> None:
+    """What the token cap cost, printed before any number that depends on it.
+
+    This runs first because every mean below it is computed on the surviving
+    episodes. A reader who does not know how many were dropped, and from which
+    cells, cannot tell a small drop from a thin cell.
+    """
+    records = list(TranscriptReader(baseline_path)) + list(
+        TranscriptReader(ablation_path)
+    )
+    report = audit(records)
+    if not report.episodes:
+        return
+
+    print("\n".join(report.lines()))
+    if report.instrument_failures:
+        share = report.instrument_failures / report.episodes
+        print(
+            f"\n{report.instrument_failures} of {report.episodes} episodes "
+            f"({share:.0%}) had every agent turn cut off at max_tokens and no "
+            f"parseable answer; they are excluded from every mean below."
+        )
+        if share > 0.05:
+            print(
+                "  Above 5% this is no longer a rounding error. Truncation "
+                "scales with how much an agent writes, so it removes episodes "
+                "non-randomly with respect to the behaviour under study -- "
+                "raise team.max_tokens and re-run rather than reporting these "
+                "numbers.",
+                file=sys.stderr,
+            )
+    if report.truncation_rate > 0.5:
+        print(
+            f"  {report.truncation_rate:.0%} of all agent turns hit the cap. "
+            f"Even where an answer survived, the reasoning the judge codes in "
+            f"Phase 2 is cut off mid-sentence.",
+            file=sys.stderr,
+        )
 
 
 def _report_mixed(ablation_path: Path) -> None:
@@ -508,7 +552,7 @@ def _report_modes(baseline_path: Path, ablation_path: Path) -> None:
     which is why they are printed together with their controls.
     """
     by_condition: dict[str, list[float]] = {}
-    for record in TranscriptReader(baseline_path):
+    for record in _usable(TranscriptReader(baseline_path)):
         by_condition.setdefault(record.condition, []).append(record.grade.overall)
 
     base = statistics.mean(by_condition.get("baseline") or [0.0])
@@ -529,7 +573,7 @@ def _report_modes(baseline_path: Path, ablation_path: Path) -> None:
                 f"  {condition:<28} {statistics.mean(by_condition[condition]):.3f}"
             )
     by_mode: dict[str, dict[str, list[float]]] = {}
-    for record in TranscriptReader(ablation_path):
+    for record in _usable(TranscriptReader(ablation_path)):
         mode, _, agent = record.condition.partition(":")
         by_mode.setdefault(mode, {}).setdefault(agent, []).append(record.grade.overall)
 
@@ -577,12 +621,28 @@ def _component_means(
     every drop toward zero and, where solo scores low enough, past it.
     """
     acc: dict[Component, list[float]] = {c: [] for c in ALL_COMPONENTS}
-    for record in reader:
+    for record in _usable(reader):
         if condition is not None and record.condition != condition:
             continue
         for comp, val in record.grade.per_component.items():
             acc[comp].append(val)
     return {c: (statistics.mean(v) if v else 0.0) for c, v in acc.items()}
+
+
+def _usable(records: Iterable[EpisodeRecord]) -> Iterator[EpisodeRecord]:
+    """Drop episodes whose zero was the token cap rather than the team.
+
+    Every mean in the analysis runs through here. An episode in which no agent
+    turn ever finished has an unparseable answer and therefore scores 0.0 on
+    every component -- a value that is not a measurement of the team but of
+    `max_tokens`, and one that biases in a specific direction: it deflates the
+    baseline reference (understating every drop) while inflating any ablation
+    cell it lands in (overstating that one). Worse, truncation tracks how much
+    an agent writes, so leaving these in can synthesise an agent x component
+    interaction out of the token budget. `analyze` prints how many were dropped;
+    it must never be a silent filter.
+    """
+    return (r for r in records if not is_instrument_failure(r))
 
 
 def cmd_pipeline(args: argparse.Namespace) -> int:
@@ -1157,7 +1217,7 @@ def cmd_converge(args: argparse.Namespace) -> int:
 def _live_matrix(baseline_path: Path, ablation_path: Path) -> AblationMatrix | None:
     base = _component_means(TranscriptReader(baseline_path))
     per_agent: dict[str, dict[Component, list[float]]] = {}
-    for record in TranscriptReader(ablation_path):
+    for record in _usable(TranscriptReader(ablation_path)):
         if not record.condition.startswith("live:"):
             continue
         agent = record.condition.split(":", 1)[1]
