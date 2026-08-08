@@ -131,10 +131,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, help="default: <run_dir>/codes.<judge>.jsonl")
     p.add_argument(
         "--judge",
-        default="anthropic",
-        help="anthropic | self (the config's own backend) | mock",
+        default="gemini",
+        help="gemini | anthropic | self (the config's own backend) | mock",
     )
     p.add_argument("--judge-model", default=None, help="override the judge model id")
+    p.add_argument(
+        "--judge-rpm",
+        type=float,
+        default=5.0,
+        help="requests/minute to pace at (free tier allows 5 per model)",
+    )
     p.add_argument("--judge-name", default=None, help="label recorded on each code")
     p.add_argument(
         "--limit",
@@ -807,16 +813,28 @@ def cmd_code(args: argparse.Namespace) -> int:
         print(f"{transcript} contains no episodes", file=sys.stderr)
         return 2
 
-    stats = CodingStats()
-    codes = asyncio.run(_code_all(backend, records, judge_name, stats))
-
     out = args.out or (config.run_dir / f"codes.{judge_name}.jsonl")
     out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w", encoding="utf-8", newline="\n") as fh:
-        for code in codes:
-            fh.write(json.dumps(code.to_dict()) + "\n")
 
-    print(f"coded {len(records)} episodes -> {out}: {stats.summary()}")
+    # A free-tier judge paces at a few requests a minute, so a corpus is hours
+    # of wall clock. Anything that long has to survive being interrupted:
+    # already-coded episodes are skipped and each one is flushed as it lands.
+    done = {c.episode_id for c in _read_codes(out)} if out.exists() else set()
+    todo = [r for r in records if r.episode_id not in done]
+    if done:
+        print(
+            f"resuming: {len(done)} episodes already coded, {len(todo)} to go",
+            file=sys.stderr,
+        )
+    if not todo:
+        print(f"nothing to code; {out} is complete")
+        codes = _read_codes(out)
+    else:
+        stats = CodingStats()
+        codes = asyncio.run(_code_all(backend, todo, judge_name, stats, out))
+        print(f"coded {len(todo)} episodes -> {out}: {stats.summary()}")
+        codes = _read_codes(out)
+
     report = summarize(codes)
     print(json.dumps(report.to_dict(), indent=2))
     print(
@@ -867,17 +885,53 @@ def _build_judge(args: argparse.Namespace, config: ExperimentConfig):
             AnthropicJudgeBackend(model=args.judge_model or DEFAULT_JUDGE_MODEL),
             None,
         )
-    return None, f"unknown judge {args.judge!r}; expected anthropic|self|mock"
+    if args.judge == "gemini":
+        from collabengine.backends.gemini_judge import (
+            DEFAULT_JUDGE_MODEL as GEMINI_DEFAULT,
+            GeminiJudgeBackend,
+        )
+
+        if not os.environ.get("GEMINI_API_KEY"):
+            return None, (
+                "no GEMINI_API_KEY set, so the frontier judge cannot run.\n"
+                "Set the key, or pass `--judge self` to code with the local "
+                "model (a pipeline smoke test, not a reportable number)."
+            )
+        return (
+            GeminiJudgeBackend(
+                model=args.judge_model or GEMINI_DEFAULT,
+                requests_per_minute=args.judge_rpm,
+            ),
+            f"judge: {args.judge_model or GEMINI_DEFAULT} at {args.judge_rpm}/min "
+            "-- free-tier pacing, so a large corpus takes hours. The run "
+            "checkpoints after every episode and resumes where it stopped.",
+        )
+    return None, f"unknown judge {args.judge!r}; expected gemini|anthropic|self|mock"
 
 
-async def _code_all(backend, records, judge_name: str, stats: CodingStats):
+async def _code_all(backend, records, judge_name: str, stats: CodingStats, out: Path):
+    """Code episode by episode, flushing each one before starting the next.
+
+    Per-episode rather than per-message so a resumed run never has to reason
+    about a half-coded episode: an episode id is either absent from the file or
+    complete in it.
+    """
     codes: list = []
-    for record in records:
-        codes.extend(
-            await code_episode(
+    with out.open("a", encoding="utf-8", newline="\n") as fh:
+        for index, record in enumerate(records, start=1):
+            batch = await code_episode(
                 backend=backend, record=record, judge_name=judge_name, stats=stats
             )
-        )
+            for code in batch:
+                fh.write(json.dumps(code.to_dict()) + "\n")
+            fh.flush()
+            codes.extend(batch)
+            if index % 5 == 0 or index == len(records):
+                print(
+                    f"  {index}/{len(records)} episodes | {stats.summary()}",
+                    file=sys.stderr,
+                    flush=True,
+                )
     return codes
 
 

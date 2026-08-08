@@ -68,6 +68,15 @@ class BackendConfig:
                 enable_thinking=self.enable_thinking,
                 trust_remote_code=self.trust_remote_code,
             )
+        if self.kind == "gemini":
+            from collabengine.backends.gemini_judge import GeminiJudgeBackend
+
+            return GeminiJudgeBackend(
+                model=self.model,
+                api_key=self.api_key,
+                timeout_s=self.timeout_s,
+                max_retries=self.max_retries,
+            )
         if self.kind == "anthropic":
             from collabengine.backends.anthropic_judge import AnthropicJudgeBackend
 
@@ -88,7 +97,8 @@ class BackendConfig:
                 max_retries=self.max_retries,
             )
         raise ValueError(
-            f"unknown backend kind {self.kind!r}; expected mock|hf|openai|anthropic"
+            f"unknown backend kind {self.kind!r}; "
+            "expected mock|hf|openai|anthropic|gemini"
         )
 
     def to_dict(self) -> dict[str, Any]:
