@@ -149,6 +149,11 @@ def main(argv: list[str] | None = None) -> int:
         "subsample before paying for the full corpus",
     )
     p.add_argument(
+        "--episode-concurrency",
+        type=int,
+        help="episodes coded at once (default: 1 for API judges, 8 for local)",
+    )
+    p.add_argument(
         "--condition",
         help="only code episodes in these conditions (comma-separated). At a "
         "few requests a minute, coding the baseline first is what unblocks "
@@ -845,8 +850,13 @@ def cmd_code(args: argparse.Namespace) -> int:
         codes = _read_codes(out)
     else:
         stats = CodingStats()
+        # A quota-paced judge is already saturated at one episode; a local GPU
+        # judge is not, and its replies are ~8 tokens each.
+        concurrency = args.episode_concurrency or (
+            1 if args.judge in {"gemini", "anthropic"} else 8
+        )
         try:
-            asyncio.run(_code_all(backend, todo, judge_name, stats, out))
+            asyncio.run(_code_all(backend, todo, judge_name, stats, out, concurrency))
         except JudgeUnavailable as exc:
             print(
                 f"\ncoding stopped: {exc}\n"
@@ -935,29 +945,54 @@ def _build_judge(args: argparse.Namespace, config: ExperimentConfig):
     return None, f"unknown judge {args.judge!r}; expected gemini|anthropic|self|mock"
 
 
-async def _code_all(backend, records, judge_name: str, stats: CodingStats, out: Path):
-    """Code episode by episode, flushing each one before starting the next.
+async def _code_all(
+    backend,
+    records,
+    judge_name: str,
+    stats: CodingStats,
+    out: Path,
+    concurrency: int = 1,
+):
+    """Code episodes concurrently, flushing each one as it completes.
 
-    Per-episode rather than per-message so a resumed run never has to reason
-    about a half-coded episode: an episode id is either absent from the file or
+    Per-episode flushing rather than per-message so a resumed run never has to
+    reason about a half-coded episode: an id is either absent from the file or
     complete in it.
+
+    `concurrency` exists because the two kinds of judge have opposite
+    bottlenecks. An API judge is paced by a quota, so one episode at a time is
+    already at the limit and more would just queue. A local judge is a batching
+    GPU: one episode offers twelve short requests, which leaves most of a
+    32-slot batch empty, and coding replies are ~8 tokens each so the pass is
+    almost pure overhead. Several episodes in flight fill it.
     """
     codes: list = []
+    semaphore = asyncio.Semaphore(max(1, concurrency))
+    write_lock = asyncio.Lock()
+    done = 0
+
     with out.open("a", encoding="utf-8", newline="\n") as fh:
-        for index, record in enumerate(records, start=1):
-            batch = await code_episode(
-                backend=backend, record=record, judge_name=judge_name, stats=stats
-            )
-            for code in batch:
-                fh.write(json.dumps(code.to_dict()) + "\n")
-            fh.flush()
-            codes.extend(batch)
-            if index % 5 == 0 or index == len(records):
-                print(
-                    f"  {index}/{len(records)} episodes | {stats.summary()}",
-                    file=sys.stderr,
-                    flush=True,
+
+        async def one(record) -> None:
+            nonlocal done
+            async with semaphore:
+                batch = await code_episode(
+                    backend=backend, record=record, judge_name=judge_name, stats=stats
                 )
+            async with write_lock:
+                for code in batch:
+                    fh.write(json.dumps(code.to_dict()) + "\n")
+                fh.flush()
+                codes.extend(batch)
+                done += 1
+                if done % 5 == 0 or done == len(records):
+                    print(
+                        f"  {done}/{len(records)} episodes | {stats.summary()}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+
+        await asyncio.gather(*(one(r) for r in records))
     return codes
 
 
