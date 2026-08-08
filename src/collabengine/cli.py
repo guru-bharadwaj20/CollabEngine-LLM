@@ -148,6 +148,12 @@ def main(argv: list[str] | None = None) -> int:
         help="code only the first N episodes -- use for the human-validation "
         "subsample before paying for the full corpus",
     )
+    p.add_argument(
+        "--condition",
+        help="only code episodes in these conditions (comma-separated). At a "
+        "few requests a minute, coding the baseline first is what unblocks "
+        "Phase 4 while the sweep conditions are still being labelled.",
+    )
 
     p = sub.add_parser("kappa", help="inter-judge agreement between two coding runs")
     p.add_argument("first", type=Path)
@@ -807,6 +813,14 @@ def cmd_code(args: argparse.Namespace) -> int:
         print(warning, file=sys.stderr)
 
     records = list(TranscriptReader(transcript))
+    if args.condition:
+        wanted = {c.strip() for c in args.condition.split(",") if c.strip()}
+        records = [
+            r
+            for r in records
+            if r.condition in wanted
+            or any(r.condition.startswith(f"{w}:") for w in wanted)
+        ]
     if args.limit:
         records = records[: args.limit]
     if not records:
