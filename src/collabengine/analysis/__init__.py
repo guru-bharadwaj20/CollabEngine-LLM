@@ -5,8 +5,12 @@ performance drop. `interaction` implements it; everything else in this package
 feeds it.
 
   interaction  the causal side -- what ablation says each agent contributed
+  mixed        whether that interaction survives a significance test
   coding       the observational side -- what the transcript says each agent did
   convergent   whether the second predicts the first, which is the whole study
+
+`mixed` needs pandas and statsmodels (the `analysis` extra) and is imported
+lazily, so the rest of the stack works without them.
 """
 
 from collabengine.analysis.coding import (

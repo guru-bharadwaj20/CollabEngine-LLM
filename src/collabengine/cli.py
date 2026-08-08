@@ -445,7 +445,39 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         f"(chance {report.chance_level:.2f})"
     )
     _report_modes(baseline_path, ablation_path)
+    _report_mixed(ablation_path)
     return 0
+
+
+def _report_mixed(ablation_path: Path) -> None:
+    """The significance test for the interaction, with episode as random effect.
+
+    Double-centering gives the effect size; this says whether it is
+    distinguishable from noise once shared instance difficulty is absorbed.
+    """
+    from collabengine.analysis.mixed import fit_interaction
+
+    report = fit_interaction(TranscriptReader(ablation_path))
+    if report.interaction_p is None:
+        print(f"\nmixed-effects interaction: not fitted ({report.note})")
+        return
+
+    print(
+        f"\nmixed-effects interaction: chi2={report.interaction_chi2:.2f} "
+        f"p={report.interaction_p:.4g} over {report.n_observations} observations "
+        f"from {report.n_episodes} episodes"
+    )
+    if report.group_variance is not None:
+        print(f"  episode random-intercept variance: {report.group_variance:.4f}")
+    if not report.converged:
+        print("  WARNING: the fit did not converge; treat the p-value as unreliable",
+              file=sys.stderr)
+    elif not report.significant:
+        print(
+            "  The interaction is not distinguishable from noise. Whatever the "
+            "transcripts look like, ablation does not show agents damaging "
+            "their own components differentially -- which is the claim."
+        )
 
 
 def _report_modes(baseline_path: Path, ablation_path: Path) -> None:
