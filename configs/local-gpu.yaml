@@ -30,8 +30,14 @@ backend:
   # Two ceilings, and the token one is the real constraint: KV cache scales with
   # tokens, not requests. A high sequence cap lets short round-one turns pack in;
   # the token budget is what stops sixteen full-transcript turns from OOMing.
-  max_batch_size: 32
-  max_batch_tokens: 32768  # ~16.4 GB of weights leaves ~6 GB of KV on a 24 GB card
+  # Measured, not derived. A theoretical 144 KiB/token of KV says ~43k tokens
+  # fit beside the weights; benchmarking says otherwise -- batch 8 at a
+  # 1200-token context peaks at 22.0 GiB against 15.3 GiB of weights, i.e.
+  # ~490 KiB per token once transient prefill allocations are counted. Budgeting
+  # on the theoretical figure is what drove batches into OOM-halving, which
+  # looks like a healthy 100%-utilization run from outside and runs 3x slower.
+  max_batch_size: 16
+  max_batch_tokens: 11000
   batch_window_s: 0.05     # invisible next to a multi-second generation
   max_model_len: 8192
   enable_thinking: false   # a <think> block would consume the whole turn budget
