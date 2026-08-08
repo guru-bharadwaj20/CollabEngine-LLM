@@ -48,6 +48,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("calibrate", help="difficulty sweep (Phase 1)")
     p.add_argument("--config", type=Path)
     p.add_argument("--episodes", type=int, default=20)
+    p.add_argument(
+        "--difficulties",
+        help="comma-separated subset of the presets (default: all)",
+    )
 
     p = sub.add_parser("baseline", help="record un-ablated episodes (Phase 2)")
     p.add_argument("--config", type=Path, required=True)
@@ -85,23 +89,80 @@ def _load(path: Path | None) -> ExperimentConfig:
 
 
 def cmd_calibrate(args: argparse.Namespace) -> int:
-    """Sweep difficulty and report the score band per preset.
+    """Sweep difficulty at one agent and at N, and report the collaboration gap.
 
-    If no preset lands between the floor and the ceiling, the task needs
-    redesigning before anything downstream is worth running.
+    Phase 1 is looking for a band, and the band is defined by two edges that a
+    single team size cannot see:
+
+      floor    the model scores near zero however many agents it has, so any
+               ablation effect is measured against noise
+      ceiling  one agent already saturates the task, so a team has nothing to
+               divide and no role can pay for itself
+
+    The operating point wants `team - solo` large and `team` short of 1.0. A
+    preset where four agents match one agent is not a collaboration task, no
+    matter how hard it looks -- and running Phase 2 on it would produce a null
+    result about the harness rather than about emergence.
     """
     config = _load(args.config)
     backend = config.backend.build()
+    print(f"backend: {backend.name}", file=sys.stderr)
 
-    print(f"{'difficulty':<10} {'mean':>7} {'sd':>7} {'min':>6} {'max':>6}")
-    for difficulty in sorted(PRESETS, key=lambda d: PRESETS[d].n_jobs):
-        team = TeamConfig.from_dict({**config.team.to_dict(), "difficulty": difficulty})
-        scores = asyncio.run(_score_many(backend, team, args.episodes))
-        print(
-            f"{difficulty:<10} {statistics.mean(scores):>7.3f} "
-            f"{statistics.pstdev(scores):>7.3f} {min(scores):>6.2f} {max(scores):>6.2f}"
+    n_agents = config.team.n_agents
+    difficulties = sorted(PRESETS, key=lambda d: PRESETS[d].n_jobs)
+    if args.difficulties:
+        wanted = {d.strip() for d in args.difficulties.split(",")}
+        difficulties = [d for d in difficulties if d in wanted]
+
+    print(
+        f"{'difficulty':<10}{'solo':>8}{'sd':>7}"
+        f"{f'{n_agents}-agent':>10}{'sd':>7}{'gap':>8}"
+    )
+    rows: list[tuple[str, float, float]] = []
+    for difficulty in difficulties:
+        base = {**config.team.to_dict(), "difficulty": difficulty}
+        solo = asyncio.run(
+            _score_many(
+                backend, TeamConfig.from_dict({**base, "n_agents": 1}), args.episodes
+            )
         )
+        team = asyncio.run(
+            _score_many(backend, TeamConfig.from_dict(base), args.episodes)
+        )
+        gap = statistics.mean(team) - statistics.mean(solo)
+        rows.append((difficulty, statistics.mean(team), gap))
+        print(
+            f"{difficulty:<10}{statistics.mean(solo):>8.3f}"
+            f"{statistics.pstdev(solo):>7.3f}"
+            f"{statistics.mean(team):>10.3f}{statistics.pstdev(team):>7.3f}"
+            f"{gap:>+8.3f}",
+            flush=True,
+        )
+
+    _recommend(rows)
     return 0
+
+
+def _recommend(rows: list[tuple[str, float, float]]) -> None:
+    """Name an operating point, or say plainly that there is not one."""
+    usable = [r for r in rows if 0.05 < r[1] < 0.95]
+    if not usable:
+        print(
+            "\nNo preset sits off both the floor and the ceiling. Redesign the "
+            "task before Phase 2 -- everything downstream depends on this band "
+            "existing (PLAN.md 4, Phase 1).",
+            file=sys.stderr,
+        )
+        return
+    best = max(usable, key=lambda r: r[2])
+    print(f"\nsuggested operating point: difficulty={best[0]} (gap {best[2]:+.3f})")
+    if best[2] <= 0:
+        print(
+            "  WARNING: the team does not beat one agent anywhere in the band. "
+            "Division of labor cannot pay off on this task as configured, and a "
+            "null ablation result would say nothing about emergence.",
+            file=sys.stderr,
+        )
 
 
 async def _score_many(backend, team: TeamConfig, n: int) -> list[float]:

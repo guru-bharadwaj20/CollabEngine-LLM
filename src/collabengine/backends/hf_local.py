@@ -82,6 +82,7 @@ class HFLocalBackend(LLMBackend):
     _queue: Any = field(default=None, init=False, repr=False)
     _worker: Any = field(default=None, init=False, repr=False)
     _load_lock: Any = field(default=None, init=False, repr=False)
+    _loop: Any = field(default=None, init=False, repr=False)
     _stats: dict = field(default_factory=dict, init=False, repr=False)
 
     # ---------------------------------------------------------------- loading
@@ -134,11 +135,20 @@ class HFLocalBackend(LLMBackend):
     # ---------------------------------------------------------------- queueing
 
     async def generate(self, request: GenRequest) -> GenResponse:
-        await self._ensure_loaded()
         loop = asyncio.get_running_loop()
-
-        if self._queue is None:
+        if self._loop is not loop:
+            # A backend instance outlives the loop it was first used on: the CLI
+            # builds it once and `calibrate` calls asyncio.run per difficulty.
+            # Queues and locks bind to a loop at first use, so carrying them
+            # across would raise "attached to a different loop" partway into a
+            # sweep. The weights, which are the expensive part, are kept.
+            self._loop = loop
             self._queue = asyncio.Queue()
+            self._worker = None
+            self._load_lock = None
+
+        await self._ensure_loaded()
+
         if self._worker is None or self._worker.done():
             self._worker = loop.create_task(self._run_batches())
 

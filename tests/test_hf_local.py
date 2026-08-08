@@ -92,6 +92,23 @@ async def test_the_worker_survives_a_failed_batch() -> None:
     assert ok.ok and ok.text == "reply-99"
 
 
+def test_the_backend_survives_being_reused_across_event_loops() -> None:
+    """`calibrate` builds the backend once and calls asyncio.run per difficulty.
+
+    Queues and locks bind to a loop at first use, so a backend that cached them
+    would fail on the second difficulty -- after the weights were loaded and the
+    first sweep had already been paid for.
+    """
+    backend = FakeHF(max_batch_size=4)
+
+    first = asyncio.run(backend.generate(_req(1)))
+    second = asyncio.run(backend.generate(_req(2)))
+
+    assert first.text == "reply-1"
+    assert second.text == "reply-2"
+    assert backend.batches == [1, 1]
+
+
 def test_mixed_sampling_parameters_are_never_batched_together() -> None:
     """`generate` takes one temperature for the whole call, so a mixed batch
     would silently apply one episode's sampling to another's turn."""
