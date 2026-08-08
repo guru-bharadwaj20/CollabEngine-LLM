@@ -41,6 +41,7 @@ from collabengine.analysis import (
     code_episode,
     cohens_kappa,
     convergent_validity,
+    kappa_interval,
     summarize,
 )
 from collabengine.analysis.coding import CodingStats, JudgeUnavailable
@@ -1075,17 +1076,27 @@ def cmd_kappa(args: argparse.Namespace) -> int:
         print("the two files share no coded messages", file=sys.stderr)
         return 2
 
-    kappa = cohens_kappa(
-        [first[k].action for k in shared], [second[k].action for k in shared]
-    )
-    raw = sum(1 for k in shared if first[k].action is second[k].action) / len(shared)
+    left = [first[k].action for k in shared]
+    right = [second[k].action for k in shared]
+    kappa = cohens_kappa(left, right)
+    lo, hi = kappa_interval(left, right)
+    raw = sum(1 for a, b in zip(left, right) if a is b) / len(shared)
 
     print(f"messages compared: {len(shared)}")
     print(f"raw agreement:     {raw:.3f}")
-    print(f"Cohen's kappa:     {kappa:.3f}")
-    if kappa < 0.78:
+    print(f"Cohen's kappa:     {kappa:.3f}  95% CI [{lo:.2f}, {hi:.2f}]")
+
+    if len(shared) < 100:
         print(
-            "  Below the 0.78 reported by 2604.00026. Report this number "
+            f"\n  {len(shared)} messages is far too few to characterise a judge. "
+            "PLAN.md asks for a ~500-message validation subsample; this is a "
+            "smoke test of the coding path, and the interval above shows how "
+            "little it constrains. Do not report it as a reliability figure.",
+            file=sys.stderr,
+        )
+    elif kappa < 0.78:
+        print(
+            "\n  Below the 0.78 reported by 2604.00026. Report this number "
             "alongside any claim these labels support.",
             file=sys.stderr,
         )

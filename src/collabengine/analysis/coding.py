@@ -383,6 +383,38 @@ def cohens_kappa(a: Sequence[ActionType], b: Sequence[ActionType]) -> float:
     return float((observed - expected) / (1 - expected))
 
 
+def kappa_interval(
+    a: Sequence[ActionType],
+    b: Sequence[ActionType],
+    *,
+    n_boot: int = 2000,
+    seed: int = 0,
+) -> tuple[float, float]:
+    """Bootstrap 95% interval for Cohen's kappa.
+
+    A point estimate of kappa carries no information about how many messages it
+    rests on, and the sample available here is set by a judge's free quota
+    rather than by design. Resampling message pairs with replacement gives the
+    width directly, which is the difference between "the judges agree" and "we
+    cannot tell whether the judges agree".
+    """
+    if len(a) != len(b):
+        raise ValueError("judges must have coded the same messages")
+    if len(a) < 2:
+        return (float("nan"), float("nan"))
+
+    rng = np.random.default_rng(seed)
+    n = len(a)
+    estimates = np.empty(n_boot)
+    for i in range(n_boot):
+        idx = rng.integers(0, n, size=n)
+        estimates[i] = cohens_kappa([a[j] for j in idx], [b[j] for j in idx])
+    return (
+        float(np.percentile(estimates, 2.5)),
+        float(np.percentile(estimates, 97.5)),
+    )
+
+
 def ownership_from_codes(
     codes: Iterable[MessageCode],
     *,
