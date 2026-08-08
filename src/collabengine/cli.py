@@ -56,8 +56,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--config", type=Path, required=True)
     p.add_argument(
         "--modes",
-        default="live,frozen_excise,frozen_replay,capacity",
-        help="comma-separated subset of the ablation modes",
+        default="live,frozen_excise,frozen_replay,capacity,random_message",
+        help=(
+            "comma-separated subset of: live, frozen_excise, frozen_replay, "
+            "capacity, random_message"
+        ),
     )
 
     p = sub.add_parser("analyze", help="interaction report from transcripts")
@@ -202,6 +205,18 @@ def cmd_ablate(args: argparse.Namespace) -> int:
                         f"frozen_excise:{agent}:{seed}",
                         lambda rec=record, agent=agent: _immediate(
                             frozen_excise(rec, agent)
+                        ),
+                    )
+                )
+            if "random_message" in modes:
+                # The volume-matched control for frozen_excise. Also free, and
+                # excision drops are uninterpretable without it: dropping k
+                # messages shortens the context whoever wrote them.
+                plans.append(
+                    RunPlan(
+                        f"random_message:{agent}:{seed}",
+                        lambda rec=record, agent=agent: _immediate(
+                            random_message_control(rec, agent, seed=config.seed_start)
                         ),
                     )
                 )
