@@ -43,7 +43,7 @@ from collabengine.analysis import (
     convergent_validity,
     summarize,
 )
-from collabengine.analysis.coding import CodingStats
+from collabengine.analysis.coding import CodingStats, JudgeUnavailable
 from collabengine.backends.mock import MockBackend, MockMode
 from collabengine.config import ExperimentConfig
 from collabengine.orchestrator import run_episode
@@ -845,7 +845,19 @@ def cmd_code(args: argparse.Namespace) -> int:
         codes = _read_codes(out)
     else:
         stats = CodingStats()
-        codes = asyncio.run(_code_all(backend, todo, judge_name, stats, out))
+        try:
+            asyncio.run(_code_all(backend, todo, judge_name, stats, out))
+        except JudgeUnavailable as exc:
+            print(
+                f"\ncoding stopped: {exc}\n"
+                f"  {stats.summary()}\n"
+                f"  Episodes already written to {out} are complete and will be "
+                "skipped on the next run. Nothing partial was recorded -- a "
+                "judge that has stopped answering produces 'other' for every "
+                "message, which is indistinguishable from real data once saved.",
+                file=sys.stderr,
+            )
+            return 2
         print(f"coded {len(todo)} episodes -> {out}: {stats.summary()}")
         codes = _read_codes(out)
 
