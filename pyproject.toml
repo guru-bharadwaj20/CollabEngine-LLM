@@ -2,7 +2,10 @@
 name = "collabengine"
 version = "0.1.0"
 description = "Causally verifying emergent division of labor in same-model LLM agent teams"
-requires-python = ">=3.11"
+# 3.10 rather than 3.11: the CUDA box this runs on ships 3.10 with torch/
+# transformers already built against it, and nothing in the source uses 3.11-only
+# syntax. Rebuilding that stack for one minor version would buy nothing.
+requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.26",
     "pyyaml>=6.0",

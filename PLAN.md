@@ -38,28 +38,28 @@ This single change is what separates a publishable finding from a restatement of
 
 ## 1. Hardware reality check — read before anything else
 
-Your premise: *"One quantized 7–8B model serving all agent turns fits 24GB easily."* Correct in general. **This machine has no such GPU.**
+Your premise: *"One quantized 7–8B model serving all agent turns fits 24GB easily."* Correct — and this machine is that machine.
 
-| | Detected |
+| | Detected (2026-08-08) |
 |---|---|
-| CPU | Intel Core i3-5005U @ 2.00 GHz — **2 cores / 4 threads**, Broadwell (2015) |
-| RAM | **7.9 GB total** |
-| GPU | Intel HD 5500 (integrated) + AMD Radeon R5 M330 (2 GB) — **no CUDA, no usable compute** |
+| CPU | Intel Core i9-14900 — **24 cores / 32 threads**, Raptor Lake |
+| RAM | **128 GB** |
+| GPU | **NVIDIA RTX 4500 Ada Generation, 24 GB GDDR6** — driver 595.95, CUDA 13.2, `torch.cuda.is_available() == True` |
 
-A 7–8B model at Q4 is ~4.5 GB of weights against 7.9 GB of system RAM shared with Windows, on two Broadwell cores. Realistic throughput: **~1–2 tokens/sec**, single-stream, no batching.
+> **This section previously described an i3-5005U with 7.9 GB of RAM and no CUDA device, and on that basis routed every real number to a rented GPU.** That hardware is not what the project is running on. The correction matters beyond bookkeeping: it moves Phases 1–4 from "rent a box first" to "run tonight," and it is why the phase list below no longer gates on a rental. What the old constraint produced — a backend abstraction, a mock that exercises the full pipeline for free, and resumable runs — stays, because each is worth having for its own reasons.
 
-**Sizing the experiment against that:**
+**Sizing the experiment:**
 
 - One episode ≈ 4 agents × ~10 turns × ~300 output tokens ≈ **12k output tokens**
 - Statistical power for an interaction effect ≈ **100 episodes per condition**
 - Conditions ≈ 1 baseline + (4 agents × 2 ablation modes) + controls ≈ **~12**
 - Total ≈ **~14M output tokens**
 
-At 1.5 tok/s that is **~108 days of continuous generation**. On a rented 24 GB GPU with vLLM and batched serving (~1,500 aggregate output tok/s), it is **~2.5 hours** — call it 10–20 GPU-hours including failed runs and reruns.
+An 8B model at bf16 is ~16.4 GB of weights, leaving ~7 GB for KV cache on a 24 GB card — enough for a batch of 16–32 at 4–8k context. Sustained batched throughput in that regime is a few hundred to ~1k aggregate output tok/s, putting the full grid at **roughly 4–12 hours of local wall clock**. Overnight, at zero marginal cost.
 
-**Decision: develop locally, execute remotely.**
-- **Local (this laptop):** harness, prompts, grader, analysis, all plumbing — debugged against a 0.6–1.5B model (Qwen3-0.6B, Llama-3.2-1B) at Q4 via llama.cpp. Enough to prove the pipeline runs end to end. It will produce garbage science; that is fine, it is a smoke test.
-- **Remote (rented):** every number that goes in the writeup. RunPod / Vast.ai RTX 4090 24 GB at ~$0.35–0.70/hr → **the entire experiment costs roughly $10–30.** This is not a real constraint; it is a rounding error. Do not contort the science to fit the i3.
+**Decision: develop and execute locally.** Rental is no longer on the critical path. It returns only for the Phase 4 robustness sweep (2–3 model families × 3–5 team sizes), which is the one part of the plan that genuinely wants more than one card, and even that is a convenience rather than a blocker.
+
+**Serving caveat — Windows.** vLLM ships no supported Windows build, so the batching server the plan assumed is not directly available. Two paths exist: vLLM inside the WSL2 Ubuntu instance already present on this box, or in-process generation via `transformers` on CUDA. The phases below run against `backends/hf_local.py` — a CUDA `transformers` backend that micro-batches concurrent turns — which keeps the OpenAI-compatible backend intact and unused-but-ready for a WSL vLLM server or a rented box. **The backend abstraction earns its keep here:** switching between them is a config line, exactly as Phase 0 required.
 
 The "one model, many conversation contexts" insight stays exactly right — and it is more than a convenience. It is your **critical control**: identical weights across all agents means observed differentiation *cannot* come from model heterogeneity. Note that 2604.00026 used 7 *different* LLMs, so their differentiation is partly confounded by model identity. Yours is not. **That is a second, independent novelty axis — name it in the paper.**
 
@@ -126,8 +126,8 @@ Avoid SWE-bench-style tasks at this model scale; the failure floor swamps the ef
 - Calibration: single-agent baseline and 4-agent baseline across difficulty, to find the band where the task is hard enough to need collaboration but not so hard the model floors out. **If there is no such band, stop and redesign the task — everything downstream depends on it.**
 - **Deliverable:** difficulty curve plot; a chosen operating point.
 
-### Phase 2 — Emergence measurement (first GPU rental, ~1 week)
-- Move to rented 24 GB + vLLM + 7–8B (Qwen3-8B or Llama-3.1-8B-Instruct). Batch aggressively.
+### Phase 2 — Emergence measurement (local GPU, ~1 week)
+- Local 24 GB + 7–8B (Qwen3-8B or Llama-3.1-8B-Instruct). Batch aggressively — this is the difference between hours and days, whether the batching happens in vLLM or in `hf_local`.
 - Run the symmetry-breaking sweep (C3) × baseline episodes.
 - Behavioral coding of transcripts into action-type labels. **Use a frontier API model as the judge** — a local 7–8B is too weak to code reliably. Two judges from different families, blind to condition, human-validated on a ~500-message subsample, report Cohen's κ (2604.00026 got 0.78; match or beat it). Bulk coding with Claude Haiku 4.5 on ~14k messages runs roughly $5.
 - Metrics: per-agent action distributions, pairwise JS divergence, role stability within episode, role consistency across seeds — each against a **permutation null**.
@@ -153,7 +153,7 @@ The question that makes the paper matter: **does the transcript-derived role lab
 - Preregister Phases 3–4 hypotheses **before** running them (OSF). Cheap, and it is what makes the interaction test credible rather than post-hoc.
 - Release: harness, task generator, all transcripts, analysis notebooks. The transcript corpus alone has standalone value.
 
-**Total: ~8 weeks part-time, ~$30–60 of GPU, ~$10 of judge API.**
+**Total: ~8 weeks part-time, $0 of GPU (local card), ~$10 of judge API.**
 
 ---
 
@@ -161,8 +161,9 @@ The question that makes the paper matter: **does the transcript-derived role lab
 
 | Layer | Choice | Note |
 |---|---|---|
-| Serving (remote) | vLLM, OpenAI-compatible endpoint | Batching is what makes this tractable — do not use one-request-at-a-time |
-| Serving (local dev) | llama.cpp + Qwen3-0.6B/Llama-3.2-1B Q4 | Pipeline debugging only |
+| Serving (primary) | `hf_local` — `transformers` on CUDA with dynamic micro-batching | Runs on Windows, where vLLM does not. Batching is what makes this tractable — do not use one-request-at-a-time |
+| Serving (alternate) | vLLM, OpenAI-compatible endpoint | For a WSL2 server or a rented box. Reached by changing `backend.kind`, nothing else |
+| Serving (free) | `mock` | Full-pipeline debugging and instrument validation with no GPU at all |
 | Models | Qwen3-8B, Llama-3.1-8B-Instruct, Mistral-7B | ≥2 families for Phase 4 robustness |
 | Judge | Frontier API model, 2 families, blind to condition | Local models are not adequate judges |
 | Orchestration | Plain Python. No LangGraph/AutoGen/CrewAI | Frameworks impose role structure — the exact thing you are trying to observe emerging. A hidden prompt template would invalidate the whole result |
