@@ -16,8 +16,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import statistics
 import sys
+import time
+from dataclasses import replace
 from pathlib import Path
 
 from collabengine.ablation import (
@@ -26,8 +29,17 @@ from collabengine.ablation import (
     frozen_replay,
     live_ablation,
 )
-from collabengine.ablation.modes import propagation_index
-from collabengine.analysis import AblationMatrix, analyze_interaction
+from collabengine.ablation.modes import propagation_index, random_message_control
+from collabengine.analysis import (
+    AblationMatrix,
+    MessageCode,
+    analyze_interaction,
+    code_episode,
+    cohens_kappa,
+    convergent_validity,
+    summarize,
+)
+from collabengine.analysis.coding import CodingStats
 from collabengine.backends.mock import MockBackend, MockMode
 from collabengine.config import ExperimentConfig
 from collabengine.orchestrator import run_episode
@@ -39,6 +51,26 @@ from collabengine.transcripts.store import TranscriptReader
 
 BASELINE = "baseline.jsonl"
 ABLATION = "ablation.jsonl"
+_ALL_MODES = frozenset(
+    {"live", "frozen_excise", "frozen_replay", "capacity", "random_message"}
+)
+
+
+def _run_id(condition: str, difficulty: str, seed: int) -> str:
+    """The id `run_episode` will stamp on the record it produces.
+
+    Resume compares plan ids against the ids already in the transcript, so a
+    plan id that does not match its own record means the work is never skipped
+    and the whole grid re-runs on restart. Deriving both from one function is
+    what keeps them in step; `tests/test_pipeline_cli.py` asserts they agree for
+    every mode.
+    """
+    return f"{condition}:{difficulty}:{seed}"
+
+
+def _derived_id(mode: str, agent: str, source_episode_id: str) -> str:
+    """The id the frozen-transcript modes stamp on their derived records."""
+    return f"{mode}:{agent}:{source_episode_id}"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,6 +103,45 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--config", type=Path, required=True)
     p.add_argument("--ownership", type=Path, help="JSON map of component -> agent id")
 
+    p = sub.add_parser(
+        "pipeline",
+        help="run every GPU phase back to back in one process (keeps the card busy)",
+    )
+    p.add_argument("--config", type=Path, required=True)
+    p.add_argument("--episodes", type=int, help="override n_episodes")
+    p.add_argument(
+        "--phases",
+        default="baseline,symmetry,c2,ablate",
+        help="comma-separated subset of: baseline, symmetry, c2, ablate",
+    )
+
+    p = sub.add_parser("code", help="behavioral coding of transcripts (Phase 2)")
+    p.add_argument("--config", type=Path, required=True)
+    p.add_argument("--transcript", type=Path, help=f"default: <run_dir>/{BASELINE}")
+    p.add_argument("--out", type=Path, help="default: <run_dir>/codes.<judge>.jsonl")
+    p.add_argument(
+        "--judge",
+        default="anthropic",
+        help="anthropic | self (the config's own backend) | mock",
+    )
+    p.add_argument("--judge-model", default=None, help="override the judge model id")
+    p.add_argument("--judge-name", default=None, help="label recorded on each code")
+    p.add_argument(
+        "--limit",
+        type=int,
+        help="code only the first N episodes -- use for the human-validation "
+        "subsample before paying for the full corpus",
+    )
+
+    p = sub.add_parser("kappa", help="inter-judge agreement between two coding runs")
+    p.add_argument("first", type=Path)
+    p.add_argument("second", type=Path)
+
+    p = sub.add_parser("converge", help="do labels predict contribution? (Phase 4)")
+    p.add_argument("--config", type=Path, required=True)
+    p.add_argument("--codes", type=Path, required=True)
+    p.add_argument("--permutations", type=int, default=2000)
+
     p = sub.add_parser("selftest", help="validate the instrument on mock worlds")
     p.add_argument("--episodes", type=int, default=30)
 
@@ -80,6 +151,10 @@ def main(argv: list[str] | None = None) -> int:
         "baseline": cmd_baseline,
         "ablate": cmd_ablate,
         "analyze": cmd_analyze,
+        "pipeline": cmd_pipeline,
+        "code": cmd_code,
+        "kappa": cmd_kappa,
+        "converge": cmd_converge,
         "selftest": cmd_selftest,
     }[args.command](args)
 
@@ -219,16 +294,43 @@ def cmd_ablate(args: argparse.Namespace) -> int:
         print(f"no baseline at {baseline_path}; run `baseline` first", file=sys.stderr)
         return 2
 
-    records = {r.instance_seed: r for r in TranscriptReader(baseline_path)}
+    records = [r for r in TranscriptReader(baseline_path) if r.condition == "baseline"]
     modes = {m.strip() for m in args.modes.split(",") if m.strip()}
     agents = [a.agent_id for a in build_team(config.team, config.seed_start)]
+    plans = _ablation_plans(config, backend, records, modes)
 
+    stats = asyncio.run(
+        run_plan(
+            plans,
+            out_path=config.run_dir / ABLATION,
+            max_concurrency=config.max_concurrency,
+            on_progress=lambda s: print(f"  {s.summary()}", file=sys.stderr),
+        )
+    )
+    print(f"ablation -> {config.run_dir / ABLATION}: {stats.summary()}")
+    _report_propagation(records, agents)
+    return 0 if stats.failed == 0 else 1
+
+
+def _ablation_plans(config, backend, records, modes: set[str]) -> list[RunPlan]:
+    """The Phase 3 condition grid over a recorded baseline.
+
+    `frozen_excise` and `random_message` cost zero model calls, so they run over
+    every episode rather than a sampled subset -- and the second is what makes
+    the first interpretable, since excising k messages also shortens the context.
+    """
+    agents = [a.agent_id for a in build_team(config.team, config.seed_start)]
     plans: list[RunPlan] = []
-    for seed, record in records.items():
+
+    difficulty = config.team.difficulty
+    capacity_size = max(1, config.team.n_agents - 1)
+
+    for record in records:
+        seed = record.instance_seed
         if "capacity" in modes:
             plans.append(
                 RunPlan(
-                    f"capacity:{seed}",
+                    _run_id(f"capacity:{capacity_size}", difficulty, seed),
                     lambda seed=seed: capacity_control(
                         backend=backend, config=config.team, episode_seed=seed
                     ),
@@ -238,7 +340,7 @@ def cmd_ablate(args: argparse.Namespace) -> int:
             if "live" in modes:
                 plans.append(
                     RunPlan(
-                        f"live:{agent}:{seed}",
+                        _run_id(f"live:{agent}", difficulty, seed),
                         lambda seed=seed, agent=agent: live_ablation(
                             backend=backend,
                             config=config.team,
@@ -250,7 +352,7 @@ def cmd_ablate(args: argparse.Namespace) -> int:
             if "frozen_replay" in modes:
                 plans.append(
                     RunPlan(
-                        f"frozen_replay:{agent}:{seed}",
+                        _derived_id("frozen_replay", agent, record.episode_id),
                         lambda rec=record, agent=agent: frozen_replay(
                             backend=backend,
                             record=rec,
@@ -263,7 +365,7 @@ def cmd_ablate(args: argparse.Namespace) -> int:
                 # Free: no model calls, so it runs over every episode.
                 plans.append(
                     RunPlan(
-                        f"frozen_excise:{agent}:{seed}",
+                        _derived_id("frozen_excise", agent, record.episode_id),
                         lambda rec=record, agent=agent: _immediate(
                             frozen_excise(rec, agent)
                         ),
@@ -275,24 +377,13 @@ def cmd_ablate(args: argparse.Namespace) -> int:
                 # messages shortens the context whoever wrote them.
                 plans.append(
                     RunPlan(
-                        f"random_message:{agent}:{seed}",
+                        _derived_id("random_message", agent, record.episode_id),
                         lambda rec=record, agent=agent: _immediate(
                             random_message_control(rec, agent, seed=config.seed_start)
                         ),
                     )
                 )
-
-    stats = asyncio.run(
-        run_plan(
-            plans,
-            out_path=config.run_dir / ABLATION,
-            max_concurrency=config.max_concurrency,
-            on_progress=lambda s: print(f"  {s.summary()}", file=sys.stderr),
-        )
-    )
-    print(f"ablation -> {config.run_dir / ABLATION}: {stats.summary()}")
-    _report_propagation(records.values(), agents)
-    return 0 if stats.failed == 0 else 1
+    return plans
 
 
 async def _immediate(value):
@@ -326,25 +417,10 @@ def cmd_analyze(args: argparse.Namespace) -> int:
             print(f"missing {path}", file=sys.stderr)
             return 2
 
-    base = _component_means(TranscriptReader(baseline_path))
-    per_agent: dict[str, dict[Component, list[float]]] = {}
-    for record in TranscriptReader(ablation_path):
-        if not record.condition.startswith("live:"):
-            continue
-        agent = record.condition.split(":", 1)[1]
-        bucket = per_agent.setdefault(agent, {c: [] for c in ALL_COMPONENTS})
-        for comp, val in record.grade.per_component.items():
-            bucket[comp].append(val)
-
-    if not per_agent:
+    matrix = _live_matrix(baseline_path, ablation_path)
+    if matrix is None:
         print("no live-ablation records found", file=sys.stderr)
         return 2
-
-    ablated = {
-        agent: {c: statistics.mean(v) for c, v in comps.items() if v}
-        for agent, comps in per_agent.items()
-    }
-    matrix = AblationMatrix.from_means(base, ablated)
 
     ownership = None
     if args.ownership:
@@ -367,6 +443,367 @@ def _component_means(reader: TranscriptReader) -> dict[Component, float]:
         for comp, val in record.grade.per_component.items():
             acc[comp].append(val)
     return {c: (statistics.mean(v) if v else 0.0) for c, v in acc.items()}
+
+
+def cmd_pipeline(args: argparse.Namespace) -> int:
+    """Run every GPU phase back to back in one process.
+
+    Three things this does that running the subcommands in sequence does not,
+    each of which is wall-clock rather than cosmetic:
+
+    * **The weights load once.** Every separate invocation pays ~15 s to
+      re-materialize 16 GB from disk, and the card sits idle throughout.
+    * **Independent phases share one queue.** Baseline, the symmetry sweep and
+      the fixed-order control do not depend on each other, so they are submitted
+      as a single work list. A batching backend runs at its worst when a phase is
+      draining -- the last few episodes of a hundred leave a batch of two on a
+      card sized for sixteen. Merging removes three of those drains.
+    * **No human in the loop between phases.** The ablation grid starts the
+      instant the baseline it reads from is on disk.
+
+    Ablation cannot merge into the first stage: it is defined over recorded
+    transcripts, so it has to wait for them.
+    """
+    config = ExperimentConfig.load(args.config)
+    if args.episodes:
+        config.n_episodes = args.episodes
+    backend = config.backend.build()
+    phases = {p.strip() for p in args.phases.split(",") if p.strip()}
+    config.save(config.run_dir / "config.resolved.yaml")
+
+    from collabengine.backends.hf_local import cuda_report
+
+    print(f"device: {cuda_report()}", file=sys.stderr)
+    print(f"run dir: {config.run_dir} | episodes: {config.n_episodes}", file=sys.stderr)
+
+    return asyncio.run(_pipeline(config, backend, phases))
+
+
+async def _pipeline(config: ExperimentConfig, backend, phases: set[str]) -> int:
+    started = time.monotonic()
+    baseline_path = config.run_dir / BASELINE
+    failures = 0
+
+    stage1: list[RunPlan] = []
+    if "baseline" in phases:
+        stage1 += _baseline_plans(config, backend)
+    if "symmetry" in phases:
+        stage1 += _symmetry_plans(config, backend)
+    if "c2" in phases:
+        stage1 += _fixed_order_plans(config, backend)
+
+    if stage1:
+        print(f"\n== stage 1: {len(stage1)} episodes ==", file=sys.stderr)
+        stats = await run_plan(
+            stage1,
+            out_path=baseline_path,
+            max_concurrency=config.max_concurrency,
+            on_progress=lambda s: print(f"  {s.summary()}", file=sys.stderr),
+        )
+        failures += stats.failed
+        print(f"stage 1 -> {baseline_path}: {stats.summary()}")
+
+    if "ablate" in phases:
+        if not baseline_path.exists():
+            print("no baseline to ablate; include the baseline phase", file=sys.stderr)
+            return 2
+        records = [
+            r for r in TranscriptReader(baseline_path) if r.condition == "baseline"
+        ]
+        plans = _ablation_plans(config, backend, records, _ALL_MODES)
+        print(f"\n== stage 2: {len(plans)} ablation runs ==", file=sys.stderr)
+        stats = await run_plan(
+            plans,
+            out_path=config.run_dir / ABLATION,
+            max_concurrency=config.max_concurrency,
+            on_progress=lambda s: print(f"  {s.summary()}", file=sys.stderr),
+        )
+        failures += stats.failed
+        print(f"stage 2 -> {config.run_dir / ABLATION}: {stats.summary()}")
+        agents = [a.agent_id for a in build_team(config.team, config.seed_start)]
+        _report_propagation(records, agents)
+
+    _report_throughput(config.run_dir, time.monotonic() - started)
+    return 0 if failures == 0 else 1
+
+
+def _baseline_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
+    return [
+        RunPlan(
+            episode_id=f"baseline:{config.team.difficulty}:{seed}",
+            factory=(
+                lambda seed=seed: run_episode(
+                    backend=backend,
+                    config=config.team,
+                    episode_seed=seed,
+                    condition="baseline",
+                )
+            ),
+        )
+        for seed in config.seeds
+    ]
+
+
+def _symmetry_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
+    """The C3 sweep: does minimal asymmetry amplify into stable roles?"""
+    from collabengine.orchestrator.team import SymmetryBreaking
+
+    plans: list[RunPlan] = []
+    for level in SymmetryBreaking:
+        if level is config.team.symmetry:
+            continue  # already covered by the baseline condition
+        team = replace(config.team, symmetry=level)
+        plans += [
+            RunPlan(
+                episode_id=_run_id(
+                    f"symmetry:{level.value}", config.team.difficulty, seed
+                ),
+                factory=(
+                    lambda seed=seed, team=team, level=level: run_episode(
+                        backend=backend,
+                        config=team,
+                        episode_seed=seed,
+                        condition=f"symmetry:{level.value}",
+                    )
+                ),
+            )
+            for seed in config.seeds
+        ]
+    return plans
+
+
+def _fixed_order_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
+    """The C2 control: with speaking order frozen, do roles track slot or identity?
+
+    PLAN.md calls this the highest-information-per-GPU-hour test in the project,
+    because a positional world scores 0.50 against a 0.25 baseline under a fixed
+    order -- close enough to be mistaken for real specialization.
+    """
+    team = replace(config.team, randomize_turn_order=False)
+    return [
+        RunPlan(
+            episode_id=_run_id("fixed_order", config.team.difficulty, seed),
+            factory=(
+                lambda seed=seed: run_episode(
+                    backend=backend,
+                    config=team,
+                    episode_seed=seed,
+                    condition="fixed_order",
+                )
+            ),
+        )
+        for seed in config.seeds
+    ]
+
+
+def _report_throughput(run_dir: Path, elapsed_s: float) -> None:
+    """State the achieved rate, so the next run can be sized from data."""
+    tokens = 0
+    episodes = 0
+    for name in (BASELINE, ABLATION):
+        path = run_dir / name
+        if not path.exists():
+            continue
+        for record in TranscriptReader(path):
+            episodes += 1
+            tokens += sum(
+                int(m.meta.get("completion_tokens", 0) or 0) for m in record.messages
+            )
+    if elapsed_s <= 0:
+        return
+    print(
+        f"\ncorpus: {episodes} episodes, {tokens:,} output tokens | "
+        f"{elapsed_s / 60:.1f} min this run | {tokens / elapsed_s:.0f} tok/s aggregate"
+    )
+
+
+def cmd_code(args: argparse.Namespace) -> int:
+    """Code a recorded corpus into per-message action labels.
+
+    The judge is chosen separately from the agents' backend and defaults to a
+    frontier model, because PLAN.md Phase 2 is explicit that a local 7-8B is not
+    an adequate judge. `--judge self` reuses the config's backend anyway, which
+    is the right call for a smoke test and the wrong one for a reported number.
+    """
+    config = ExperimentConfig.load(args.config)
+    transcript = args.transcript or (config.run_dir / BASELINE)
+    if not transcript.exists():
+        print(f"no transcript at {transcript}; run `baseline` first", file=sys.stderr)
+        return 2
+
+    judge_name = args.judge_name or args.judge
+    backend, warning = _build_judge(args, config)
+    if backend is None:
+        print(warning, file=sys.stderr)
+        return 2
+    if warning:
+        print(warning, file=sys.stderr)
+
+    records = list(TranscriptReader(transcript))
+    if args.limit:
+        records = records[: args.limit]
+    if not records:
+        print(f"{transcript} contains no episodes", file=sys.stderr)
+        return 2
+
+    stats = CodingStats()
+    codes = asyncio.run(_code_all(backend, records, judge_name, stats))
+
+    out = args.out or (config.run_dir / f"codes.{judge_name}.jsonl")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8", newline="\n") as fh:
+        for code in codes:
+            fh.write(json.dumps(code.to_dict()) + "\n")
+
+    print(f"coded {len(records)} episodes -> {out}: {stats.summary()}")
+    report = summarize(codes)
+    print(json.dumps(report.to_dict(), indent=2))
+    print(
+        f"\ndifferentiation {report.differentiation:.4f} vs null "
+        f"{report.null_mean:.4f} (p={report.p_value:.4f}) | "
+        f"consistency {report.consistency:.3f}"
+    )
+    if report.p_value > 0.05:
+        print(
+            "  Differentiation is indistinguishable from the permutation null: "
+            "on this corpus the transcripts do not show role structure, so a "
+            "Phase 4 convergence result would have nothing to converge on.",
+            file=sys.stderr,
+        )
+    if stats.unparseable > stats.coded * 0.05:
+        print(
+            f"  WARNING: {stats.unparseable} replies were unparseable and fell "
+            "back to 'other'. Check the judge model and prompt before trusting "
+            "these labels.",
+            file=sys.stderr,
+        )
+    return 0
+
+
+def _build_judge(args: argparse.Namespace, config: ExperimentConfig):
+    """Returns (backend, warning). A None backend means refuse to run."""
+    if args.judge == "self":
+        return config.backend.build(), (
+            "judge: reusing the experiment backend. PLAN.md Phase 2 rates a "
+            "local 7-8B as an inadequate judge -- smoke tests only."
+        )
+    if args.judge == "mock":
+        return MockBackend(mode=MockMode.SPECIALIZED), "judge: mock (labels are fake)"
+    if args.judge == "anthropic":
+        from collabengine.backends.anthropic_judge import (
+            DEFAULT_JUDGE_MODEL,
+            AnthropicJudgeBackend,
+        )
+
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            return None, (
+                "no ANTHROPIC_API_KEY set, so the frontier judge cannot run.\n"
+                "Set the key, or pass `--judge self` to code with the local "
+                "model (adequate for a pipeline smoke test, not for a reported "
+                "kappa or any Phase 4 number)."
+            )
+        return (
+            AnthropicJudgeBackend(model=args.judge_model or DEFAULT_JUDGE_MODEL),
+            None,
+        )
+    return None, f"unknown judge {args.judge!r}; expected anthropic|self|mock"
+
+
+async def _code_all(backend, records, judge_name: str, stats: CodingStats):
+    codes: list = []
+    for record in records:
+        codes.extend(
+            await code_episode(
+                backend=backend, record=record, judge_name=judge_name, stats=stats
+            )
+        )
+    return codes
+
+
+def cmd_kappa(args: argparse.Namespace) -> int:
+    """Cohen's kappa between two coding runs over the same messages.
+
+    2604.00026 reported 0.78. Below that, the labels are too noisy to carry a
+    convergent-validity claim and the honest move is to report the kappa and
+    say so rather than to report the correlation anyway.
+    """
+    first = {c.key: c for c in _read_codes(args.first)}
+    second = {c.key: c for c in _read_codes(args.second)}
+    shared = sorted(set(first) & set(second))
+
+    if not shared:
+        print("the two files share no coded messages", file=sys.stderr)
+        return 2
+
+    kappa = cohens_kappa(
+        [first[k].action for k in shared], [second[k].action for k in shared]
+    )
+    raw = sum(1 for k in shared if first[k].action is second[k].action) / len(shared)
+
+    print(f"messages compared: {len(shared)}")
+    print(f"raw agreement:     {raw:.3f}")
+    print(f"Cohen's kappa:     {kappa:.3f}")
+    if kappa < 0.78:
+        print(
+            "  Below the 0.78 reported by 2604.00026. Report this number "
+            "alongside any claim these labels support.",
+            file=sys.stderr,
+        )
+    return 0
+
+
+def _read_codes(path: Path) -> list[MessageCode]:
+    with Path(path).open("r", encoding="utf-8") as fh:
+        return [MessageCode.from_dict(json.loads(line)) for line in fh if line.strip()]
+
+
+def cmd_converge(args: argparse.Namespace) -> int:
+    """Phase 4: do the transcript labels predict causal contribution?
+
+    Either answer is a result. A weak correlation is the stronger form of the
+    project's thesis and independently replicates *Agents that Matter*' finding
+    that introspective judgment diverges from ablation.
+    """
+    config = ExperimentConfig.load(args.config)
+    baseline_path = config.run_dir / BASELINE
+    ablation_path = config.run_dir / ABLATION
+
+    for path in (baseline_path, ablation_path):
+        if not path.exists():
+            print(f"missing {path}", file=sys.stderr)
+            return 2
+
+    matrix = _live_matrix(baseline_path, ablation_path)
+    if matrix is None:
+        print("no live-ablation records found", file=sys.stderr)
+        return 2
+
+    codes = _read_codes(args.codes)
+    report = convergent_validity(codes, matrix, n_permutations=args.permutations)
+
+    print(json.dumps(report.to_dict(), indent=2))
+    print(f"\nr = {report.r:+.3f} (p={report.p_value:.4f}) -- {report.verdict}")
+    return 0
+
+
+def _live_matrix(baseline_path: Path, ablation_path: Path) -> AblationMatrix | None:
+    base = _component_means(TranscriptReader(baseline_path))
+    per_agent: dict[str, dict[Component, list[float]]] = {}
+    for record in TranscriptReader(ablation_path):
+        if not record.condition.startswith("live:"):
+            continue
+        agent = record.condition.split(":", 1)[1]
+        bucket = per_agent.setdefault(agent, {c: [] for c in ALL_COMPONENTS})
+        for comp, val in record.grade.per_component.items():
+            bucket[comp].append(val)
+
+    if not per_agent:
+        return None
+    ablated = {
+        agent: {c: statistics.mean(v) for c, v in comps.items() if v}
+        for agent, comps in per_agent.items()
+    }
+    return AblationMatrix.from_means(base, ablated)
 
 
 def cmd_selftest(args: argparse.Namespace) -> int:
