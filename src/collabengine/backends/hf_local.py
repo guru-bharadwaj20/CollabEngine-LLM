@@ -118,6 +118,8 @@ class HFLocalBackend(LLMBackend):
     is the only signal that distinguishes a slow run from a stuck one while
     there is still time to act on the difference."""
     _last_heartbeat: float = field(default=0.0, init=False, repr=False)
+    _window_generated: int = field(default=0, init=False, repr=False)
+    _window_busy_s: float = field(default=0.0, init=False, repr=False)
     _passes: int = field(default=0, init=False, repr=False)
     _sequences: int = field(default=0, init=False, repr=False)
     _generated: int = field(default=0, init=False, repr=False)
@@ -144,10 +146,21 @@ class HFLocalBackend(LLMBackend):
             return
         self._last_heartbeat = now
         rate = self._generated / self._busy_s if self._busy_s else 0.0
+
+        # A cumulative rate describes the whole run, including any stretch that
+        # has since been fixed, so it recovers only slowly and reads low long
+        # after conditions are fine. That has twice been mistaken here for a
+        # sick run -- once badly enough to kill a healthy one. The windowed rate
+        # is what the card is doing now; the cumulative one is context.
+        window_tokens = self._generated - self._window_generated
+        window_busy = self._busy_s - self._window_busy_s
+        recent = window_tokens / window_busy if window_busy else 0.0
+        self._window_generated, self._window_busy_s = self._generated, self._busy_s
+
         print(
             f"  [{self.name}] {self._passes} passes | mean batch "
             f"{self._sequences / self._passes:.1f} | prompt ~{prompt_len} tok "
-            f"| {rate:.0f} tok/s",
+            f"| {recent:.0f} tok/s now ({rate:.0f} avg)",
             file=sys.stderr,
             flush=True,
         )

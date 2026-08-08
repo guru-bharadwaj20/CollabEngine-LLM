@@ -358,3 +358,29 @@ def test_long_prompts_lose_their_oldest_messages_not_their_instructions() -> Non
     kept = tok(text, truncation=True, max_length=64)["input_ids"]
 
     assert "ANSWER-CONTRACT-SENTINEL" in tok.decode(kept)
+
+
+def test_windowed_rate_ignores_a_degraded_stretch_once_it_is_over(capsys) -> None:
+    """The cumulative rate recovers too slowly to act on.
+
+    A run that spent its first minutes sharing the card reports a low average
+    long after it has the card to itself. Twice tonight that was read as a sick
+    run, once badly enough to kill a healthy one. The windowed figure is what
+    the card is doing now.
+    """
+    backend = FakeHF(model_id="m", heartbeat_s=0)
+
+    backend._passes, backend._sequences = 5, 20
+    backend._generated, backend._busy_s = 100, 100.0      # a slow stretch: 1 tok/s
+    backend.heartbeat_s = 0.0001
+    backend._heartbeat(1000)
+    capsys.readouterr()
+
+    backend._last_heartbeat = 0.0                          # allow the next line
+    backend._passes, backend._sequences = 10, 40
+    backend._generated, backend._busy_s = 1100, 110.0      # then 1000 tok in 10 s
+    backend._heartbeat(1000)
+
+    line = capsys.readouterr().err
+    assert "100 tok/s now" in line, line     # the window sees only the good part
+    assert "(10 avg)" in line, line          # the average is still dragged down
