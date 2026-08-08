@@ -735,6 +735,10 @@ async def _pipeline(config: ExperimentConfig, backend, phases: set[str]) -> int:
         _report_propagation(records, agents)
 
     _report_throughput(config.run_dir, time.monotonic() - started)
+    if hasattr(backend, "batching_report"):
+        # Mean batch size is the one number that separates a healthy run from an
+        # OOM-collapsed one; both look like 100% utilization from outside.
+        print(f"batching: {backend.batching_report()}")
     return 0 if failures == 0 else 1
 
 

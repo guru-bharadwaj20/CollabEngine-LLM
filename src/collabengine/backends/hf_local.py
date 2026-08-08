@@ -42,6 +42,7 @@ import asyncio
 import hashlib
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -98,7 +99,28 @@ class HFLocalBackend(LLMBackend):
     _worker: Any = field(default=None, init=False, repr=False)
     _load_lock: Any = field(default=None, init=False, repr=False)
     _loop: Any = field(default=None, init=False, repr=False)
-    _stats: dict = field(default_factory=dict, init=False, repr=False)
+    _passes: int = field(default=0, init=False, repr=False)
+    _sequences: int = field(default=0, init=False, repr=False)
+    _generated: int = field(default=0, init=False, repr=False)
+    _busy_s: float = field(default=0.0, init=False, repr=False)
+
+    def batching_report(self) -> str:
+        """How full the card actually ran.
+
+        Mean batch size is the number that matters and the one that is hardest
+        to see from outside: an OOM-collapsed run and a healthy one both show
+        100% utilization in nvidia-smi, and differ mainly in power draw. Stating
+        it directly means the next run can be sized from evidence instead of
+        from a guess about what fits.
+        """
+        if not self._passes:
+            return "no forward passes"
+        rate = self._generated / self._busy_s if self._busy_s else 0.0
+        return (
+            f"{self._passes} forward passes | mean batch "
+            f"{self._sequences / self._passes:.1f} | {self._generated:,} tokens "
+            f"| {rate:.0f} tok/s while generating"
+        )
 
     # ---------------------------------------------------------------- loading
 
@@ -259,6 +281,7 @@ class HFLocalBackend(LLMBackend):
         # immediately before the call. Generation runs one batch at a time in a
         # single worker thread, so nothing else is drawing in between.
         set_seed(_batch_seed(batch))
+        started = time.monotonic()
 
         try:
             with torch.inference_mode():
@@ -282,11 +305,16 @@ class HFLocalBackend(LLMBackend):
         prompt_len = encoded["input_ids"].shape[1]
         generated = out[:, prompt_len:]
 
+        self._passes += 1
+        self._sequences += len(batch)
+        self._busy_s += time.monotonic() - started
+
         responses: list[GenResponse] = []
         for i, w in enumerate(batch):
             tokens = generated[i]
             text = tok.decode(tokens, skip_special_tokens=True).strip()
             n_new = int((tokens != tok.pad_token_id).sum().item())
+            self._generated += n_new
             responses.append(
                 GenResponse(
                     text=text,
