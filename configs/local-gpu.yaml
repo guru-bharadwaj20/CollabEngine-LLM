@@ -67,7 +67,17 @@ backend:
   max_batch_tokens: 30000
   memory_fraction: 0.90
   batch_window_s: 0.05     # invisible next to a multi-second generation
-  max_model_len: 8192
+  # 8192 truncated the team arm and only the team arm. A solo episode is 3
+  # turns and peaks near 5700 tokens; a four-agent episode is 12 turns and
+  # crosses 8192 on its last two -- the turns that submit the answer -- losing
+  # the head of the brief, which is where the worker capacities are defined.
+  # That biases the team score down and the Phase 1 gate toward failure, which
+  # is the conclusion it would have been read as supporting.
+  #
+  # This is our ceiling, not the model's: Qwen3-8B handles far more. Raising it
+  # costs no memory, because max_batch_tokens still bounds the KV cache; it only
+  # lowers the batch once contexts are long, which is already the case.
+  max_model_len: 12288
   enable_thinking: false   # a <think> block would consume the whole turn budget
 
 team:
