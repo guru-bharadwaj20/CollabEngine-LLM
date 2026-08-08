@@ -394,7 +394,6 @@ class HFLocalBackend(LLMBackend):
         self._passes += 1
         self._sequences += len(batch)
         self._busy_s += time.monotonic() - started
-        self._heartbeat(prompt_len)
 
         responses: list[GenResponse] = []
         for i, w in enumerate(batch):
@@ -412,6 +411,14 @@ class HFLocalBackend(LLMBackend):
                     ),
                 )
             )
+
+        # After the tally above, not before it. Called earlier, the line divides
+        # this pass's elapsed time by the previous pass's token count and
+        # reports a rate that climbs toward the truth over the first few
+        # heartbeats -- 17, then 26, then 29 for a run steady at ~31. A metric
+        # that reads low while a run starts is exactly the kind that gets acted
+        # on wrongly.
+        self._heartbeat(prompt_len)
         return responses
 
     def _render(self, request: GenRequest) -> str:
