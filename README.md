@@ -42,8 +42,16 @@ This builds three worlds whose answer is already known — genuinely specialized
 | world | diagonal dominance | interaction strength |
 |---|---:|---:|
 | specialized | 1.00 | 0.171 |
-| positional | 0.25 *(chance)* | 0.012 |
-| null | 0.00 | 0.007 |
+| positional | 0.25 *(chance)* | 0.015 |
+| null | 0.25 *(chance)* | 0.008 |
+
+Dominance separates the specialized world from the other two; it cannot separate
+positional from null, because both put ownership at chance by construction and
+chance is 1/n_agents, not zero. Interaction strength is what distinguishes those
+two, and both sit an order of magnitude below the specialized world. The exact
+dominance figure for a chance-level world moves between runs — with four
+components a coincidental hit is a one-in-four event per column — so read it
+against 0.25, never against 0.00.
 
 A pipeline that reports specialization in the null world is manufacturing its result. Catching that here costs seconds; catching it after a rented GPU run costs the study.
 
