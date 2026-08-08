@@ -70,17 +70,42 @@ generates in-process through `transformers` on CUDA and supplies the batching
 itself.
 
 **Batching is the entire difference between an overnight run and a two-week
-one.** Measured on this card: 9.6 output tok/s for a single turn, 134 tok/s
-aggregate at batch 8. Decoding at this size is memory-bandwidth-bound, so the
-extra sequences are close to free — the same reason vLLM is fast.
+one.** Sweeping batch size at a realistic 1600-token context on this card:
 
-Batches are bounded by **tokens, not request count**. KV cache scales with
-tokens, so a batch size that fits comfortably in round one carries the whole
-transcript per sequence by round three; at ~144 KiB of KV per token, sixteen
-6k-token contexts want ~14 GB on top of 16.4 GB of weights, which 24 GB does not
-have. Getting this wrong is not subtle — an early run collapsed to batch ~1 and
-spent ninety minutes drawing 64 W of a 210 W cap. With the token budget in
-place the same work runs at 165 W.
+| batch | aggregate | per sequence | peak |
+|---|---|---|---|
+| 8 | 72.6 tok/s | 9.1 | 16.8 GiB |
+| 16 | 94.1 tok/s | 5.9 | 18.3 GiB |
+| 32 | **108.1 tok/s** | 3.4 | 21.4 GiB |
+| 48 | 71.1 tok/s | 1.5 | 24.4 GiB |
+
+Decoding at this size is memory-bandwidth-bound, so extra sequences are nearly
+free until they are not — and the batch-48 row is the one to read twice.
+Throughput falls by a third there. **Windows does not raise OOM as allocations
+approach the card; it pages to host memory over PCIe and keeps reporting 100%
+GPU utilization**, so the collapse is invisible in `nvidia-smi` and looks
+exactly like a healthy run. Sustained PCIe traffic under a pure decode workload
+is the tell.
+
+Two earlier figures in this file were measured inside that regime and were
+wrong: a "134 tok/s at batch 8" that came from 50-token prompts and did not
+survive real contexts, and a "~490 KiB/token" KV cost inferred from an inflated
+peak, which set the token budget three times too small and held the card near
+40% of its throughput. Marginal cost across the healthy rows above is
+~123 KiB/token, close to the 144 KiB the GQA geometry predicts (36 layers ×
+8 KV heads × 128 dim × 2 × bf16).
+
+Batches are bounded by **tokens, not request count**, and the budget must
+include `max_tokens` as well as the prompt, since generation extends every
+sequence in the chunk. This is what holds peak memory roughly constant as
+contexts grow: at 44,000 tokens the batcher runs 32 sequences in round one and
+12 by round three, at about the same GiB either way.
+
+The remaining inefficiency is structural rather than a misconfiguration. A
+chunk runs until its *longest* member stops, so with a 1024-token cap and ~600
+tokens of useful output, roughly 40% of decode steps generate padding for
+sequences that already finished. Continuous batching is the fix and it is the
+main reason to prefer vLLM (~3–5× here) where a supported build exists.
 
 ```bash
 collabengine pipeline --config configs/local-gpu.yaml --auto-difficulty
