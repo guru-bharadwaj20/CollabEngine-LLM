@@ -330,7 +330,29 @@ class HFLocalBackend(LLMBackend):
             if len(chunks) > 1:
                 produced: list[GenResponse] = []
                 for chunk in chunks:
-                    produced.extend(self._generate_batch(chunk))
+                    # Isolate each chunk. Letting one propagate would abandon
+                    # every other chunk in the same batch: the caller's handler
+                    # fails the whole group, so a single sequence too long to
+                    # fit takes the turns that already generated down with it.
+                    # Measured before this guard: 96 of 144 agent turns in a
+                    # 12-episode corpus came back empty from a handful of
+                    # oversized round-three contexts, and each empty turn is a
+                    # 0.0 that looks exactly like a team failing the task.
+                    try:
+                        produced.extend(self._generate_batch(chunk))
+                    except Exception as exc:  # noqa: BLE001 - degrade per chunk
+                        produced.extend(
+                            GenResponse(
+                                text="",
+                                finish_reason="error",
+                                error=f"{type(exc).__name__}: {exc}",
+                            )
+                            for _ in chunk
+                        )
+                    finally:
+                        # The next chunk sizes itself against free memory, so
+                        # reclaim before it is measured rather than after.
+                        _release(torch)
                 responses: list[GenResponse] = [None] * len(batch)  # type: ignore[list-item]
                 for position, original in enumerate(order):
                     responses[original] = produced[position]
@@ -375,14 +397,27 @@ class HFLocalBackend(LLMBackend):
             oom = True
 
         if oom:
+            padded = int(encoded["input_ids"].shape[1])
             del encoded
-            gc.collect()
-            torch.cuda.empty_cache()
+            _release(torch)
             if len(batch) == 1:
-                raise RuntimeError(
-                    "CUDA OOM generating a single sequence: no batch left to "
-                    "halve. Lower backend.max_batch_tokens or memory_fraction."
-                )
+                # Report the one turn that cannot fit rather than raising. A
+                # raise here escapes through every enclosing chunk and the
+                # caller fails the entire batch, so one 6000-token context
+                # would blank a dozen turns that had nothing wrong with them.
+                # The turn is still recorded as an error, and
+                # `analysis.integrity` excludes any episode containing one.
+                return [
+                    GenResponse(
+                        text="",
+                        finish_reason="error",
+                        error=(
+                            f"CUDA OOM on a single {padded}-token sequence: no "
+                            "batch left to halve. Lower backend.max_model_len "
+                            "or raise memory_fraction."
+                        ),
+                    )
+                ]
             # Halve and retry rather than lose the queued work. A batch that
             # OOMs is usually one long-context outlier riding with short turns.
             mid = len(batch) // 2
@@ -530,6 +565,19 @@ def _group_by_sampling(batch: list[_Waiter]) -> list[list[_Waiter]]:
         key = (w.request.max_tokens, w.request.temperature, w.request.top_p)
         groups.setdefault(key, []).append(w)
     return list(groups.values())
+
+
+def _release(torch: Any) -> None:
+    """Hand memory back before the next chunk sizes itself against it.
+
+    Python frees the tensors when a frame returns, but the caching allocator
+    keeps the blocks, and `set_per_process_memory_fraction` counts what is
+    *reserved*, not what is live. Without this a stage drifts into OOM over
+    time with nothing actually leaking -- and on this workload the batch shapes
+    change every pass, which is the pattern that fragments worst.
+    """
+    gc.collect()
+    torch.cuda.empty_cache()
 
 
 def _batch_seed(batch: list[_Waiter]) -> int:
