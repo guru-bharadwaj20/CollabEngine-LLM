@@ -70,6 +70,20 @@ class HFLocalBackend(LLMBackend):
     model's head configuration. 16 is comfortable; 32 is reachable at shorter
     contexts. Exceeding it does not fail cleanly, so `_generate_batch` catches
     OOM and halves the batch rather than losing an hour of queued work."""
+    max_batch_tokens: int = 32768
+    """Padded token ceiling for one forward pass -- the real memory limit.
+
+    A sequence count alone is the wrong bound, because KV cache scales with
+    tokens, not requests. Sixteen round-one turns share a short context and fit
+    easily; sixteen round-three turns each carry the whole transcript and do
+    not. Qwen3-8B at bf16 costs ~144 KiB of KV per token (36 layers x 8 KV heads
+    x 128 dim x 2 tensors x 2 bytes), so the ~6 GB left after weights holds
+    roughly 43k tokens; 32k leaves room for activations and fragmentation.
+
+    Bounding on `max_batch_size` alone means the batch that OOMs is the one with
+    the longest contexts -- late in an episode, after the most work has already
+    been done. Recovery is possible (see `_generate_batch`) but costs a wasted
+    forward pass and a cache flush, so it is much better to not get there."""
     batch_window_s: float = 0.05
     """How long to keep collecting after the first request arrives."""
     max_model_len: int = 8192
@@ -202,6 +216,23 @@ class HFLocalBackend(LLMBackend):
         prompts = [self._render(w.request) for w in batch]
         sample = batch[0].request
 
+        # Split on the token budget before allocating anything. Tokenizing
+        # twice is microseconds against a multi-second generation, and it is
+        # what keeps a batch of long contexts from reserving more KV cache than
+        # the card has.
+        if len(batch) > 1:
+            chunks = _split_by_token_budget(
+                batch,
+                [len(ids) for ids in tok(prompts, add_special_tokens=False)["input_ids"]],
+                budget=self.max_batch_tokens,
+                max_new_tokens=sample.max_tokens,
+            )
+            if len(chunks) > 1:
+                out: list[GenResponse] = []
+                for chunk in chunks:
+                    out.extend(self._generate_batch(chunk))
+                return out
+
         encoded = tok(
             prompts,
             return_tensors="pt",
@@ -293,6 +324,44 @@ class HFLocalBackend(LLMBackend):
                 torch.cuda.empty_cache()
             except Exception:  # noqa: BLE001
                 pass
+
+
+def _split_by_token_budget(
+    batch: list[_Waiter],
+    lengths: list[int],
+    *,
+    budget: int,
+    max_new_tokens: int,
+) -> list[list[_Waiter]]:
+    """Chunk a batch so no forward pass exceeds `budget` padded tokens.
+
+    Cost is `len(chunk) * (longest prompt in chunk + max_new_tokens)`, because
+    left-padding brings every sequence in a chunk up to the longest one and
+    generation extends all of them. Order is preserved -- callers map results
+    back positionally, so reordering to pack tighter would silently hand one
+    episode another's turn.
+
+    A single request always forms its own chunk even when it exceeds the budget:
+    splitting cannot help, and refusing would fail a turn that the card can very
+    likely still run.
+    """
+    chunks: list[list[_Waiter]] = []
+    current: list[_Waiter] = []
+    longest = 0
+
+    for waiter, length in zip(batch, lengths):
+        candidate_longest = max(longest, length)
+        cost = (len(current) + 1) * (candidate_longest + max_new_tokens)
+        if current and cost > budget:
+            chunks.append(current)
+            current, longest = [waiter], length
+        else:
+            current.append(waiter)
+            longest = candidate_longest
+
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def _group_by_sampling(batch: list[_Waiter]) -> list[list[_Waiter]]:
