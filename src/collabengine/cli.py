@@ -763,10 +763,23 @@ def _symmetry_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
     """The C3 sweep: does minimal asymmetry amplify into stable roles?"""
     from collabengine.orchestrator.team import SymmetryBreaking
 
+    seed_blind = not getattr(backend, "honors_request_seed", True)
     plans: list[RunPlan] = []
     for level in SymmetryBreaking:
         if level is config.team.symmetry:
             continue  # already covered by the baseline condition
+        if seed_blind and level is SymmetryBreaking.NAME_ONLY:
+            # NAME_ONLY differs from NAME_SEED only in the per-agent seed, and
+            # this backend samples a whole batch from one RNG. The two are the
+            # same condition here, so running both spends the card to produce a
+            # duplicate and invites reading a difference into sampling noise.
+            print(
+                f"  skipping symmetry:{level.value} -- {backend.name} ignores "
+                "per-request seeds, so it is indistinguishable from "
+                f"{config.team.symmetry.value}",
+                file=sys.stderr,
+            )
+            continue
         team = replace(config.team, symmetry=level)
         plans += [
             RunPlan(

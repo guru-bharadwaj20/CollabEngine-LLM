@@ -251,3 +251,26 @@ def test_converge_reports_a_correlation_and_a_verdict(run, capsys) -> None:
     out = capsys.readouterr().out
     assert "r = " in out
     assert "transcript labels" in out
+
+
+def test_seed_blind_backends_skip_the_redundant_symmetry_arm(run) -> None:
+    """NAME_ONLY and NAME_SEED differ only by per-agent seed.
+
+    On a backend that samples a whole batch from one RNG, that makes them the
+    same condition -- so running both spends the card producing a duplicate and
+    invites reading a difference into sampling noise.
+    """
+    from collabengine.cli import _symmetry_plans
+    from collabengine.config import ExperimentConfig
+
+    config = ExperimentConfig.load(run[0])
+    backend = config.backend.build()
+
+    backend.honors_request_seed = True
+    with_seeds = {p.episode_id for p in _symmetry_plans(config, backend)}
+    backend.honors_request_seed = False
+    without = {p.episode_id for p in _symmetry_plans(config, backend)}
+
+    assert any("name_only" in i for i in with_seeds)
+    assert not any("name_only" in i for i in without)
+    assert any("name_seed_scratch" in i for i in without)
