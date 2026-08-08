@@ -527,9 +527,27 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 # reservation instead of hunting for a contiguous block.
 #
 # Not available on Windows: torch accepts the setting and then warns that the
-# platform does not support it. Setting it there buys a confusing warning line
-# and nothing else, so it is skipped -- on Windows the token budget is the only
-# thing standing between a long-context batch and an OOM, which is the reason
-# that budget is conservative.
-if sys.platform != "win32":
+# platform does not support it.
+#
+# The Windows settings below are precautionary, and the distinction matters
+# because it was nearly mistaken for a fix. During a long stage nvidia-smi
+# reports the full 24 GiB, which looks like the WDDM driver paging to host
+# memory -- it does that instead of raising OOM, while still showing 100%
+# utilization. But a clean batch at the production shape (13 sequences, a
+# 1300-token context, 1024 new tokens) peaks at 19.3 GiB allocated, so the
+# figure in nvidia-smi is the caching allocator's reservation across varying
+# batch shapes, not live tensors, and the run's speed is simply the speed of
+# generating 1024 tokens at that batch.
+#
+# `garbage_collection_threshold` makes the allocator reclaim cached blocks
+# rather than let the reservation climb; `max_split_size_mb` stops large blocks
+# being split into pieces that cannot be recombined. Both are cheap insurance
+# against fragmentation on a workload whose batch shapes change every pass.
+# Neither has been shown to change throughput here.
+if sys.platform == "win32":
+    os.environ.setdefault(
+        "PYTORCH_CUDA_ALLOC_CONF",
+        "garbage_collection_threshold:0.8,max_split_size_mb:512",
+    )
+else:
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
