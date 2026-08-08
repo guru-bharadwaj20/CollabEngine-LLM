@@ -18,7 +18,13 @@ while true; do
   if tr '\r' '\n' < runs/pipeline.err 2>/dev/null | grep -qa "^corpus:"; then break; fi
   if tr '\r' '\n' < runs/pipeline.log 2>/dev/null | grep -qa "^corpus:"; then break; fi
   # A dead pipeline is also a reason to stop waiting; analyse what landed.
-  if [ "$(powershell -NoProfile -Command '(Get-Process python -ErrorAction SilentlyContinue|Measure-Object).Count' | tr -d '\r ')" = "0" ]; then
+  #
+  # Match the command line, not the image name. Counting `python` processes
+  # treats a test run or a one-off probe as the pipeline still being alive, and
+  # -- worse -- treats the moment between two of them as the pipeline having
+  # died, which starts the judge while the card is still busy.
+  alive=$(powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { \$_.CommandLine -like '*collabengine.cli pipeline*' } | Measure-Object).Count" | tr -d '\r ')
+  if [ "${alive:-0}" = "0" ]; then
     say "pipeline process is gone; proceeding with whatever is on disk"
     break
   fi
