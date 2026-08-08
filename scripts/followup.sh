@@ -10,6 +10,8 @@ set -u
 CONFIG=configs/local-gpu.yaml
 RUN_DIR=runs/qwen3-8b-local
 LOG=runs/followup.log
+GONE_LIMIT=${GONE_LIMIT:-5}   # consecutive misses (x60s) before believing it
+gone=0
 
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
 
@@ -25,8 +27,20 @@ while true; do
   # died, which starts the judge while the card is still busy.
   alive=$(powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { \$_.CommandLine -like '*collabengine.cli pipeline*' } | Measure-Object).Count" | tr -d '\r ')
   if [ "${alive:-0}" = "0" ]; then
-    say "pipeline process is gone; proceeding with whatever is on disk"
-    break
+    # Absent once is not the same as finished. A restart leaves a gap of a few
+    # seconds, and firing into it starts the judge -- a second 15 GiB model --
+    # while the relaunched pipeline is loading its own. Both then fit only by
+    # paging to host memory, which does not fail, it just runs the card at a
+    # third speed with no error anywhere. Observed: judge at 01:01:00, pipeline
+    # at 01:01:05, 66 W of a 210 W cap.
+    gone=$((gone + 1))
+    say "pipeline not found (${gone}/${GONE_LIMIT} consecutive)"
+    if [ "$gone" -ge "$GONE_LIMIT" ]; then
+      say "pipeline gone for ${GONE_LIMIT} checks; proceeding with what is on disk"
+      break
+    fi
+  else
+    gone=0
   fi
   sleep 60
 done
