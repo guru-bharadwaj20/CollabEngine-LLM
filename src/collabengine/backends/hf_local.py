@@ -358,13 +358,51 @@ class HFLocalBackend(LLMBackend):
                     responses[original] = produced[position]
                 return responses
 
-        encoded = tok(
-            prompts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=self.max_model_len,
-        ).to(self._model.device)
+        # Recomputed rather than reused: `lengths` above exists only on the
+        # multi-request path, and this check has to cover a lone long turn too
+        # -- which is exactly the one most likely to overflow.
+        raw_lengths = [
+            len(ids) for ids in tok(prompts, add_special_tokens=False)["input_ids"]
+        ]
+
+        # Truncate from the left, and say so when it happens.
+        #
+        # A transcript grows past `max_model_len` in the last round of a large
+        # instance -- at `hard` a round-three prompt projects to ~9200 tokens
+        # against 8192. The tokenizer's default is to truncate on the *right*,
+        # which for a chat prompt removes the newest teammate messages, the
+        # final-round banner, and the answer-format contract, while carefully
+        # preserving the oldest history. The agent is then asked to answer with
+        # the instructions describing how to answer deleted, and the resulting
+        # unparseable turn is indistinguishable from a team that failed.
+        #
+        # Left truncation drops the oldest messages instead, which is the
+        # ordinary sliding-window behaviour and keeps the task brief's tail, the
+        # recent turns and the contract intact.
+        previous_side = tok.truncation_side
+        tok.truncation_side = "left"
+        try:
+            encoded = tok(
+                prompts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=self.max_model_len,
+            ).to(self._model.device)
+        finally:
+            tok.truncation_side = previous_side
+
+        # Silence here would hide context loss inside a normal-looking turn, so
+        # it is reported like any other instrument limit.
+        clipped = sum(1 for p in raw_lengths if p > self.max_model_len)
+        if clipped:
+            print(
+                f"  [{self.name}] {clipped}/{len(prompts)} prompts exceeded "
+                f"max_model_len={self.max_model_len} and lost their oldest "
+                f"messages (longest {max(raw_lengths)} tok)",
+                file=sys.stderr,
+                flush=True,
+            )
 
         # `generate` samples via `torch.multinomial` against the global RNG and
         # exposes no per-call generator, so seeding is a process-wide set_seed
