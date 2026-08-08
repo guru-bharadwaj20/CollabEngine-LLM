@@ -563,9 +563,22 @@ def _report_modes(baseline_path: Path, ablation_path: Path) -> None:
         )
 
 
-def _component_means(reader: TranscriptReader) -> dict[Component, float]:
+def _component_means(
+    reader: TranscriptReader, condition: str | None = "baseline"
+) -> dict[Component, float]:
+    """Per-component means over one condition.
+
+    The condition filter is not optional in practice. Stage 1 writes the
+    baseline, the solo control, the symmetry sweep and the fixed-order control
+    to the same transcript, and every ablation drop is measured against this
+    reference -- so averaging across all of them would fold a one-agent team's
+    score into the number that four-agent ablations are compared to, shrinking
+    every drop toward zero and, where solo scores low enough, past it.
+    """
     acc: dict[Component, list[float]] = {c: [] for c in ALL_COMPONENTS}
     for record in reader:
+        if condition is not None and record.condition != condition:
+            continue
         for comp, val in record.grade.per_component.items():
             acc[comp].append(val)
     return {c: (statistics.mean(v) if v else 0.0) for c, v in acc.items()}

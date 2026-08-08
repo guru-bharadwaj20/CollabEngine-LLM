@@ -79,6 +79,29 @@ def test_ablation_ignores_the_sweep_conditions(run) -> None:
     assert len(live) == len(baselines) * 3
 
 
+def test_the_ablation_reference_uses_only_baseline_episodes(run) -> None:
+    """Every drop is measured against this reference.
+
+    Stage 1 writes baseline, solo, symmetry and fixed-order episodes to one
+    transcript. Averaging across all of them would fold a one-agent team's
+    score into the number four-agent ablations are compared against, shrinking
+    every drop toward zero -- and, where solo scores low enough, past it.
+    """
+    from collabengine.cli import _component_means
+
+    config_path, run_dir = run
+    main(["pipeline", "--config", str(config_path), "--phases", "baseline,solo"])
+
+    path = run_dir / "baseline.jsonl"
+    filtered = _component_means(TranscriptReader(path))
+    unfiltered = _component_means(TranscriptReader(path), condition=None)
+    baseline_only = _component_means(TranscriptReader(path), condition="baseline")
+
+    assert filtered == baseline_only
+    # Solo teams score differently, so mixing them in moves the reference.
+    assert filtered != unfiltered
+
+
 def test_pipeline_resumes_without_redoing_work(run, capsys) -> None:
     """A second run must cost nothing -- this is what makes a crash survivable."""
     config_path, _ = run
