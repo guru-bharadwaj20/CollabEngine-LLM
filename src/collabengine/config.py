@@ -45,6 +45,10 @@ class BackendConfig:
     max_model_len: int = 8192
     enable_thinking: bool = False
     trust_remote_code: bool = False
+    memory_fraction: float = 0.85
+    """Fraction of the card the process may allocate. See `hf_local`: above
+    this Windows pages rather than raising OOM, and a paging run looks
+    healthy everywhere except PCIe traffic."""
 
     def build(self) -> LLMBackend:
         if self.kind == "mock":
@@ -67,6 +71,7 @@ class BackendConfig:
                 max_model_len=self.max_model_len,
                 enable_thinking=self.enable_thinking,
                 trust_remote_code=self.trust_remote_code,
+                memory_fraction=self.memory_fraction,
             )
         if self.kind == "gemini":
             from collabengine.backends.gemini_judge import GeminiJudgeBackend
@@ -119,6 +124,7 @@ class BackendConfig:
             "batch_window_s": self.batch_window_s,
             "max_model_len": self.max_model_len,
             "enable_thinking": self.enable_thinking,
+            "memory_fraction": self.memory_fraction,
             "trust_remote_code": self.trust_remote_code,
         }
 

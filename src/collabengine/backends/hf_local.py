@@ -39,6 +39,7 @@ Two caveats worth stating plainly, because both bear on claims the study makes:
 from __future__ import annotations
 
 import asyncio
+import gc
 import hashlib
 import os
 import sys
@@ -102,6 +103,14 @@ class HFLocalBackend(LLMBackend):
     _worker: Any = field(default=None, init=False, repr=False)
     _load_lock: Any = field(default=None, init=False, repr=False)
     _loop: Any = field(default=None, init=False, repr=False)
+    memory_fraction: float = 0.85
+    """Hard ceiling on the card, as a fraction. 0 disables the cap.
+
+    Not a safety margin -- a correctness one. Above it Windows pages instead of
+    failing, and a paging run is indistinguishable from a healthy one except in
+    PCIe traffic. Capping turns that into an OOM the batcher can recover from.
+    0.85 of 24 GiB leaves ~20.4 GiB against ~15.3 GiB of weights."""
+
     heartbeat_s: float = 120.0
     """Seconds between mid-stage throughput lines. 0 disables them.
 
@@ -177,6 +186,26 @@ class HFLocalBackend(LLMBackend):
         tokenizer.padding_side = "left"
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token = tokenizer.eos_token
+
+        if self.device.startswith("cuda") and self.memory_fraction:
+            # Make paging impossible rather than merely unlikely.
+            #
+            # Windows does not refuse an allocation that no longer fits: the
+            # WDDM driver moves the working set to host memory over PCIe and
+            # the run keeps going at a fraction of the speed, still reporting
+            # 100% utilization. Tuning the token budget only makes that outcome
+            # less likely, and every surface that would normally reveal it --
+            # utilization, absence of errors, allocated bytes -- looks healthy.
+            # Observed: 24 GiB resident, 62 W of a 210 W cap, and 18 GB/s of
+            # sustained PCIe traffic under a pure decode workload.
+            #
+            # Capping the fraction converts that silent slowdown into an
+            # ordinary OOM, which `_generate_batch` already handles by halving
+            # the batch. A run that is momentarily too ambitious then costs one
+            # wasted forward pass instead of the whole night.
+            torch.cuda.set_per_process_memory_fraction(
+                self.memory_fraction, torch.cuda.current_device()
+            )
 
         torch_dtype = getattr(torch, self.dtype)
         try:
@@ -321,6 +350,7 @@ class HFLocalBackend(LLMBackend):
         # single worker thread, so nothing else is drawing in between.
         set_seed(_batch_seed(batch))
         started = time.monotonic()
+        oom = False
 
         try:
             with torch.inference_mode():
@@ -333,9 +363,26 @@ class HFLocalBackend(LLMBackend):
                     pad_token_id=tok.pad_token_id,
                 )
         except torch.cuda.OutOfMemoryError:
+            # Deliberately does nothing but record the fact. Recovering *here*
+            # does not work: while this block runs the exception is still
+            # active, and its traceback holds every frame inside `generate` --
+            # including the KV cache that just failed to fit. `empty_cache()`
+            # reclaims nothing against live references, so the halved retry
+            # would start from an allocator that is still full and OOM as well,
+            # all the way down to a single sequence. That cascade turns one
+            # oversized batch into a whole stage of empty turns, each recorded
+            # as a genuine zero.
+            oom = True
+
+        if oom:
+            del encoded
+            gc.collect()
             torch.cuda.empty_cache()
             if len(batch) == 1:
-                raise
+                raise RuntimeError(
+                    "CUDA OOM generating a single sequence: no batch left to "
+                    "halve. Lower backend.max_batch_tokens or memory_fraction."
+                )
             # Halve and retry rather than lose the queued work. A batch that
             # OOMs is usually one long-context outlier riding with short turns.
             mid = len(batch) // 2

@@ -34,6 +34,13 @@ from collabengine.transcripts.store import EpisodeRecord
 TRUNCATED = "length"
 """`finish_reason` a backend reports when it stopped at `max_tokens`."""
 
+ERRORED = "error"
+"""`finish_reason` a backend reports when generation raised.
+
+These carry no model output at all. They arrive in bursts rather than
+singly -- one oversized batch OOMs, the halved retries OOM against the same
+un-reclaimed memory, and an entire stage records empty turns."""
+
 
 def _agent_turns(messages: Sequence[Message]) -> list[Message]:
     return [m for m in messages if m.speaker is Speaker.AGENT]
@@ -43,17 +50,42 @@ def was_truncated(message: Message) -> bool:
     return (message.meta or {}).get("finish_reason") == TRUNCATED
 
 
-def is_instrument_failure(record: EpisodeRecord) -> bool:
-    """Whether this episode's zero is the token cap talking, not the team.
+def errored(message: Message) -> bool:
+    """Whether the backend failed to generate this turn at all.
 
-    Requires the answer to be unparseable *and* every agent turn to have been
-    cut off. Both halves are needed: truncation alone is common and usually
-    harmless, and a malformed answer alone can be a real refusal to commit.
+    Distinct from truncation: a truncated turn contains real model output that
+    stopped early, while an errored one contains nothing. A CUDA OOM that
+    cascades through a stage produces episodes of these, every one of which
+    grades 0.0 and is indistinguishable in the means from a team that tried and
+    failed.
     """
+    return (message.meta or {}).get("finish_reason") == ERRORED
+
+
+def is_instrument_failure(record: EpisodeRecord) -> bool:
+    """Whether this episode's zero came from the harness, not the team.
+
+    Two ways that happens, and they need different rules.
+
+    A generation that *errored* is never attributable to the team, so a single
+    such turn condemns the episode regardless of what it scored -- there is no
+    reading under which a batch that OOMed tells us something about the agent
+    whose turn it was.
+
+    Truncation is weaker evidence, because a turn cut off at `max_tokens` still
+    contains real output. It only counts when the answer is also unparseable
+    *and* every turn was cut off, i.e. no turn ever had the chance to finish. A
+    malformed answer after a turn that ended on its own is a real failure to
+    commit and stays in the means.
+    """
+    turns = _agent_turns(record.messages)
+    if not turns:
+        return False
+    if any(errored(m) for m in turns):
+        return True
     if not record.solution.malformed:
         return False
-    turns = _agent_turns(record.messages)
-    return bool(turns) and all(was_truncated(m) for m in turns)
+    return all(was_truncated(m) for m in turns)
 
 
 @dataclass(slots=True)
@@ -64,6 +96,7 @@ class ConditionIntegrity:
     instrument_failures: int = 0
     agent_turns: int = 0
     truncated_turns: int = 0
+    errored_turns: int = 0
 
     @property
     def truncation_rate(self) -> float:
@@ -99,6 +132,10 @@ class IntegrityReport:
     @property
     def truncated_turns(self) -> int:
         return sum(c.truncated_turns for c in self.by_condition.values())
+
+    @property
+    def errored_turns(self) -> int:
+        return sum(c.errored_turns for c in self.by_condition.values())
 
     @property
     def truncation_rate(self) -> float:
@@ -140,6 +177,8 @@ def audit(records: Iterable[EpisodeRecord]) -> IntegrityReport:
             cell.agent_turns += 1
             if was_truncated(message):
                 cell.truncated_turns += 1
+            if errored(message):
+                cell.errored_turns += 1
     return report
 
 
