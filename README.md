@@ -87,6 +87,20 @@ GPU utilization**, so the collapse is invisible in `nvidia-smi` and looks
 exactly like a healthy run. Sustained PCIe traffic under a pure decode workload
 is the tell.
 
+**The remedy is a hard cap, not a better budget.** `memory_fraction` (default
+0.85) calls `set_per_process_memory_fraction`, so an over-ambitious batch fails
+with an ordinary OOM that the batcher recovers from by halving, instead of
+being absorbed into host memory. Tuning `max_batch_tokens` only makes paging
+less likely; three successive budgets here all looked plausible and all paged.
+
+That cap also exposed a bug it had been hiding, worth repeating because the
+shape is general: **retrying after `except torch.cuda.OutOfMemoryError` cannot
+free the memory that failed.** While the block runs, the exception's traceback
+holds every frame inside `generate`, including the KV cache, so
+`empty_cache()` reclaims nothing and each halved retry OOMs against the same
+full allocator — turning one oversized batch into a stage of empty turns.
+Recovery has to happen after the block exits.
+
 Two earlier figures in this file were measured inside that regime and were
 wrong: a "134 tok/s at batch 8" that came from 50-token prompts and did not
 survive real contexts, and a "~490 KiB/token" KV cost inferred from an inflated
