@@ -20,7 +20,12 @@ out_dir: runs
 # The runner fans this many episodes at the backend at once; the backend batches
 # whatever turns are waiting. Higher than max_batch_size on purpose -- the queue
 # should never be empty when a forward pass finishes.
-max_concurrency: 80
+# Deliberately well below the stage size. Fanning all 48 stage-1 episodes at the
+# card at once makes them advance in lockstep and finish in one clump at the
+# very end, so the transcript stays empty for hours, resume has nothing to
+# resume from, and a crash costs the whole stage. Running them in waves gives up
+# a little batch fullness for episodes that land steadily.
+max_concurrency: 24
 
 backend:
   kind: hf
@@ -52,8 +57,12 @@ backend:
   # bf16). An earlier sweep inferred ~490 KiB/token and set the budget to 11000;
   # that figure was taken inside the paging regime, and the resulting batch of
   # ~7 ran the card at roughly 40% of its throughput.
+  # Confirmed at the production shape rather than the sweep's: 13 sequences of
+  # 1300 prompt tokens generating 1024 new peaks at 19.3 GiB, i.e. ~123 KiB per
+  # budgeted token as above. 40000 tokens puts the peak near 20.2 GiB, which
+  # leaves headroom for the longest round-three chunks without giving up batch.
   max_batch_size: 32
-  max_batch_tokens: 44000
+  max_batch_tokens: 40000
   batch_window_s: 0.05     # invisible next to a multi-second generation
   max_model_len: 8192
   enable_thinking: false   # a <think> block would consume the whole turn budget
