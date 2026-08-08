@@ -49,16 +49,45 @@ A pipeline that reports specialization in the null world is manufacturing its re
 
 ## Run against a real model
 
-```bash
-vllm serve Qwen/Qwen3-8B --max-model-len 8192 --max-num-seqs 64
+The study runs on one 24 GB card. vLLM has no supported Windows build, so the
+default path generates in-process through `transformers` on CUDA, with dynamic
+micro-batching to keep the card saturated — measured at 9.6 output tok/s for a
+single turn against 134 tok/s at batch 8, which is the difference between a
+two-week grid and an overnight one.
 
-collabengine calibrate --config configs/vllm-8b.yaml   # pick a difficulty
-collabengine baseline  --config configs/vllm-8b.yaml   # Phase 2
-collabengine ablate    --config configs/vllm-8b.yaml   # Phase 3
-collabengine analyze   --config configs/vllm-8b.yaml
+```bash
+collabengine calibrate --config configs/local-gpu.yaml   # Phase 1: pick a difficulty
+collabengine pipeline  --config configs/local-gpu.yaml   # Phases 2-3, one process
+collabengine analyze   --config configs/local-gpu.yaml
 ```
 
-Runs resume: a dropped connection re-runs only what is missing.
+`pipeline` runs baseline, the symmetry sweep, the fixed-order control and the
+ablation grid back to back. Weights load once rather than per subcommand, and
+the three independent phases share a single work queue so the batcher never
+drains between them.
+
+Then the observational half, and the question the project exists to answer:
+
+```bash
+collabengine code     --config configs/local-gpu.yaml --judge-name haiku
+collabengine code     --config configs/local-gpu.yaml --judge-name sonnet \
+                      --judge-model claude-sonnet-4-5      # second family
+collabengine kappa    runs/<name>/codes.haiku.jsonl runs/<name>/codes.sonnet.jsonl
+collabengine converge --config configs/local-gpu.yaml --codes runs/<name>/codes.haiku.jsonl
+```
+
+Coding uses a frontier API model, because a local 7–8B is not a reliable judge.
+It reads finished transcripts and never runs an episode — using one to *produce*
+agent turns would destroy the one-model control the whole design rests on. Set
+`ANTHROPIC_API_KEY`, or pass `--judge self` for a pipeline smoke test whose
+labels nobody should report.
+
+To serve with vLLM instead — WSL2, or a rented Linux box — point at
+`configs/vllm-8b.yaml`. Only `backend.kind` differs.
+
+Runs resume, and resume is checked by a test: plan ids and recorded episode ids
+are asserted identical for every mode, because a mismatch re-runs the whole grid
+silently rather than failing.
 
 ---
 
@@ -80,9 +109,9 @@ Runs resume: a dropped connection re-runs only what is missing.
 |---|---|
 | `tasks/` | Instance generation (satisfiable by construction), per-component grading, prompt rendering |
 | `orchestrator/` | Episode loop, team composition, turn scheduling |
-| `backends/` | Model serving: mock (no GPU) and OpenAI-compatible (vLLM / llama.cpp) |
+| `backends/` | Model serving: mock (no GPU), in-process CUDA, OpenAI-compatible (vLLM), and the frontier judge |
 | `ablation/` | Live, frozen-replay, frozen-excise, plus capacity and random-message controls |
-| `analysis/` | Double-centered interaction, diagonal dominance |
+| `analysis/` | Double-centered interaction and diagonal dominance; behavioral coding against a permutation null; convergent validity |
 | `runner/` | Bounded-concurrency execution with resume |
 | `transcripts/` | JSONL episode records, sharded for parallel writers |
 

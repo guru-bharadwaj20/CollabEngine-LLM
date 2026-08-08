@@ -21,6 +21,7 @@ from collabengine.backends.hf_local import (
     HFLocalBackend,
     _batch_seed,
     _group_by_sampling,
+    _split_by_token_budget,
     _Waiter,
 )
 
@@ -127,6 +128,43 @@ def test_mixed_sampling_parameters_are_never_batched_together() -> None:
             for w in group
         }
         assert len(params) == 1
+
+
+def test_token_budget_splits_long_contexts_and_packs_short_ones() -> None:
+    """The batch that OOMs is the one carrying full transcripts.
+
+    Cost is `count * (longest + max_new)`, so a sequence-count cap sized for
+    round-one turns is far too large by round three. Short turns must still pack
+    in, or the card idles on the cheap half of every episode."""
+    waiters = [_Waiter(_req(i), None) for i in range(4)]
+
+    short = _split_by_token_budget(
+        waiters, [100] * 4, budget=8192, max_new_tokens=512
+    )
+    assert len(short) == 1  # 4 * (100 + 512) = 2448, fits
+
+    long = _split_by_token_budget(
+        waiters, [6000] * 4, budget=8192, max_new_tokens=512
+    )
+    assert [len(c) for c in long] == [1, 1, 1, 1]  # 6512 each, one at a time
+
+
+def test_token_budget_preserves_order() -> None:
+    """Results map back positionally; packing tighter by reordering would hand
+    one episode another episode's turn."""
+    waiters = [_Waiter(_req(i), None) for i in range(6)]
+    chunks = _split_by_token_budget(
+        waiters, [100, 5000, 100, 5000, 100, 100], budget=6000, max_new_tokens=256
+    )
+    flat = [w.request.seed for c in chunks for w in c]
+    assert flat == [0, 1, 2, 3, 4, 5]
+
+
+def test_a_single_oversized_request_is_not_dropped() -> None:
+    """Splitting cannot help one request, and the card can usually still run it."""
+    waiters = [_Waiter(_req(0), None)]
+    chunks = _split_by_token_budget(waiters, [99999], budget=1024, max_new_tokens=512)
+    assert chunks == [waiters]
 
 
 def test_batch_seed_is_deterministic_and_composition_sensitive() -> None:

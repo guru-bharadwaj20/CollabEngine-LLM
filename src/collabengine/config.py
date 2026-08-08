@@ -40,6 +40,7 @@ class BackendConfig:
     device: str = "cuda"
     dtype: str = "bfloat16"
     max_batch_size: int = 16
+    max_batch_tokens: int = 32768
     batch_window_s: float = 0.05
     max_model_len: int = 8192
     enable_thinking: bool = False
@@ -61,6 +62,7 @@ class BackendConfig:
                 device=self.device,
                 dtype=self.dtype,
                 max_batch_size=self.max_batch_size,
+                max_batch_tokens=self.max_batch_tokens,
                 batch_window_s=self.batch_window_s,
                 max_model_len=self.max_model_len,
                 enable_thinking=self.enable_thinking,
@@ -103,6 +105,7 @@ class BackendConfig:
             "device": self.device,
             "dtype": self.dtype,
             "max_batch_size": self.max_batch_size,
+            "max_batch_tokens": self.max_batch_tokens,
             "batch_window_s": self.batch_window_s,
             "max_model_len": self.max_model_len,
             "enable_thinking": self.enable_thinking,
