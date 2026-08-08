@@ -48,6 +48,7 @@ def test_pipeline_produces_every_phase_in_one_invocation(run, capsys) -> None:
 
     baseline = _conditions(run_dir / "baseline.jsonl")
     assert "baseline" in baseline
+    assert "solo" in baseline  # the Phase 1 gate, run at the operating point
     assert "fixed_order" in baseline  # the C2 control
     assert any(c.startswith("symmetry:") for c in baseline)  # the C3 sweep
 
@@ -104,6 +105,7 @@ def test_every_plan_id_matches_the_record_it_produces(run) -> None:
         _ablation_plans,
         _baseline_plans,
         _fixed_order_plans,
+        _solo_plans,
         _symmetry_plans,
     )
     from collabengine.config import ExperimentConfig
@@ -116,6 +118,7 @@ def test_every_plan_id_matches_the_record_it_produces(run) -> None:
     ]
 
     planned = {p.episode_id for p in _baseline_plans(config, backend)}
+    planned |= {p.episode_id for p in _solo_plans(config, backend)}
     planned |= {p.episode_id for p in _symmetry_plans(config, backend)}
     planned |= {p.episode_id for p in _fixed_order_plans(config, backend)}
     planned |= {

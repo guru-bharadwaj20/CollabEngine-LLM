@@ -115,8 +115,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--episodes", type=int, help="override n_episodes")
     p.add_argument(
         "--phases",
-        default="baseline,symmetry,c2,ablate",
-        help="comma-separated subset of: baseline, symmetry, c2, ablate",
+        default="baseline,solo,symmetry,c2,ablate",
+        help="comma-separated subset of: baseline, solo, symmetry, c2, ablate",
     )
     p.add_argument(
         "--auto-difficulty",
@@ -506,10 +506,27 @@ def _report_modes(baseline_path: Path, ablation_path: Path) -> None:
     but any of them could have filled it. Neither number means anything alone,
     which is why they are printed together with their controls.
     """
-    base = statistics.mean(
-        [r.grade.overall for r in TranscriptReader(baseline_path) if r.condition == "baseline"]
-        or [0.0]
-    )
+    by_condition: dict[str, list[float]] = {}
+    for record in TranscriptReader(baseline_path):
+        by_condition.setdefault(record.condition, []).append(record.grade.overall)
+
+    base = statistics.mean(by_condition.get("baseline") or [0.0])
+
+    if by_condition.get("solo"):
+        solo = statistics.mean(by_condition["solo"])
+        print(f"\nteam {base:.3f} vs solo {solo:.3f} | gap {base - solo:+.3f}")
+        if base - solo <= 0:
+            print(
+                "  The team does not beat one agent at this difficulty, so the "
+                "task did not reward collaboration and the ablation grid below "
+                "is measuring participation rather than specialization.",
+                file=sys.stderr,
+            )
+    for condition in sorted(by_condition):
+        if condition.startswith("symmetry:") or condition == "fixed_order":
+            print(
+                f"  {condition:<28} {statistics.mean(by_condition[condition]):.3f}"
+            )
     by_mode: dict[str, dict[str, list[float]]] = {}
     for record in TranscriptReader(ablation_path):
         mode, _, agent = record.condition.partition(":")
@@ -665,6 +682,8 @@ async def _pipeline(config: ExperimentConfig, backend, phases: set[str]) -> int:
     stage1: list[RunPlan] = []
     if "baseline" in phases:
         stage1 += _baseline_plans(config, backend)
+    if "solo" in phases:
+        stage1 += _solo_plans(config, backend)
     if "symmetry" in phases:
         stage1 += _symmetry_plans(config, backend)
     if "c2" in phases:
@@ -748,6 +767,38 @@ def _symmetry_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
             for seed in config.seeds
         ]
     return plans
+
+
+def _solo_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
+    """Single-agent episodes at the operating difficulty.
+
+    This is the Phase 1 gate, moved inside the run. Calibrating as a separate
+    sweep means paying for every difficulty -- including the most expensive one,
+    whose long contexts cap the batch and dominate the wall clock -- to answer a
+    question that only matters at the difficulty actually used. Running solo
+    episodes alongside the baseline answers it for the operating point at a
+    quarter of an episode's cost (one agent, so a third of the turns) and with
+    the same instances the team plays, which makes the comparison paired rather
+    than merely matched.
+
+    If the team does not beat one agent here, the task did not reward
+    collaboration and the ablation grid is measuring nothing.
+    """
+    team = replace(config.team, n_agents=1)
+    return [
+        RunPlan(
+            episode_id=_run_id("solo", config.team.difficulty, seed),
+            factory=(
+                lambda seed=seed: run_episode(
+                    backend=backend,
+                    config=team,
+                    episode_seed=seed,
+                    condition="solo",
+                )
+            ),
+        )
+        for seed in config.seeds
+    ]
 
 
 def _fixed_order_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
