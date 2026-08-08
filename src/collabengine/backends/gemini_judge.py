@@ -150,8 +150,20 @@ class GeminiJudgeBackend(LLMBackend):
                     return _parse(response.json())
                 last_error = f"HTTP {response.status_code}: {response.text[:300]}"
                 if response.status_code == 429:
-                    # The server states how long to wait. Guessing shorter just
-                    # spends another attempt against a closed window.
+                    if _is_daily_quota(response):
+                        # A per-day quota does not refill in this run. Retrying
+                        # burns the retry budget and then returns an error
+                        # anyway, which the coding layer would turn into an
+                        # "other" label -- a fabricated observation that looks
+                        # exactly like a real one in the output file.
+                        return GenResponse(
+                            text="",
+                            finish_reason="error",
+                            error=f"daily quota exhausted for {self.model}",
+                        )
+                    # Per-minute: the server states how long to wait, and
+                    # guessing shorter just spends another attempt on a closed
+                    # window.
                     await asyncio.sleep(_retry_delay(response) or 30.0)
                     continue
                 if response.status_code < 500:
@@ -177,6 +189,24 @@ class GeminiJudgeBackend(LLMBackend):
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+
+def _is_daily_quota(response: httpx.Response) -> bool:
+    """Whether the 429 is a per-day cap rather than a per-minute one.
+
+    The distinction decides whether waiting helps at all. Free tier reports
+    `GenerateRequestsPerDayPerProjectPerModel-FreeTier` when the daily
+    allowance is gone, and no amount of backoff inside one run recovers it.
+    """
+    try:
+        details = response.json().get("error", {}).get("details", [])
+    except ValueError:
+        return False
+    for detail in details:
+        for violation in detail.get("violations", []):
+            if "PerDay" in str(violation.get("quotaId", "")):
+                return True
+    return False
 
 
 def _retry_delay(response: httpx.Response) -> float | None:

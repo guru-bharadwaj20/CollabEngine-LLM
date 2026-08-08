@@ -141,17 +141,50 @@ class MessageCode:
         return (self.episode_id, self.turn)
 
 
+class JudgeUnavailable(RuntimeError):
+    """The judge stopped answering, so coding must stop too.
+
+    Raised rather than absorbed because the alternative is worse than a crash:
+    a failed call becomes an `other` label, and a file full of `other` is
+    indistinguishable from a corpus of genuinely uncategorizable messages once
+    it is on disk. Every downstream statistic would be computed over fabricated
+    observations.
+    """
+
+
 @dataclass(slots=True)
 class CodingStats:
     coded: int = 0
     unparseable: int = 0
     errors: int = 0
+    consecutive_errors: int = 0
+    last_error: str = ""
 
     def summary(self) -> str:
         return (
             f"coded {self.coded} | unparseable {self.unparseable} | "
             f"errors {self.errors}"
         )
+
+    def record_error(self, message: str, *, tolerate: int = 8) -> None:
+        """Count a failure, and give up once the judge is clearly gone.
+
+        A handful of transient errors across thousands of messages is noise. A
+        run of them means the key is bad, the quota is spent, or the endpoint is
+        down -- and continuing would keep writing `other` for every remaining
+        message in the corpus.
+        """
+        self.errors += 1
+        self.consecutive_errors += 1
+        self.last_error = message
+        if self.consecutive_errors >= tolerate:
+            raise JudgeUnavailable(
+                f"{self.consecutive_errors} consecutive judge failures; "
+                f"last error: {message}"
+            )
+
+    def record_success(self) -> None:
+        self.consecutive_errors = 0
 
 
 async def code_episode(
@@ -204,10 +237,11 @@ async def _code_one(
     )
     response = await backend.generate(request)
     if not response.ok:
-        stats.errors += 1
+        stats.record_error(response.error or "unknown judge error")
         return ActionType.OTHER
 
     action = parse_action(response.text)
+    stats.record_success()
     if action is None:
         stats.unparseable += 1
         return ActionType.OTHER
