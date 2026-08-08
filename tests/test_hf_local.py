@@ -233,3 +233,46 @@ def test_config_builds_the_backend_without_importing_torch() -> None:
     # Off by default: a Qwen3 <think> block would eat the whole token budget
     # before the agent said anything to its team.
     assert backend.enable_thinking is False
+
+
+def test_heartbeat_reports_between_episode_writes(capsys) -> None:
+    """The only signal a stage emits before its episodes land in a clump.
+
+    Exercised directly rather than through `generate`: `FakeHF` replaces
+    `_generate_batch`, which is where the heartbeat is called from, so a test
+    driving the queue would pass without ever running this code.
+    """
+    backend = FakeHF(model_id="m", heartbeat_s=0.0001)
+    backend._passes, backend._sequences = 4, 48
+    backend._generated, backend._busy_s = 900, 9.0
+
+    backend._heartbeat(prompt_len=2510)
+
+    line = capsys.readouterr().err
+    assert "4 passes" in line
+    assert "mean batch 12.0" in line   # the number that explains a slow run
+    assert "~2510 tok" in line
+    assert "100 tok/s" in line
+
+
+def test_heartbeat_stays_quiet_until_the_interval_elapses() -> None:
+    """A line per forward pass would bury the run it is meant to describe."""
+    backend = FakeHF(model_id="m", heartbeat_s=3600)
+    backend._passes, backend._sequences = 1, 1
+    backend._generated, backend._busy_s = 10, 1.0
+
+    backend._heartbeat(prompt_len=100)
+    first = backend._last_heartbeat
+    backend._heartbeat(prompt_len=100)
+
+    assert backend._last_heartbeat == first
+
+
+def test_heartbeat_can_be_switched_off(capsys) -> None:
+    backend = FakeHF(model_id="m", heartbeat_s=0)
+    backend._passes, backend._sequences = 1, 1
+    backend._generated, backend._busy_s = 10, 1.0
+
+    backend._heartbeat(prompt_len=100)
+
+    assert capsys.readouterr().err == ""

@@ -102,10 +102,46 @@ class HFLocalBackend(LLMBackend):
     _worker: Any = field(default=None, init=False, repr=False)
     _load_lock: Any = field(default=None, init=False, repr=False)
     _loop: Any = field(default=None, init=False, repr=False)
+    heartbeat_s: float = 120.0
+    """Seconds between mid-stage throughput lines. 0 disables them.
+
+    Not a debug flag. A stage writes nothing until its episodes finish, so this
+    is the only signal that distinguishes a slow run from a stuck one while
+    there is still time to act on the difference."""
+    _last_heartbeat: float = field(default=0.0, init=False, repr=False)
     _passes: int = field(default=0, init=False, repr=False)
     _sequences: int = field(default=0, init=False, repr=False)
     _generated: int = field(default=0, init=False, repr=False)
     _busy_s: float = field(default=0.0, init=False, repr=False)
+
+    def _heartbeat(self, prompt_len: int) -> None:
+        """Print throughput mid-stage, because episodes report far too late.
+
+        Episodes are written only when they finish, and the runner fans every
+        episode of a stage at the card at once, so they finish in a clump at the
+        end. Between the first forward pass and that clump -- hours, for a full
+        grid -- a healthy run and a collapsed one produce identical output:
+        nothing. Diagnosing that gap after the fact has cost this project more
+        card time than any bug in it.
+
+        Mean batch and prompt length are here because together they explain the
+        rate. A batch that has quietly shrunk to two because contexts grew is
+        the usual reason a run is slow, and it is invisible in nvidia-smi.
+        """
+        if self.heartbeat_s <= 0:
+            return
+        now = time.monotonic()
+        if now - self._last_heartbeat < self.heartbeat_s:
+            return
+        self._last_heartbeat = now
+        rate = self._generated / self._busy_s if self._busy_s else 0.0
+        print(
+            f"  [{self.name}] {self._passes} passes | mean batch "
+            f"{self._sequences / self._passes:.1f} | prompt ~{prompt_len} tok "
+            f"| {rate:.0f} tok/s",
+            file=sys.stderr,
+            flush=True,
+        )
 
     def batching_report(self) -> str:
         """How full the card actually ran.
@@ -311,6 +347,7 @@ class HFLocalBackend(LLMBackend):
         self._passes += 1
         self._sequences += len(batch)
         self._busy_s += time.monotonic() - started
+        self._heartbeat(prompt_len)
 
         responses: list[GenResponse] = []
         for i, w in enumerate(batch):
