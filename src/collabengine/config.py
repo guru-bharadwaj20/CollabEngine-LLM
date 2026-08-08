@@ -23,7 +23,7 @@ from collabengine.orchestrator.team import SymmetryBreaking, TeamConfig
 @dataclass(slots=True)
 class BackendConfig:
     kind: str = "mock"
-    """"mock" or "openai" (vLLM / llama.cpp server)."""
+    """"mock", "hf" (in-process CUDA) or "openai" (vLLM / llama.cpp server)."""
     model: str = "Qwen/Qwen3-8B"
     base_url: str = "http://localhost:8000/v1"
     api_key: str | None = None
@@ -34,12 +34,36 @@ class BackendConfig:
     mock_competence: float = 0.5
     mock_off_focus: float = 0.0
 
+    # -- hf backend. Recorded even when unused, because batch size changes what
+    # -- the sampler produces and so belongs in the reproducibility record.
+    device: str = "cuda"
+    dtype: str = "bfloat16"
+    max_batch_size: int = 16
+    batch_window_s: float = 0.05
+    max_model_len: int = 8192
+    enable_thinking: bool = False
+    trust_remote_code: bool = False
+
     def build(self) -> LLMBackend:
         if self.kind == "mock":
             return MockBackend(
                 mode=MockMode(self.mock_mode),
                 competence=self.mock_competence,
                 off_focus_competence=self.mock_off_focus,
+            )
+        if self.kind == "hf":
+            # Imported here so that parsing a mock config never pulls in torch.
+            from collabengine.backends.hf_local import HFLocalBackend
+
+            return HFLocalBackend(
+                model_id=self.model,
+                device=self.device,
+                dtype=self.dtype,
+                max_batch_size=self.max_batch_size,
+                batch_window_s=self.batch_window_s,
+                max_model_len=self.max_model_len,
+                enable_thinking=self.enable_thinking,
+                trust_remote_code=self.trust_remote_code,
             )
         if self.kind == "openai":
             return OpenAICompatBackend(
@@ -50,7 +74,7 @@ class BackendConfig:
                 timeout_s=self.timeout_s,
                 max_retries=self.max_retries,
             )
-        raise ValueError(f"unknown backend kind {self.kind!r}; expected mock|openai")
+        raise ValueError(f"unknown backend kind {self.kind!r}; expected mock|hf|openai")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,6 +87,13 @@ class BackendConfig:
             "mock_mode": self.mock_mode,
             "mock_competence": self.mock_competence,
             "mock_off_focus": self.mock_off_focus,
+            "device": self.device,
+            "dtype": self.dtype,
+            "max_batch_size": self.max_batch_size,
+            "batch_window_s": self.batch_window_s,
+            "max_model_len": self.max_model_len,
+            "enable_thinking": self.enable_thinking,
+            "trust_remote_code": self.trust_remote_code,
         }
 
 

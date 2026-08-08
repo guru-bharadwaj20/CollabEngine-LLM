@@ -72,7 +72,7 @@ def test_shipped_configs_are_valid(tmp_path) -> None:
     """The example configs must actually load -- they are the documented path in."""
     from pathlib import Path
 
-    for name in ("mock.yaml", "vllm-8b.yaml"):
+    for name in ("mock.yaml", "vllm-8b.yaml", "local-gpu.yaml"):
         path = Path(__file__).parent.parent / "configs" / name
         config = ExperimentConfig.load(path)
         assert config.team.n_agents >= 2

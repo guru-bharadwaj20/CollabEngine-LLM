@@ -1,0 +1,43 @@
+# Real-run config for the local RTX 4500 Ada (24 GB), no server process.
+#
+# vLLM has no supported Windows build, so generation happens in-process through
+# `transformers` on CUDA with dynamic micro-batching. Nothing above the backend
+# knows the difference; `configs/vllm-8b.yaml` is the same experiment against a
+# WSL2 or remote vLLM server.
+#
+#   collabengine calibrate --config configs/local-gpu.yaml   # Phase 1
+#   collabengine baseline  --config configs/local-gpu.yaml   # Phase 2
+#   collabengine ablate    --config configs/local-gpu.yaml   # Phase 3
+#   collabengine analyze   --config configs/local-gpu.yaml
+#
+# One model serves every agent. That is the control that rules out model
+# heterogeneity as the source of any differentiation observed.
+name: qwen3-8b-local
+seed_start: 0
+n_episodes: 100
+out_dir: runs
+
+# The runner fans this many episodes at the backend at once; the backend batches
+# whatever turns are waiting. Higher than max_batch_size on purpose -- the queue
+# should never be empty when a forward pass finishes.
+max_concurrency: 48
+
+backend:
+  kind: hf
+  model: Qwen/Qwen3-8B
+  device: cuda
+  dtype: bfloat16
+  max_batch_size: 16       # ~16.4 GB of bf16 weights leaves ~7 GB for KV
+  batch_window_s: 0.05     # invisible next to a multi-second generation
+  max_model_len: 8192
+  enable_thinking: false   # a <think> block would consume the whole turn budget
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: medium       # set from `collabengine calibrate`, not by guess
+  symmetry: name_seed
+  randomize_turn_order: true   # the C2 control; do not disable without a reason
+  max_tokens: 512
+  temperature: 0.8
+  top_p: 0.95
