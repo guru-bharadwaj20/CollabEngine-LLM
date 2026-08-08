@@ -57,12 +57,26 @@ backend:
   # bf16). An earlier sweep inferred ~490 KiB/token and set the budget to 11000;
   # that figure was taken inside the paging regime, and the resulting batch of
   # ~7 ran the card at roughly 40% of its throughput.
-  # Confirmed at the production shape rather than the sweep's: 13 sequences of
-  # 1300 prompt tokens generating 1024 new peaks at 19.3 GiB, i.e. ~123 KiB per
-  # budgeted token as above. 40000 tokens puts the peak near 20.2 GiB, which
-  # leaves headroom for the longest round-three chunks without giving up batch.
+  # 30000 is the largest budget verified healthy at the production shape: 13
+  # sequences of 1300 prompt tokens generating 1024 new, peaking at 19.3 GiB
+  # allocated and sustaining 4.2 decode steps per second.
+  #
+  # Do not raise this without re-measuring PCIe traffic, and do not trust
+  # allocated-memory headroom as permission to. At 40000 the card sits at
+  # 24 GiB, draws 64 W of a 210 W cap, still reports 100% utilization -- and
+  # moves 19 GB/s to host memory and 12 GB/s back. That is the WDDM driver
+  # paging the working set over PCIe rather than raising OOM. It is the single
+  # most expensive failure mode on this machine because every surface that
+  # normally signals trouble looks fine; `nvidia-smi dmon -s t` is the one that
+  # does not. Sustained multi-GB/s under a pure decode workload means the
+  # budget is too high, whatever the peak allocation says.
+  # Sized against the hard cap rather than against the card. With
+  # memory_fraction 0.85 the process may hold 20.39 GiB; weights take 15.3 and
+  # a 30000-token budget took the total to 19.5, which left too little for
+  # transient activations -- a 764 MiB allocation was enough to OOM. 24000
+  # tokens is ~2.9 GiB of KV and clears it with room to spare.
   max_batch_size: 32
-  max_batch_tokens: 40000
+  max_batch_tokens: 24000
   batch_window_s: 0.05     # invisible next to a multi-second generation
   max_model_len: 8192
   enable_thinking: false   # a <think> block would consume the whole turn budget

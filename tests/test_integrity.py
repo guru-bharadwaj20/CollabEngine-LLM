@@ -140,3 +140,26 @@ def test_report_lines_put_the_worst_cell_first() -> None:
     )
     lines = report.lines()
     assert "live:A2" in lines[2]
+
+
+def test_an_errored_turn_condemns_the_episode_on_its_own() -> None:
+    """A batch that OOMed says nothing about the agent whose turn it was.
+
+    Unlike truncation, an errored turn carries no model output, so there is no
+    reading under which its zero is the team's. One is enough -- and it must
+    count even when the surviving turns still produced a parseable answer,
+    because the episode then reflects a team missing a member it should have
+    had.
+    """
+    record = _record(finishes=["error", "stop", "stop"], malformed=False)
+    assert is_instrument_failure(record)
+
+
+def test_an_oom_cascade_is_counted_per_turn_not_just_per_episode() -> None:
+    """OOMs arrive in bursts, so the turn count is what shows the scale."""
+    records = [_record(finishes=["error", "error", "error"], malformed=True)] * 2
+    report = audit(records)
+
+    assert report.instrument_failures == 2
+    assert report.errored_turns == 6
+    assert report.by_condition["baseline"].usable == 0
