@@ -41,6 +41,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
+import sys
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -414,9 +415,16 @@ def cuda_report() -> str:
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-# Batch sizes vary by design here -- the token budget deliberately produces
-# differently shaped allocations rather than one fixed block. The default
-# caching allocator fragments badly under that pattern and starts failing
-# allocations while nvidia-smi still shows free memory; expandable segments let
-# it grow a reservation instead of hunting for a contiguous block.
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+# Batch shapes vary by design here -- the token budget produces differently
+# sized allocations rather than one fixed block, and the caching allocator can
+# fragment under that pattern until it fails an allocation while nvidia-smi
+# still shows memory free. Expandable segments avoid it by growing a
+# reservation instead of hunting for a contiguous block.
+#
+# Not available on Windows: torch accepts the setting and then warns that the
+# platform does not support it. Setting it there buys a confusing warning line
+# and nothing else, so it is skipped -- on Windows the token budget is the only
+# thing standing between a long-context batch and an OOM, which is the reason
+# that budget is conservative.
+if sys.platform != "win32":
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
