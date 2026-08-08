@@ -413,3 +413,10 @@ def cuda_report() -> str:
 
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
+# Batch sizes vary by design here -- the token budget deliberately produces
+# differently shaped allocations rather than one fixed block. The default
+# caching allocator fragments badly under that pattern and starts failing
+# allocations while nvidia-smi still shows free memory; expandable segments let
+# it grow a reservation instead of hunting for a contiguous block.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")

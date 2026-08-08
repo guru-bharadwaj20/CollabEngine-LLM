@@ -118,6 +118,12 @@ def main(argv: list[str] | None = None) -> int:
         default="baseline,symmetry,c2,ablate",
         help="comma-separated subset of: baseline, symmetry, c2, ablate",
     )
+    p.add_argument(
+        "--auto-difficulty",
+        action="store_true",
+        help="calibrate first and pick the operating point, in the same process",
+    )
+    p.add_argument("--calibrate-episodes", type=int, default=6)
 
     p = sub.add_parser("code", help="behavioral coding of transcripts (Phase 2)")
     p.add_argument("--config", type=Path, required=True)
@@ -523,14 +529,71 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
         config.n_episodes = args.episodes
     backend = config.backend.build()
     phases = {p.strip() for p in args.phases.split(",") if p.strip()}
-    config.save(config.run_dir / "config.resolved.yaml")
 
     from collabengine.backends.hf_local import cuda_report
 
     print(f"device: {cuda_report()}", file=sys.stderr)
-    print(f"run dir: {config.run_dir} | episodes: {config.n_episodes}", file=sys.stderr)
 
+    if args.auto_difficulty:
+        # Calibrating in this process rather than a prior invocation is the
+        # difference between one model load and two, and -- more to the point --
+        # it leaves no window where the card sits idle waiting for someone to
+        # read a table and pick a row.
+        chosen = asyncio.run(
+            _choose_difficulty(config, backend, args.calibrate_episodes)
+        )
+        if chosen is None:
+            return 2
+        config.team = replace(config.team, difficulty=chosen)
+
+    config.save(config.run_dir / "config.resolved.yaml")
+    print(
+        f"run dir: {config.run_dir} | episodes: {config.n_episodes} "
+        f"| difficulty: {config.team.difficulty}",
+        file=sys.stderr,
+    )
     return asyncio.run(_pipeline(config, backend, phases))
+
+
+async def _choose_difficulty(config: ExperimentConfig, backend, episodes: int):
+    """Run the Phase 1 sweep and return the operating point, or None to stop.
+
+    Same criterion as `calibrate`: off the floor, off the ceiling, and the
+    largest gap between a team and a single agent. Returning None is a real
+    outcome -- if no preset rewards collaboration, running Phase 2 on it would
+    produce a null result about the harness rather than about emergence, and
+    the right move is to stop rather than to spend the card proving it.
+    """
+    print(f"\n== calibrating ({episodes} episodes/cell) ==", file=sys.stderr)
+    print(f"{'difficulty':<10}{'solo':>8}{'team':>8}{'gap':>9}", file=sys.stderr)
+
+    rows: list[tuple[str, float, float]] = []
+    for difficulty in sorted(PRESETS, key=lambda d: PRESETS[d].n_jobs):
+        base = {**config.team.to_dict(), "difficulty": difficulty}
+        solo = await _score_many(
+            backend, TeamConfig.from_dict({**base, "n_agents": 1}), episodes
+        )
+        team = await _score_many(backend, TeamConfig.from_dict(base), episodes)
+        gap = statistics.mean(team) - statistics.mean(solo)
+        rows.append((difficulty, statistics.mean(team), gap))
+        print(
+            f"{difficulty:<10}{statistics.mean(solo):>8.3f}"
+            f"{statistics.mean(team):>8.3f}{gap:>+9.3f}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    usable = [r for r in rows if 0.05 < r[1] < 0.95]
+    if not usable:
+        print(
+            "\nNo preset sits off both the floor and the ceiling. Redesign the "
+            "task before Phase 2 (PLAN.md 4, Phase 1).",
+            file=sys.stderr,
+        )
+        return None
+    best = max(usable, key=lambda r: r[2])
+    print(f"\noperating point: {best[0]} (gap {best[2]:+.3f})", file=sys.stderr)
+    return best[0]
 
 
 async def _pipeline(config: ExperimentConfig, backend, phases: set[str]) -> int:
