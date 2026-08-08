@@ -17,8 +17,9 @@ from collabengine.analysis.coding import (
     ActionType,
     CodingReport,
     MessageCode,
-    cohens_kappa,
     code_episode,
+    cohens_kappa,
+    kappa_interval,
     ownership_from_codes,
     summarize,
 )
@@ -46,6 +47,7 @@ __all__ = [
     "code_episode",
     "cohens_kappa",
     "convergent_validity",
+    "kappa_interval",
     "double_center",
     "ownership_from_codes",
     "summarize",

@@ -164,6 +164,41 @@ def test_kappa_is_zero_for_chance_agreement_on_a_dominant_class() -> None:
     assert cohens_kappa(a, b) == pytest.approx(0.0, abs=1e-9)
 
 
+def test_kappa_interval_is_wide_on_a_tiny_sample_and_narrow_on_a_large_one() -> None:
+    """The sample size here is set by a judge's free quota, not by design, so
+    the point estimate alone would invite reading agreement into noise."""
+    from collabengine.analysis.coding import kappa_interval
+
+    pool = [
+        ActionType.COMPUTE,
+        ActionType.VERIFY,
+        ActionType.SEARCH,
+        ActionType.SYNTHESIZE,
+    ]
+    small = [pool[i % 4] for i in range(12)]
+    large = [pool[i % 4] for i in range(600)]
+
+    small_lo, small_hi = kappa_interval(small, list(small), n_boot=300)
+    large_lo, large_hi = kappa_interval(large, list(large), n_boot=300)
+
+    # Perfect agreement in both, but only the large sample pins it down.
+    assert (small_hi - small_lo) >= 0.0
+    assert (large_hi - large_lo) <= (small_hi - small_lo) + 1e-9
+
+
+def test_kappa_interval_brackets_the_point_estimate() -> None:
+    from collabengine.analysis.coding import kappa_interval
+
+    rng = random.Random(4)
+    pool = [ActionType.COMPUTE, ActionType.VERIFY, ActionType.SEARCH]
+    a = [rng.choice(pool) for _ in range(200)]
+    b = [x if rng.random() < 0.8 else rng.choice(pool) for x in a]
+
+    point = cohens_kappa(a, b)
+    lo, hi = kappa_interval(a, b, n_boot=400)
+    assert lo <= point <= hi
+
+
 def test_kappa_rejects_mismatched_lengths() -> None:
     with pytest.raises(ValueError, match="same messages"):
         cohens_kappa([ActionType.COMPUTE], [])
