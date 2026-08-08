@@ -225,5 +225,6 @@ find one under 0.05 essentially every time under a true null.
 | `analysis/` | `interaction` (double-centering, diagonal dominance), `mixed` (episode as random effect), `coding` (action labels vs a permutation null), `convergent` (do labels predict contribution) |
 | `runner/` | Bounded-concurrency execution with resume |
 | `transcripts/` | JSONL episode records, sharded for parallel writers |
+| `docs/RESEARCH-LOG.md` | Full record: every failure, pivot and measurement, with what each cost |
 
 **Orchestration is hand-written on purpose.** Every mainstream agent framework ships role scaffolding in its prompt templates, which would silently plant the structure this project claims to observe emerging.
