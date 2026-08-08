@@ -129,7 +129,13 @@ Avoid SWE-bench-style tasks at this model scale; the failure floor swamps the ef
 ### Phase 2 — Emergence measurement (local GPU, ~1 week)
 - Local 24 GB + 7–8B (Qwen3-8B or Llama-3.1-8B-Instruct). Batch aggressively — this is the difference between hours and days, whether the batching happens in vLLM or in `hf_local`.
 - Run the symmetry-breaking sweep (C3) × baseline episodes.
-- Behavioral coding of transcripts into action-type labels. **Use a frontier API model as the judge** — a local 7–8B is too weak to code reliably. Two judges from different families, blind to condition, human-validated on a ~500-message subsample, report Cohen's κ (2604.00026 got 0.78; match or beat it). Bulk coding with Claude Haiku 4.5 on ~14k messages runs roughly $5.
+- Behavioral coding of transcripts into action-type labels. The judge sees one message at a time with the agent's self-label stripped, so it cannot invent a consistent character for an agent across an episode — the exact artifact this project exists to distinguish from a real one.
+
+  > **Judge availability — measured, and it changes the plan.** This section assumed a paid frontier judge (~$5 for 14k messages on Haiku 4.5). No paid API is available for this run. The free Gemini tier turns out to be metered per *day*, not per minute: `GenerateRequestsPerDayPerProjectPerModel-FreeTier` is **20 requests per day per model**, which is roughly three coded messages short of a single episode. Bulk coding through it is not slow, it is impossible.
+  >
+  > **The free substitute, and why it is defensible.** Code the full corpus with the local 8B — coding replies are ~8 tokens, so batched on the same card it is minutes of work and costs nothing — then spend the daily free quota of a frontier model on a *subsample* and report Cohen's κ between the two. That does not make the local judge as good as a frontier one. It measures how good it is, which is what the κ was always for. If κ is far below the 0.78 reported by 2604.00026, the honest conclusion is that Phase 4's correlation is not trustworthy on these labels, and that is a reportable finding rather than a hidden weakness.
+  >
+  > Both judges here are Google models (2.5-flash and 3-flash-preview), not two families. Correlated errors are likelier between them, so their agreement is an upper bound on true reliability. Say so wherever the number appears.
 - Metrics: per-agent action distributions, pairwise JS divergence, role stability within episode, role consistency across seeds — each against a **permutation null**.
 - **Run the C2 position-vs-identity test here.**
 - **Deliverable:** does differentiation occur, is it stable, and does it attach to identity or to slot? Go/no-go gate for Phase 3.
@@ -153,7 +159,7 @@ The question that makes the paper matter: **does the transcript-derived role lab
 - Preregister Phases 3–4 hypotheses **before** running them (OSF). Cheap, and it is what makes the interaction test credible rather than post-hoc.
 - Release: harness, task generator, all transcripts, analysis notebooks. The transcript corpus alone has standalone value.
 
-**Total: ~8 weeks part-time, $0 of GPU (local card), ~$10 of judge API.**
+**Total: ~8 weeks part-time, $0 of GPU (local card), $0 of judge API** — the judge is the local model, validated against a free-tier frontier subsample rather than paid for outright. See the Phase 2 note for what that costs in confidence.
 
 ---
 
