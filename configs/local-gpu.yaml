@@ -17,9 +17,6 @@ seed_start: 0
 n_episodes: 100
 out_dir: runs
 
-# The runner fans this many episodes at the backend at once; the backend batches
-# whatever turns are waiting. Higher than max_batch_size on purpose -- the queue
-# should never be empty when a forward pass finishes.
 # Deliberately well below the stage size. Fanning all 48 stage-1 episodes at the
 # card at once makes them advance in lockstep and finish in one clump at the
 # very end, so the transcript stays empty for hours, resume has nothing to
@@ -33,12 +30,13 @@ backend:
   device: cuda
   dtype: bfloat16
   # Two ceilings, and the token one is the real constraint: KV cache scales with
-  # tokens, not requests. A high sequence cap lets short round-one turns pack in;
-  # the token budget holds peak memory roughly constant as contexts grow, which
-  # is what stops a batch of full-transcript turns from OOMing.
+  # tokens, not requests, so the token budget is what holds peak memory roughly
+  # constant as contexts grow. It is also, directly, the throughput knob: every
+  # turn carries the ~2500-token task brief and reaches ~4000 by round three, so
+  # budget / (context + max_tokens) is how many turns share a forward pass --
+  # about 4 at 24000, 5-6 at 30000.
   #
-  # Both numbers come from sweeping batch size at a realistic 1600-token context
-  # (scratchpad bench.py), not from head-count arithmetic:
+  # Sweeping batch size at a 1600-token context (scratchpad bench.py):
   #
   #     batch  8   72.6 tok/s   16.8 GiB
   #     batch 16   94.1 tok/s   18.3 GiB
@@ -46,37 +44,28 @@ backend:
   #     batch 32  108.1 tok/s   21.4 GiB   <- best
   #     batch 48   71.1 tok/s   24.4 GiB   <- collapses
   #
-  # The batch-48 row is the important one: throughput falls by a third at the
-  # point peak memory approaches the 24 GiB card. Windows does not OOM there, it
-  # pages to host memory over PCIe and keeps reporting 100% utilization, so the
-  # failure is invisible from nvidia-smi and looks exactly like a healthy run.
-  # Staying near 21 GiB is therefore a throughput decision, not a safety margin.
+  # Marginal cost across the healthy rows is ~123 KiB/token, near the 144 KiB the
+  # GQA geometry predicts (36 layers x 8 kv-heads x 128 dim x 2 x bf16).
   #
-  # Marginal cost measured across those rows is ~123 KiB/token, close to the
-  # 144 KiB/token GQA arithmetic predicts (36 layers x 8 kv-heads x 128 dim x 2 x
-  # bf16). An earlier sweep inferred ~490 KiB/token and set the budget to 11000;
-  # that figure was taken inside the paging regime, and the resulting batch of
-  # ~7 ran the card at roughly 40% of its throughput.
-  # 30000 is the largest budget verified healthy at the production shape: 13
-  # sequences of 1300 prompt tokens generating 1024 new, peaking at 19.3 GiB
-  # allocated and sustaining 4.2 decode steps per second.
+  # The batch-48 row is the one to read twice. Throughput falls by a third as
+  # peak memory approaches the card, because Windows does not raise OOM there --
+  # the WDDM driver pages the working set to host memory over PCIe and keeps
+  # reporting 100% utilization. Measured in that state: 24 GiB resident, 64 W of
+  # a 210 W cap, and 19 GB/s out to host with 12 GB/s back. Every surface that
+  # would normally signal trouble looks healthy, which is what makes it the most
+  # expensive failure mode on this machine. `nvidia-smi dmon -s t` is the one
+  # that does not lie: sustained multi-GB/s under pure decode means the budget is
+  # too high, whatever the peak allocation says.
   #
-  # Do not raise this without re-measuring PCIe traffic, and do not trust
-  # allocated-memory headroom as permission to. At 40000 the card sits at
-  # 24 GiB, draws 64 W of a 210 W cap, still reports 100% utilization -- and
-  # moves 19 GB/s to host memory and 12 GB/s back. That is the WDDM driver
-  # paging the working set over PCIe rather than raising OOM. It is the single
-  # most expensive failure mode on this machine because every surface that
-  # normally signals trouble looks fine; `nvidia-smi dmon -s t` is the one that
-  # does not. Sustained multi-GB/s under a pure decode workload means the
-  # budget is too high, whatever the peak allocation says.
-  # Sized against the hard cap rather than against the card. With
-  # memory_fraction 0.85 the process may hold 20.39 GiB; weights take 15.3 and
-  # a 30000-token budget took the total to 19.5, which left too little for
-  # transient activations -- a 764 MiB allocation was enough to OOM. 24000
-  # tokens is ~2.9 GiB of KV and clears it with room to spare.
+  # memory_fraction is the actual defence -- it caps the process so an oversized
+  # batch OOMs recoverably instead of paging silently. 30000 tokens did OOM under
+  # an 0.85 cap, but only because a failed batch could not then free its own KV
+  # cache (the retry ran inside the except block, where the live traceback pins
+  # it), so the budget had been cut to compensate for a bug. With that fixed,
+  # 0.90 allows 21.6 GiB against 15.3 of weights and ~3.5 of KV.
   max_batch_size: 32
-  max_batch_tokens: 24000
+  max_batch_tokens: 30000
+  memory_fraction: 0.90
   batch_window_s: 0.05     # invisible next to a multi-second generation
   max_model_len: 8192
   enable_thinking: false   # a <think> block would consume the whole turn budget
@@ -84,7 +73,20 @@ backend:
 team:
   n_agents: 4
   rounds: 3
-  difficulty: medium       # set from `collabengine calibrate`, not by guess
+  # Measured, and the reason it is not `medium`. At medium, with the token cap
+  # finally large enough not to truncate the answer, one agent scores 0.879 and
+  # four agents score 0.905 over 12 episodes each -- a gap of +0.026 against a
+  # standard error of ~0.029, i.e. nothing. PLAN.md 4 makes that a stop
+  # condition: an operating point where the task does not reward collaboration
+  # cannot support an ablation study, because every drop would be measured
+  # against a team that was not contributing in the first place.
+  #
+  # Worth noting how this was missed. `calibrate` chose medium while
+  # max_tokens was 512, which truncated 72% of turns and pushed solo down to
+  # 0.55 -- medium looked correctly pitched precisely because the instrument
+  # was broken. Raising the cap fixed the scores and invalidated the difficulty
+  # choice in the same stroke.
+  difficulty: hard
   symmetry: name_seed
   randomize_turn_order: true   # the C2 control; do not disable without a reason
   # 512 was not enough to answer this task. In the first real corpus 72% of
