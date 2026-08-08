@@ -258,6 +258,41 @@ past it.
 **Fix.** Condition filter defaulting to `baseline`, plus a test asserting that
 filtered and unfiltered means differ.
 
+### 3.8 One chunk's failure blanked the whole batch — the corpus-costing bug
+
+**Symptom.** A gate check reported 24 of 36 episodes as instrument failures.
+Every four-agent episode in the corpus was affected.
+
+**Diagnosis.** `RuntimeError: CUDA OOM generating a single sequence` on **96 of
+144** agent turns. A batch is split into chunks by token budget, each run as its
+own forward pass. When one chunk raised, the exception escaped
+`_generate_batch`, and the queue worker's handler failed the *entire group* — so
+one round-three context too long to fit blanked every turn batched alongside it,
+including turns that had already generated successfully.
+
+**Why it was expensive rather than merely annoying.** An errored turn produces
+an empty message and the episode still completes, still parses an answer from
+whatever turns survived, and still receives a plausible score. Nothing crashed.
+The corpus looked finished. Its headline number (§4.1) was published before
+anyone asked how many turns were in it.
+
+**Fix.** Chunks are isolated — a failure produces error responses for that chunk
+only. A single sequence that cannot fit returns an error rather than raising,
+for the same reason. `_release()` now reclaims between chunks: Python frees the
+tensors when a frame returns, but the caching allocator keeps the blocks and
+`set_per_process_memory_fraction` counts what is *reserved*, so a stage drifts
+into OOM over time with nothing actually leaking. That drift is the likely
+reason single sequences were failing at all, since one 6000-token sequence needs
+under a gigabyte of KV against several free.
+
+**A near-miss worth recording.** The `_release` helper was initially added by a
+string replacement that silently matched nothing. All 283 tests still passed,
+because the fake backend used in tests overrides the method that calls it — the
+real run would have hit `NameError` on its first chunked batch. It was caught
+only because a test was written that imported the helper directly. This is the
+same shape as the length-sorting test in §3.7: **a test that exercises a fake
+cannot tell you the real path exists.**
+
 ### 3.7 Smaller failures
 
 | Failure | Consequence | Fix |
@@ -276,7 +311,38 @@ filtered and unfiltered means differ.
 
 ## 4. Results
 
-### 4.1 Phase 1 gate at `medium` — **fails**
+### 4.1 Phase 1 gate at `medium` — **RETRACTED, the team arm was not a team**
+
+> **This result was reported and is withdrawn.** The numbers below were computed
+> from 12 four-agent episodes in which **96 of 144 agent turns failed to
+> generate** — `RuntimeError: CUDA OOM generating a single sequence`. Two thirds
+> of the team never spoke. What was measured was not a four-agent team scoring
+> 0.905; it was one or two agents with most turns empty, and the flat gap has an
+> obvious alternative explanation that has nothing to do with difficulty.
+>
+> | condition | n | mean | sd | |
+> |---|---|---|---|---|
+> | baseline (nominally 4 agents) | 12 | 0.905 | 0.095 | **96/144 turns errored** |
+> | solo (1 agent) | 12 | 0.879 | 0.100 | 0/36 errored |
+>
+> The failure is §3.8: one chunk of a batch raising took down every turn batched
+> alongside it. An empty turn grades 0.0, which is indistinguishable in the means
+> from a team that answered badly.
+>
+> **`analysis/integrity.py` caught this correctly** — it flagged all 24
+> four-agent episodes as instrument failures. The number was published anyway
+> because it was computed with an ad-hoc script that filtered only on
+> `malformed`, before the filter was extended to cover errored turns. The lesson
+> is not that the filter was missing; it is that *a result computed outside the
+> pipeline's own validity checks is not a result*.
+>
+> **Consequences.** The decision to abandon `medium` for `hard` rests on this
+> retracted comparison and is therefore unsupported. The solo arm (0.879, clean)
+> stands. Whether `medium` actually fails the gate is **unknown** and needs 12
+> uncorrupted four-agent episodes to answer — cheap to obtain, since the solo
+> arm does not need regenerating.
+
+### 4.1b Phase 1 gate at `hard` — in progress
 
 Qwen3-8B, 12 episodes per condition, identical instances, `max_tokens: 1024`:
 
