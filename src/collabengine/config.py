@@ -23,7 +23,8 @@ from collabengine.orchestrator.team import SymmetryBreaking, TeamConfig
 @dataclass(slots=True)
 class BackendConfig:
     kind: str = "mock"
-    """"mock", "hf" (in-process CUDA) or "openai" (vLLM / llama.cpp server)."""
+    """"mock", "hf" (in-process CUDA), "openai" (vLLM / llama.cpp server), or
+    "anthropic" (frontier judge -- coding only, never an agent)."""
     model: str = "Qwen/Qwen3-8B"
     base_url: str = "http://localhost:8000/v1"
     api_key: str | None = None
@@ -65,6 +66,16 @@ class BackendConfig:
                 enable_thinking=self.enable_thinking,
                 trust_remote_code=self.trust_remote_code,
             )
+        if self.kind == "anthropic":
+            from collabengine.backends.anthropic_judge import AnthropicJudgeBackend
+
+            return AnthropicJudgeBackend(
+                model=self.model,
+                api_key=self.api_key,
+                max_concurrency=self.max_concurrency,
+                max_retries=self.max_retries,
+                timeout_s=self.timeout_s,
+            )
         if self.kind == "openai":
             return OpenAICompatBackend(
                 base_url=self.base_url,
@@ -74,7 +85,9 @@ class BackendConfig:
                 timeout_s=self.timeout_s,
                 max_retries=self.max_retries,
             )
-        raise ValueError(f"unknown backend kind {self.kind!r}; expected mock|hf|openai")
+        raise ValueError(
+            f"unknown backend kind {self.kind!r}; expected mock|hf|openai|anthropic"
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
