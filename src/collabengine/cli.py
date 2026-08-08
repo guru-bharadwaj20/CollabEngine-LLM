@@ -29,7 +29,11 @@ from collabengine.ablation import (
     frozen_replay,
     live_ablation,
 )
-from collabengine.ablation.modes import propagation_index, random_message_control
+from collabengine.ablation.modes import (
+    fungibility,
+    propagation_index,
+    random_message_control,
+)
 from collabengine.analysis import (
     AblationMatrix,
     MessageCode,
@@ -434,7 +438,57 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         f"diagonal dominance {report.diagonal_dominance:.2f} "
         f"(chance {report.chance_level:.2f})"
     )
+    _report_modes(baseline_path, ablation_path)
     return 0
+
+
+def _report_modes(baseline_path: Path, ablation_path: Path) -> None:
+    """Per-mode scalar drops, and the fungibility metric they produce.
+
+    `Delta(frozen_replay) - Delta(live)` is the headline of Phase 3: the gap
+    between a compensation-blocked drop and a compensation-permitting one. Near
+    zero means the contribution was irreplaceable; large means the role was real
+    but any of them could have filled it. Neither number means anything alone,
+    which is why they are printed together with their controls.
+    """
+    base = statistics.mean(
+        [r.grade.overall for r in TranscriptReader(baseline_path) if r.condition == "baseline"]
+        or [0.0]
+    )
+    by_mode: dict[str, dict[str, list[float]]] = {}
+    for record in TranscriptReader(ablation_path):
+        mode, _, agent = record.condition.partition(":")
+        by_mode.setdefault(mode, {}).setdefault(agent, []).append(record.grade.overall)
+
+    if not by_mode:
+        return
+
+    print(f"\nbaseline overall: {base:.3f}")
+    print(f"{'mode':<16}{'mean drop':>11}{'per-agent drops':>20}")
+    drops: dict[str, float] = {}
+    for mode in sorted(by_mode):
+        per_agent = {a: base - statistics.mean(v) for a, v in by_mode[mode].items()}
+        mean_drop = statistics.mean(per_agent.values())
+        drops[mode] = mean_drop
+        detail = " ".join(f"{a}:{d:+.3f}" for a, d in sorted(per_agent.items()))
+        print(f"{mode:<16}{mean_drop:>+11.3f}   {detail}")
+
+    if "live" in drops and "frozen_replay" in drops:
+        print(
+            f"\nfungibility (frozen_replay - live): "
+            f"{fungibility(drops['live'], drops['frozen_replay']):+.3f}"
+        )
+    if "frozen_excise" in drops and "random_message" in drops:
+        excess = drops["frozen_excise"] - drops["random_message"]
+        print(
+            f"excision above its volume-matched control: {excess:+.3f}"
+            + (
+                "\n  At or below the control, excision is measuring lost context "
+                "rather than this agent's contribution."
+                if excess <= 0
+                else ""
+            )
+        )
 
 
 def _component_means(reader: TranscriptReader) -> dict[Component, float]:
