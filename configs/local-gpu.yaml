@@ -65,7 +65,16 @@ backend:
   # 0.90 allows 21.6 GiB against 15.3 of weights and ~3.5 of KV.
   max_batch_size: 32
   max_batch_tokens: 30000
-  memory_fraction: 0.90
+  # 0.90 (21.6 GiB) was not enough headroom to *prefill* a round-three context.
+  # A single 7000-9000 token sequence needs under 1 GiB of KV, so what fails is
+  # the transient activation peak against ~5 GiB free above the weights. It
+  # failed only in the team arm, because solo episodes are 3 turns and never
+  # get that long -- the same one-sided bias as the truncation it replaced.
+  #
+  # Measured: 35 such OOMs across 24 four-agent episodes, leaving 1 of 12
+  # baseline episodes clean. 0.95 gives ~22.8 GiB, and paging was first observed
+  # at 23.9, so the margin is real but thin -- watch `nvidia-smi dmon -s t`.
+  memory_fraction: 0.95
   batch_window_s: 0.05     # invisible next to a multi-second generation
   # 8192 truncated the team arm and only the team arm. A solo episode is 3
   # turns and peaks near 5700 tokens; a four-agent episode is 12 turns and
