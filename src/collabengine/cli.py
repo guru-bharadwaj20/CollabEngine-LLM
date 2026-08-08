@@ -597,20 +597,32 @@ async def _choose_difficulty(config: ExperimentConfig, backend, episodes: int):
     the right move is to stop rather than to spend the card proving it.
     """
     print(f"\n== calibrating ({episodes} episodes/cell) ==", file=sys.stderr)
-    print(f"{'difficulty':<10}{'solo':>8}{'team':>8}{'gap':>9}", file=sys.stderr)
 
-    rows: list[tuple[str, float, float]] = []
-    for difficulty in sorted(PRESETS, key=lambda d: PRESETS[d].n_jobs):
+    # Every cell is submitted at once rather than one difficulty at a time. A
+    # cell holds only `episodes` turns in flight, so running them sequentially
+    # caps the batch at that number however much room the card has -- eight
+    # cells of six episodes fills a batch that six alone leaves five-sixths
+    # empty. The cells are independent, so there is nothing to serialize for.
+    difficulties = sorted(PRESETS, key=lambda d: PRESETS[d].n_jobs)
+    cells: list[tuple[str, int]] = [(d, n) for d in difficulties for n in (1, 0)]
+
+    async def score(difficulty: str, solo: int) -> list[float]:
         base = {**config.team.to_dict(), "difficulty": difficulty}
-        solo = await _score_many(
-            backend, TeamConfig.from_dict({**base, "n_agents": 1}), episodes
-        )
-        team = await _score_many(backend, TeamConfig.from_dict(base), episodes)
-        gap = statistics.mean(team) - statistics.mean(solo)
-        rows.append((difficulty, statistics.mean(team), gap))
+        if solo:
+            base["n_agents"] = 1
+        return await _score_many(backend, TeamConfig.from_dict(base), episodes)
+
+    results = await asyncio.gather(*(score(d, s) for d, s in cells))
+    scored = dict(zip(cells, results))
+
+    print(f"{'difficulty':<10}{'solo':>8}{'team':>8}{'gap':>9}", file=sys.stderr)
+    rows: list[tuple[str, float, float]] = []
+    for difficulty in difficulties:
+        solo = statistics.mean(scored[(difficulty, 1)])
+        team = statistics.mean(scored[(difficulty, 0)])
+        rows.append((difficulty, team, team - solo))
         print(
-            f"{difficulty:<10}{statistics.mean(solo):>8.3f}"
-            f"{statistics.mean(team):>8.3f}{gap:>+9.3f}",
+            f"{difficulty:<10}{solo:>8.3f}{team:>8.3f}{team - solo:>+9.3f}",
             file=sys.stderr,
             flush=True,
         )
