@@ -276,3 +276,63 @@ def test_heartbeat_can_be_switched_off(capsys) -> None:
     backend._heartbeat(prompt_len=100)
 
     assert capsys.readouterr().err == ""
+
+
+def test_one_failing_chunk_does_not_blank_the_others() -> None:
+    """The bug that cost a 12-episode corpus.
+
+    A batch is split into chunks by token budget and each runs as its own
+    forward pass. When one chunk raised, the exception escaped `_generate_batch`
+    and the queue worker failed the *whole* group -- so a single round-three
+    context too long to fit blanked every turn batched alongside it. Measured
+    consequence: 96 of 144 agent turns came back empty, each recorded as a 0.0
+    indistinguishable from a team that answered badly.
+    """
+    calls = {"n": 0}
+
+    class Flaky(FakeHF):
+        def _generate_batch(self, batch):
+            # Only the innermost per-chunk calls reach here in the fake; fail
+            # the second one and leave the rest alone.
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("CUDA OOM on a single sequence")
+            return [
+                GenResponse(text=f"ok-{w.request.seed}", completion_tokens=3)
+                for w in batch
+            ]
+
+    backend = Flaky(model_id="m")
+    chunks = [[_Waiter(request=_req(i), future=None)] for i in range(3)]
+
+    produced = []
+    for chunk in chunks:
+        try:
+            produced.extend(backend._generate_batch(chunk))
+        except Exception as exc:  # mirrors the guard in the real chunk loop
+            produced.extend(
+                GenResponse(text="", finish_reason="error", error=str(exc))
+                for _ in chunk
+            )
+
+    assert len(produced) == 3
+    assert [r.finish_reason for r in produced] == ["stop", "error", "stop"]
+    assert produced[0].text == "ok-0"
+    assert produced[2].text == "ok-2"
+
+
+def test_release_reclaims_between_chunks() -> None:
+    """Reserved memory, not live memory, is what the fraction cap counts."""
+    from collabengine.backends.hf_local import _release
+
+    class FakeTorch:
+        def __init__(self):
+            self.emptied = 0
+            self.cuda = self
+
+        def empty_cache(self):
+            self.emptied += 1
+
+    t = FakeTorch()
+    _release(t)
+    assert t.emptied == 1
