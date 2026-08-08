@@ -47,6 +47,7 @@ from collabengine.analysis import (
 )
 from collabengine.analysis.coding import CodingStats, JudgeUnavailable
 from collabengine.analysis.integrity import audit, is_instrument_failure
+from collabengine.analysis.scoring import FRACTION, METRICS, rescore
 from collabengine.backends.mock import MockBackend, MockMode
 from collabengine.config import ExperimentConfig
 from collabengine.orchestrator import run_episode
@@ -542,6 +543,55 @@ def _report_mixed(ablation_path: Path) -> None:
         )
 
 
+def _report_metric_spread(baseline_path: Path) -> None:
+    """The Phase 1 gate under all three metrics, with an effect size.
+
+    Reported together on purpose. The default fraction metric sits near ceiling
+    at this model scale -- one agent scores 0.842 on `hard` while producing an
+    actually feasible schedule once in twelve episodes -- so a team-vs-solo gap
+    read off it alone understates what is there. On the medium corpus the gap
+    is +0.026 under fraction and +0.167 under feasibility.
+
+    Cohen's d is printed beside each because the stricter metrics move the gap
+    far more than they move the separation (+0.27 to +0.36 on that corpus).
+    Without it, picking the metric with the largest gap would look like finding
+    an effect.
+    """
+    scores: dict[str, dict[str, list[float]]] = {m: {} for m in METRICS}
+    for record in _usable(TranscriptReader(baseline_path)):
+        if record.condition not in ("baseline", "solo"):
+            continue
+        rescored = rescore(record)
+        for metric in METRICS:
+            scores[metric].setdefault(record.condition, []).append(
+                rescored.overall[metric]
+            )
+
+    solo = scores[FRACTION].get("solo")
+    team = scores[FRACTION].get("baseline")
+    if not solo or not team:
+        return
+
+    print(f"\n{'metric':<12}{'solo':>8}{'team':>8}{'gap':>9}{'d':>8}")
+    for metric in METRICS:
+        s, t = scores[metric]["solo"], scores[metric]["baseline"]
+        gap = statistics.mean(t) - statistics.mean(s)
+        pooled = (
+            (statistics.pstdev(s) ** 2 + statistics.pstdev(t) ** 2) / 2
+        ) ** 0.5
+        d = gap / pooled if pooled else float("nan")
+        print(f"{metric:<12}{statistics.mean(s):>8.3f}{statistics.mean(t):>8.3f}"
+              f"{gap:>+9.3f}{d:>+8.2f}")
+
+    n = min(len(solo), len(team))
+    if n < 30:
+        print(
+            f"  n={n} per arm. An effect of d=0.35 needs ~130 per arm for 80% "
+            f"power, so a real effect this size cannot reach significance here.",
+            file=sys.stderr,
+        )
+
+
 def _report_modes(baseline_path: Path, ablation_path: Path) -> None:
     """Per-mode scalar drops, and the fungibility metric they produce.
 
@@ -551,6 +601,8 @@ def _report_modes(baseline_path: Path, ablation_path: Path) -> None:
     but any of them could have filled it. Neither number means anything alone,
     which is why they are printed together with their controls.
     """
+    _report_metric_spread(baseline_path)
+
     by_condition: dict[str, list[float]] = {}
     for record in _usable(TranscriptReader(baseline_path)):
         by_condition.setdefault(record.condition, []).append(record.grade.overall)
