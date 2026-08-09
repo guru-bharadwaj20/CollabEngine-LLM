@@ -811,6 +811,44 @@ corpus — but the diagnostic now answers it rather than assuming.
 Four separate failures tonight damaged the team arm and left the solo arm
 untouched. That is not coincidence, and it generalises past this project.
 
+**Quantified, once the ceiling in §3.10 was known.** The prefill ceiling on this
+card sits near 6,500 tokens. Measuring every agent turn's context length in the
+corpora already on disk:
+
+| corpus | arm | turns | median | p90 | max | **over 6.5k** |
+|---|---|---|---|---|---|---|
+| `hard` | solo | 72 | 3,554 | 3,917 | 4,039 | **0.0%** |
+| `hard` | team | 432 | 5,730 | 7,584 | 10,619 | **28.9%** |
+| `medium` | team | 144 | 3,851 | 5,021 | 5,727 | **0.0%** |
+
+**At `hard`, 28.9% of team turns sit above the hardware ceiling and 0% of solo
+turns do.** Not a subtle bias — a censoring threshold that only one arm can
+cross, and the arm it censors is the one under test. Regeneration cannot fix
+it: the context length is a deterministic property of the instance and the
+transcript, so an episode over the line is over it every time. The three
+permanently-failing `hard` episodes were never a fluke.
+
+**This re-weights the two operating points against each other.** `medium` is
+completely clean — its longest team turn is 5,727 tokens, comfortably under the
+ceiling for both arms — so §4.1d's null is measured on an uncensored
+distribution and stands as written. `hard` is not: its team mean of 0.871 is
+computed on a distribution with the upper tail removed.
+
+**The direction of that censoring argues the negative result is if anything
+understated.** At `medium`, the episodes lost to OOM scored 0.775 against the
+survivors' 0.907 and produced zero feasible schedules (§4.1d) — long team
+episodes are *worse*, not better. If that holds at `hard`, censoring the long
+tail **flatters** the team arm, and the team still fails to beat solo. The
+conclusion survives its own worst-case correction, which is the strongest form
+it can take on this hardware.
+
+**What it costs going forward.** Any operating point whose team contexts cross
+6,500 tokens cannot be measured cleanly on this card, regardless of batch
+settings. That rules out `xhard` entirely (§3.10) and puts `hard` on notice.
+`medium` is the largest instance size this hardware can evaluate without
+censoring the team arm — a statement about the equipment, not the hypothesis,
+and one that belongs in the methods section rather than the results.
+
 | limit | solo (3 turns, ~5.7k tok) | team (12 turns, ~10k tok) |
 |---|---|---|
 | `max_tokens` 512 | mild truncation | penalised the verbose agents |
