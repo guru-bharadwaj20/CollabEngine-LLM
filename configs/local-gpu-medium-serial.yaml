@@ -1,0 +1,59 @@
+# `medium`, run nearly serially — for regenerating episodes that OOMed.
+#
+# Identical to configs/local-gpu-medium.yaml except `max_concurrency`, which
+# drops from 24 to 2. That is the whole point of the file.
+#
+# Why it should work where the normal config does not. A long prefill needs
+# roughly 1 MB per prompt token of transient logits memory (RESEARCH-LOG 3.10),
+# so a 10,000-token turn wants ~7 GiB on top of 15.3 GiB of weights -- which
+# fits on a 24 GB card, but only if nothing else is holding memory at that
+# instant. Under 24-way concurrency it usually is: sibling batches are mid-
+# generation and the long sequence loses the race, exhausts its retries, and is
+# written as an errored turn. At concurrency 2 it has the card essentially to
+# itself.
+#
+# This matters because the loss is not random. Failures land on the longest
+# contexts, which are team episodes, and at `hard` they scored 0.775 against
+# surviving episodes' 0.907 -- so dropping them inflates the team mean and
+# manufactures a benefit that is not there (RESEARCH-LOG 4.1d, 4.6).
+#
+# Use with resume, which re-runs only the episodes missing from the transcript:
+#
+#   1. remove the instrument-failure episodes from baseline.jsonl
+#   2. collabengine baseline --config configs/local-gpu-medium-serial.yaml
+#
+# Slower per episode and far slower in aggregate, which is why it is not the
+# default. It is the right trade only for the handful of episodes that fail.
+name: qwen3-8b-medium
+seed_start: 0
+n_episodes: 24
+out_dir: runs
+
+max_concurrency: 2
+
+backend:
+  kind: hf
+  model: Qwen/Qwen3-8B
+  device: cuda
+  dtype: bfloat16
+  max_batch_size: 32
+  max_batch_tokens: 30000
+  memory_fraction: 0.95
+  batch_window_s: 0.05
+  max_model_len: 12288
+  enable_thinking: false
+  # More patience than the default 2. At this concurrency an OOM means a
+  # genuinely large prefill rather than a lost race, and waiting for the one
+  # sibling to finish is exactly what will free the memory it needs.
+  oom_retries: 6
+  oom_retry_s: 10.0
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: medium
+  symmetry: name_seed
+  randomize_turn_order: true
+  max_tokens: 1024
+  temperature: 0.8
+  top_p: 0.95

@@ -501,6 +501,19 @@ class HFLocalBackend(LLMBackend):
                     _release(torch)
                     return self._generate_batch(batch, attempt=attempt + 1)
 
+                # Say so on stderr, not only in the episode record. The retry
+                # attempts print here but the *outcome* used to go only into the
+                # transcript, so a live run showed "waiting for memory" lines
+                # and nothing else -- indistinguishable from a run where every
+                # retry succeeded. Four episodes were lost that way while the
+                # log was being read as healthy.
+                print(
+                    f"  [hf_local] GIVING UP on a {padded}-token sequence after "
+                    f"{self.oom_retries} retries; this turn is recorded as an "
+                    "error and its episode becomes an instrument failure",
+                    file=sys.stderr,
+                )
+
                 # Report the one turn that cannot fit rather than raising. A
                 # raise here escapes through every enclosing chunk and the
                 # caller fails the entire batch, so one 6000-token context
