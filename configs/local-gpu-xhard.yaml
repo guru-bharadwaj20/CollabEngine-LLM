@@ -1,0 +1,70 @@
+# The `xhard` operating point — the crossover test.
+#
+# Hypothesis, registered in docs/PREREG-xhard.md before any episode here was
+# generated: a single agent degrades as instances grow (0.879 -> 0.842 from
+# medium to hard) while four agents do not (0.874 -> 0.871), so the lines
+# should cross above `hard`.
+#
+#   collabengine pipeline --config configs/local-gpu-xhard.yaml \
+#                         --phases baseline,solo
+#
+# Only two arms. The symmetry sweep and the fixed-order control are not part of
+# any hypothesis in the preregistration, and running them would spend the card
+# on arms nobody predicted anything about.
+name: qwen3-8b-xhard
+seed_start: 0
+n_episodes: 12
+out_dir: runs
+
+max_concurrency: 24
+
+backend:
+  kind: hf
+  model: Qwen/Qwen3-8B
+  device: cuda
+  dtype: bfloat16
+  max_batch_size: 32
+
+  # Both of the numbers below differ from the `hard` config, and both are
+  # forced by the instance being 1.5x larger. Nothing else may differ, or the
+  # three points on the difficulty curve stop being comparable.
+  #
+  # The rendered brief measures 1704 tokens at `hard` and 2520 at `xhard`.
+  # Round-three team contexts at `hard` were observed prefilling at
+  # 10,176-10,661 tokens; adding 816 tokens of brief and the extra transcript
+  # that 36 jobs generate puts the worst case near 15,000. At the `hard`
+  # setting of 12288 those turns would be left-truncated -- and left truncation
+  # eats the head of the brief, where worker capacities are defined, on exactly
+  # the turns that submit the answer. That biased the team arm once already
+  # (RESEARCH-LOG 3.x, max_model_len 8192) and it biases it in the direction of
+  # the hypothesis being tested here, which is the worst possible direction.
+  max_model_len: 18432
+
+  # Lowered from 30000. A single 18k-token prefill has a large transient
+  # activation peak, and 10k prefills were already OOMing today whenever the
+  # shared card was contended. A smaller budget means a long sequence runs
+  # essentially alone, leaving the headroom for its own prefill instead of
+  # sharing it with a second long sequence. Slower, and the preregistration
+  # commits to regenerating any OOM rather than dropping it, so the cost of an
+  # OOM here is card time rather than a biased arm.
+  max_batch_tokens: 20000
+
+  memory_fraction: 0.95
+  batch_window_s: 0.05
+  enable_thinking: false
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: xhard
+  symmetry: name_seed
+  randomize_turn_order: true
+
+  # Deliberately unchanged from `hard`. This is the design: total work grows
+  # while per-agent capacity does not, which is the first condition under which
+  # dividing the work pays rather than being redundant. Raising it to
+  # compensate for the larger instance would remove the pressure the experiment
+  # exists to create.
+  max_tokens: 1024
+  temperature: 0.8
+  top_p: 0.95
