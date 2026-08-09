@@ -307,6 +307,52 @@ cannot tell you the real path exists.**
 | Qwen3 `<think>` block | Would consume the whole turn budget | `enable_thinking=False` |
 | Test didn't exercise length-sorting (FakeHF overrode the method) | False confidence | Extract `_sorted_chunks`, test directly |
 
+### 3.9 The card is shared, and the guard that knew it failed open
+
+2026-08-09, 10:03. Phase 2 behavioural coding was launched onto what looked
+like an idle card. It was not idle: a *different account on the same
+workstation* (`Student2`) had started an unrelated Qwen3-VL job twenty seconds
+earlier — `profile_e8_efficiency.py`, a parent plus eight worker processes,
+holding 17.3 GiB of the 24 GB and writing to a `FINAL/` results directory under
+`--resume`.
+
+Qwen3-8B in bf16 needs 15.3 GiB for weights alone. The two do not fit. Nothing
+raised an error, because this is §3.4 again: WDDM paged the working set to host
+RAM over PCIe. `nvidia-smi` read 100% utilisation and 24,118 MiB in use, which
+is what a card doing useful work looks like. The tells were the ones §3.4
+already identified — 60 W of a 210 W budget, and `dmon -s put` showing a
+sustained 8 GB/s in and 11 GB/s out with the memory controller at 0%.
+
+**Why it is worth a section of its own.** §3.4 was diagnosed as *our own*
+second model colliding with the pipeline, and the fix was written to match that
+diagnosis: `followup.sh` waits for our pipeline process to disappear. That
+guard is correct and would have passed here, because our pipeline had exited at
+09:36. The mental model — "the danger is two of our jobs overlapping" — was one
+special case of "the danger is 15.3 GiB not fitting in what's left", and the
+narrower model had been encoded into the tooling as though it were the general
+one.
+
+`scripts/queue-judge.sh` replaces the process check with a free-VRAM check:
+≥18 GiB, stable across three 60-second samples, naming the compute PIDs that
+hold the card while it waits. It **waits rather than kills**. The foreign job is
+mid-grid with `--resume` and is not ours to stop, and this is worth stating
+explicitly in a log that otherwise treats the GPU as a private resource.
+
+**The guard's first version failed open.** `nvidia-smi` emits CRLF on Windows;
+a trailing CR survives `tr -d ' '` invisibly; `$(( 24570 - 17348<CR> ))` is an
+arithmetic syntax error; `$free` was left unset; the loop fell through and
+started the judge into the busy card at 10:09:39 — the precise outcome the
+guard existed to prevent, thirty seconds after the guard was written. Fixed by
+stripping CR, validating both figures are digits, and treating anything
+unparseable as *busy*.
+
+The general form is worth keeping: **a guard that fails open is worse than no
+guard, because it gets trusted.** Without it the card would have been checked
+by hand. With it, the check was delegated to nine lines of shell that returned
+"clear" on a parse error. This is the same shape as §3.8 (an errored turn
+grading 0.0) and the retraction in §4.1 (a filter that was bypassed): in each
+case the failure produced a *plausible permissive value* rather than a stop.
+
 ---
 
 ## 4. Results
@@ -348,6 +394,12 @@ The first valid team-vs-solo measurement the project has produced. Qwen3-8B,
 `hard`, `max_tokens` 1024, `max_model_len` 12288, `memory_fraction` 0.95 —
 the first configuration in which a four-agent episode survives round three
 intact.
+
+![Phase 1 gate at hard](figures/gate.png)
+
+*Left: every usable episode, four arms, `fraction` metric. Right: the team−solo
+gap under each metric with its 95% bootstrap interval. Regenerate with
+`python scripts/figures.py`.*
 
 The measurement was taken twice. The first pass ran on 9 team episodes because
 three had died on long-context OOM; since that failure mode selects for long
@@ -523,6 +575,8 @@ Batch sweep, 1600-token context, 192 new tokens:
 | **32** | **108.1 tok/s** | 3.4 | 21.4 GiB |
 | 48 | 71.1 tok/s | 1.5 | 24.4 GiB ← paging |
 
+![Batch-size sweep](figures/throughput.png)
+
 Production shape (13 sequences, 1300-token context, **1024** new tokens):
 **54.9 tok/s, 4.22 decode steps/s, 19.3 GiB peak, 242 s per pass.**
 `cache_implementation="static"` failed — routes through inductor, no MSVC
@@ -675,7 +729,9 @@ every component.
 | Python / torch / transformers | 3.10.11 / 2.5.1+cu121 / 5.1.0 |
 | Model | Qwen3-8B, bf16, 15.3 GiB resident, `enable_thinking=False`, SDPA attention |
 | Team | 4 agents × 3 rounds, temperature 0.8, top_p 0.95, `max_tokens` 1024 |
-| Batching | token-budgeted, length-sorted, 30000 padded tokens, `memory_fraction` 0.90 |
+| Batching | token-budgeted, length-sorted, 30000 padded tokens, `memory_fraction` 0.95 |
+| Difficulty | `hard` — 24 jobs, 6 workers, 6 exclusions, 5 synthesis constraints, capacity slack 1.1, value floor 0.72 |
+| Figures | `python scripts/figures.py` regenerates all three from the corpus |
 
 **Sampling reproducibility is per batch, not per request.** vLLM seeds each
 sequence independently; `model.generate` draws the whole batch from one global
@@ -699,16 +755,34 @@ preset that `ground_truth` and `planted_errors` never reach agent-visible text.
 
 ## 7. What remains
 
-1. **Does `hard` clear the Phase 1 gate?** Early read from solo episodes;
-   full gap ~2 h into the run. Decision point before the ablation grid commits.
-2. Ablation grid: live, frozen_replay, frozen_excise, random_message, capacity.
-3. Interaction strength, diagonal dominance vs chance 0.25, fungibility
-   `Δ(frozen_replay) − Δ(live)`, propagation index on real transcripts,
-   mixed-effects joint Wald test.
-4. Behavioral coding with the local 8B; κ against the frontier subsample.
-5. Convergent validity: do transcript labels predict causal profiles?
+~~1. **Does `hard` clear the Phase 1 gate?**~~ **Answered: no** (§4.1b). All
+three metrics non-significant on near-equal arms.
+
+~~2. Ablation grid.~~ **Cancelled by the gate**, per PLAN.md's stop condition.
+Steps 2 and 3 below are what the grid would have produced and are not
+recoverable at this operating point; they need either a task the team is better
+at or a larger model.
+
+3. **Behavioural coding with the local 8B**; κ against the frontier subsample.
+   *In progress.* This is the live thread — behavioural differentiation does
+   not require a performance benefit, so a failed gate does not touch it.
+4. **Convergent validity:** do transcript labels predict causal profiles? Note
+   that with no ablation grid there is no causal profile to correlate against
+   at `hard`. Convergence can only be reported against *score* contribution,
+   which is a weaker target and must be labelled as such.
+5. **Date the retraction.** Re-run `medium`'s team arm on the fixed harness.
+   The solo arm (0.879) is clean and does not need regenerating, so this is
+   twelve episodes of card time and it converts §4.1 from "withdrawn, unknown"
+   into a measured point on the difficulty curve.
 6. Extend N via resume; Phase 4 robustness across model families and team sizes.
 7. Preregister Phases 3–4 before running them.
+
+**The honest summary of what Phase 1 cost and bought.** It bought one negative
+result (§4.1b), a difficulty curve with one measured point and one withdrawn,
+and an instrument that has now caught five distinct silent-corruption modes.
+It cost the ablation grid, which was the project's headline deliverable. The
+grid is not abandoned — it is blocked on finding an operating point where the
+team contributes something to ablate.
 
 **A weak correlation at step 5 is not a failed project.** It is the strongest
 version of the original thesis and an independent replication of *Agents that
