@@ -349,28 +349,60 @@ The first valid team-vs-solo measurement the project has produced. Qwen3-8B,
 the first configuration in which a four-agent episode survives round three
 intact.
 
-| metric | solo (n=12) | team (n=9) | gap | Cohen's *d* |
-|---|---|---|---|---|
-| `fraction` | 0.842 | 0.862 | +0.020 | +0.31 |
-| `strict` | 0.490 | 0.508 | +0.018 | +0.09 |
-| `feasible` | 0.083 | 0.000 | −0.083 | −0.43 |
+The measurement was taken twice. The first pass ran on 9 team episodes because
+three had died on long-context OOM; since that failure mode selects for long
+transcripts and only team transcripts get long, the surviving nine were a
+suspect subset. The tainted episodes were regenerated at `memory_fraction`
+0.95 before the numbers below were recomputed. **Both readings are kept here
+— the difference between them is the finding.**
 
-Four agents over three rounds do not beat one agent. On the strictest reading
-the team is *worse*: no team episode produced a fully feasible schedule, while
-one solo episode did. `strict` at *d* = 0.09 is indistinguishable from zero.
+| metric | solo (n=12) | team, n=9 (first pass) | team, n=11 (regenerated) |
+|---|---|---|---|
+| `fraction` | 0.842 | 0.862 (*d* +0.31) | 0.871 (*d* +0.40) |
+| `strict` | 0.490 | 0.508 (*d* +0.09) | 0.529 (*d* +0.17) |
+| `feasible` | 0.083 | 0.000 (*d* −0.43) | 0.091 (*d* +0.03) |
 
-Other arms, same corpus: `symmetry:name_seed_scratch` 0.865 (n=11),
-`fixed_order` 0.784 (n=4). The fixed-order arm being lowest would, if it holds,
-say randomised turn order *helps* — but four episodes is not a finding.
+The gate verdict is unchanged, but **one claim from the first pass is
+withdrawn.** It read "on the strictest reading the team is *worse* — no team
+episode produced a fully feasible schedule, while one solo episode did." That
+was subset bias, exactly of the kind predicted: with the two long episodes
+restored, one of them *is* feasible, and `feasible` moves from −0.083 to
++0.008. A one-episode gap in a 12-episode arm was never an effect, and the
+episode was missing because it was long.
 
-**Three caveats, the first serious.** The arms are not equally clean: solo is
-12/12, team 9/12. The three dropped episodes failed on long-context OOM, a
-mechanism that can only affect team episodes, so the surviving nine may be a
-non-random subset — plausibly the shorter, less elaborate ones. At n=9 that
-matters. Second, `feasible` = 0.083 is one solo episode out of twelve, so the
-−0.083 "gap" is a single episode, not an effect. Third, at n≈10 per arm only a
-very large effect could reach significance; this design cannot distinguish
-"no benefit" from "a benefit too small to see here".
+Significance, computed on the regenerated arms (10,000-permutation null on the
+arm labels, BCa bootstrap for the interval):
+
+| metric | gap | perm *p* | 95% CI of the gap |
+|---|---|---|---|
+| `fraction` | +0.029 | 0.373 | [−0.029, +0.088] |
+| `strict` | +0.039 | 0.706 | [−0.151, +0.226] |
+| `feasible` | +0.008 | 1.000 | [−0.250, +0.273] |
+
+Every interval spans zero. Four agents over three rounds do not measurably beat
+one agent on any metric.
+
+Other arms, same corpus: `symmetry:name_seed_scratch` 0.851 (n=12),
+`fixed_order` 0.854 (n=10). Both sit within a hundredth of solo. An earlier
+note here read `fixed_order` at 0.784 and wondered aloud whether randomised
+turn order helps; that was n=4 and it evaporated at n=10.
+
+**A variance result, tested and withdrawn.** The regenerated baseline arm has
+roughly a third of solo's variance (sd 0.050 vs 0.095, ratio 3.6, permutation
+*p* = 0.019 one-sided) — teams scoring no higher but more consistently is a
+plausible mechanism and would have been the one positive result of Phase 1. It
+does not survive the other two team arms. `fixed_order` (sd 0.100) and
+`symmetry` (sd 0.093) are four-agent teams too, and both are as variable as
+solo; pooling all 33 team episodes against solo gives a variance ratio of 1.36
+at *p* = 0.21. One arm in three is a fluke, and the direction was chosen after
+seeing the data. Recorded because the near-miss is instructive: the arm with
+the tight spread is also the arm that lost an episode to OOM, and OOM removes
+the tail.
+
+**Two caveats remain.** `feasible` is one episode in each arm, so its CI is an
+artefact of a binary outcome at n≈11, not a measurement. And at this n only a
+very large effect could reach significance; the design cannot distinguish "no
+benefit" from "a benefit too small to see here".
 
 **What it does establish.** Across both difficulties, a 50% increase in
 instance size moved a single agent from 0.879 to 0.842 and moved the team
@@ -385,40 +417,52 @@ labour visibly while the division buys nothing, and that combination —
 observable roles, no causal contribution — is the strongest form of the
 project's original thesis rather than a null result.
 
-Qwen3-8B, 12 episodes per condition, identical instances, `max_tokens: 1024`:
+#### 4.1c The withdrawn `medium` write-up, kept verbatim
 
-| condition | n | mean | sd |
-|---|---|---|---|
-| baseline (4 agents × 3 rounds) | 12 | 0.905 | 0.095 |
-| solo (1 agent × 3 rounds) | 12 | 0.879 | 0.100 |
-| symmetry: name_seed_scratch | 10 | 0.851 | 0.098 |
+What follows is the text §4.1 carried before the retraction, left in place
+because how a wrong result reads while you believe it is part of the record.
+Every number in it is contaminated by §3.8. **Do not cite it.**
 
-**Team − solo gap: +0.026, against a standard error of ~0.029.**
-Indistinguishable from zero.
+> Qwen3-8B, 12 episodes per condition, identical instances, `max_tokens: 1024`:
+>
+> | condition | n | mean | sd |
+> |---|---|---|---|
+> | baseline (4 agents × 3 rounds) | 12 | 0.905 | 0.095 |
+> | solo (1 agent × 3 rounds) | 12 | 0.879 | 0.100 |
+> | symmetry: name_seed_scratch | 10 | 0.851 | 0.098 |
+>
+> **Team − solo gap: +0.026, against a standard error of ~0.029.**
+> Indistinguishable from zero.
+>
+> PLAN.md Phase 1 makes this a stop condition: *"find the band where the task is
+> hard enough to need collaboration but not so hard the model floors out. If
+> there is no such band, stop and redesign."* It stops Phase 3 at this operating
+> point rather than stopping the project — an ablation grid run where the team
+> contributes nothing measures its own noise floor.
+>
+> **This is a real finding and belongs in the paper**, both as a negative result
+> about 8B agent teams on constraint-satisfaction tasks, and as the difficulty
+> curve Phase 1 asked for. The corpus is archived, not deleted.
+>
+> **Read this together with §4.2.** Under `fraction` the medium gap is +0.026;
+> under whole-instance feasibility the same transcripts give 0.250 vs 0.417 --
+> teams produce a fully feasible schedule 1.7x as often. The gate verdict does
+> not change (that gap is still inside its error at n=12), but the headline
+> metric was hiding the largest signal in the corpus.
 
-PLAN.md Phase 1 makes this a stop condition: *"find the band where the task is
-hard enough to need collaboration but not so hard the model floors out. If there
-is no such band, stop and redesign."* It stops Phase 3 at this operating point
-rather than stopping the project — an ablation grid run where the team
-contributes nothing measures its own noise floor.
+Note what the confident paragraph asserts: a negative result that "belongs in
+the paper", read alongside a §4.2 comparison in which teams look 1.7× better on
+feasibility. Both readings came from a corpus where two thirds of the team's
+turns were empty. The write-up was not careless about statistics — it quoted a
+standard error and refused to over-claim the gap. It was careless about
+*whether the episodes were episodes*, which no amount of downstream rigour
+recovers.
 
-**This is a real finding and belongs in the paper**, both as a negative result
-about 8B agent teams on constraint-satisfaction tasks, and as the difficulty
-curve Phase 1 asked for. The corpus is archived, not deleted.
-
-**Read this together with §4.2.** Under `fraction` the medium gap is +0.026;
-under whole-instance feasibility the same transcripts give 0.250 vs 0.417 --
-teams produce a fully feasible schedule 1.7x as often. The gate verdict does
-not change (that gap is still inside its error at n=12), but the headline
-metric was hiding the largest signal in the corpus.
-
-Action taken: operating point moved to `hard` (24 jobs vs 16, 6 workers vs 5, 6
-exclusions vs 4, 5 synthesis constraints vs 3, capacity slack 1.1 vs 1.2, value
-floor 0.72 vs 0.65).
-
-**Open:** whether `hard` clears the gate. If it does not, the honest reading is
-that an 8B model has no band in this task where collaboration pays — a Phase 1
-result, and not a licence to run Phase 3 anyway.
+Action taken at the time: operating point moved to `hard` (24 jobs vs 16, 6
+workers vs 5, 6 exclusions vs 4, 5 synthesis constraints vs 3, capacity slack
+1.1 vs 1.2, value floor 0.72 vs 0.65). That move was made on the retracted
+comparison, so it was unsupported when made — and §4.1b then failed the gate at
+`hard` independently, which makes it the right move for the wrong reason.
 
 ### 4.2 The scoring metric hides difficulty but is not what limits discrimination
 
