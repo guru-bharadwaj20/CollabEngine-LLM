@@ -384,3 +384,104 @@ def test_windowed_rate_ignores_a_degraded_stretch_once_it_is_over(capsys) -> Non
     line = capsys.readouterr().err
     assert "100 tok/s now" in line, line     # the window sees only the good part
     assert "(10 avg)" in line, line          # the average is still dragged down
+
+
+def test_a_single_sequence_oom_retries_before_being_recorded(monkeypatch) -> None:
+    """Transient foreign memory pressure must cost time, not a corpus.
+
+    Drives the real `HFLocalBackend._generate_batch` -- not `FakeHF`, which
+    replaces the very method under test. An earlier OOM fix in this file passed
+    the entire suite while doing nothing, for exactly that reason.
+
+    Pins the retry budget rather than the recovery: a card that never frees up
+    must back off the configured number of times, doubling each wait, and only
+    then record the turn -- with an error that says retries were spent, so a
+    genuine ceiling is still distinguishable from a busy neighbour in the log.
+    The recovery path is the same code returning normally.
+    """
+    import sys as _sys
+    import types
+
+    import collabengine.backends.hf_local as hl
+
+    class _OOM(Exception):
+        pass
+
+    slept: list[float] = []
+    attempts = {"n": 0}
+
+    class _Tensor:
+        shape = (1, 5223)
+
+    class _Encoded(dict):
+        def to(self, *_a, **_k):
+            return self
+
+    def _tok(prompts, **kw):
+        # Two different calls with two different return shapes: a plain
+        # tokenisation used to measure raw lengths, and a padded tensor batch.
+        if kw.get("return_tensors") != "pt":
+            return {"input_ids": [[1] * 5223 for _ in prompts]}
+        enc = _Encoded()
+        enc["input_ids"] = _Tensor()
+        return enc
+
+    _tok.pad_token_id = 0
+    _tok.truncation_side = "right"
+
+    class _Model:
+        device = "cpu"
+
+        def generate(self, **kw):
+            attempts["n"] += 1
+            raise _OOM("cuda oom")
+
+    torch = types.SimpleNamespace(
+        cuda=types.SimpleNamespace(
+            OutOfMemoryError=_OOM, empty_cache=lambda: None
+        ),
+        inference_mode=lambda: _NullCtx(),
+    )
+    monkeypatch.setitem(_sys.modules, "torch", torch)
+    monkeypatch.setitem(
+        _sys.modules, "transformers", types.SimpleNamespace(set_seed=lambda s: None)
+    )
+    monkeypatch.setattr(hl.time, "sleep", lambda s: slept.append(s))
+
+    backend = HFLocalBackend(model_id="m", oom_retries=2, oom_retry_s=8.0)
+    backend._tokenizer = _tok
+    backend._model = _Model()
+    monkeypatch.setattr(backend, "_render", lambda r: "prompt")
+
+    req = GenRequest(messages=[ChatMessage(role="user", content="hi")], max_tokens=8)
+    out = backend._generate_batch([_Waiter(request=req, future=None)])
+
+    # Two OOMs, both retried with backoff, then the retry budget is exhausted.
+    assert slept == [8.0, 16.0], slept
+    assert out[0].finish_reason == "error"
+    assert "after 2 retries" in (out[0].error or "")
+
+
+class _NullCtx:
+    def __enter__(self):
+        return None
+
+    def __exit__(self, *a):
+        return False
+
+
+def test_oom_backoff_doubles_and_is_bounded() -> None:
+    """The schedule must be finite: a real ceiling has to be reported."""
+    backend = HFLocalBackend(model_id="m", oom_retries=4, oom_retry_s=8.0)
+    delays = [backend.oom_retry_s * (2**a) for a in range(backend.oom_retries)]
+    assert delays == [8.0, 16.0, 32.0, 64.0]
+    assert sum(delays) == 120.0
+
+
+def test_oom_retry_settings_survive_the_config_round_trip() -> None:
+    """A knob that does not reach the backend is a comment, not a setting."""
+    from collabengine.config import BackendConfig
+
+    cfg = BackendConfig(kind="hf", oom_retries=7, oom_retry_s=1.5)
+    assert cfg.to_dict()["oom_retries"] == 7
+    assert cfg.to_dict()["oom_retry_s"] == 1.5

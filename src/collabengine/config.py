@@ -49,6 +49,13 @@ class BackendConfig:
     """Fraction of the card the process may allocate. See `hf_local`: above
     this Windows pages rather than raising OOM, and a paging run looks
     healthy everywhere except PCIe traffic."""
+    oom_retries: int = 4
+    """Waits before a single sequence that OOMs is recorded as an error.
+
+    Set above zero because this study's card is shared: every OOM recorded here
+    has been transient foreign memory pressure rather than a real ceiling, and
+    without retries that writes empty turns into the corpus."""
+    oom_retry_s: float = 8.0
 
     def build(self) -> LLMBackend:
         if self.kind == "mock":
@@ -72,6 +79,8 @@ class BackendConfig:
                 enable_thinking=self.enable_thinking,
                 trust_remote_code=self.trust_remote_code,
                 memory_fraction=self.memory_fraction,
+                oom_retries=self.oom_retries,
+                oom_retry_s=self.oom_retry_s,
             )
         if self.kind == "gemini":
             from collabengine.backends.gemini_judge import GeminiJudgeBackend
@@ -125,6 +134,8 @@ class BackendConfig:
             "max_model_len": self.max_model_len,
             "enable_thinking": self.enable_thinking,
             "memory_fraction": self.memory_fraction,
+            "oom_retries": self.oom_retries,
+            "oom_retry_s": self.oom_retry_s,
             "trust_remote_code": self.trust_remote_code,
         }
 
