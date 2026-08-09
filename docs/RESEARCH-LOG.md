@@ -842,6 +842,31 @@ tail **flatters** the team arm, and the team still fails to beat solo. The
 conclusion survives its own worst-case correction, which is the strongest form
 it can take on this hardware.
 
+**One limit runs the other way, and the section title oversells the claim.**
+Measured on the same `hard` corpus at `max_tokens` 1024:
+
+| arm | agent turns | truncated | rate |
+|---|---|---|---|
+| solo | 72 | 28 | **38.9%** |
+| team | 432 | 78 | **18.1%** |
+
+Solo turns hit the output cap **more than twice as often**. The mechanism is the
+mirror image of the prefill ceiling: a lone agent has to carry the whole answer
+in three turns, while four agents spread the same work across twelve, so
+per-turn output length — and therefore truncation — is higher for solo. This
+depresses the solo score.
+
+So the honest version of this section is not "every limit lands on the team
+arm". It is that **at `hard` the two dominant limits point in opposite
+directions**: the prefill ceiling censors the team's long tail, the output cap
+truncates the solo arm's turns. They partially offset, and neither is small.
+
+**Both distortions favour the team, which is what makes the null robust.**
+Censoring removes the team's *worst* episodes (§4.1d: 0.775 against survivors'
+0.907, zero feasible), and truncation drags the solo arm's scores down. Correct
+for either and the team's +0.020 gap shrinks or reverses. The negative result is
+measured under conditions that flatter the hypothesis it fails to support.
+
 **What it costs going forward.** Any operating point whose team contexts cross
 6,500 tokens cannot be measured cleanly on this card, regardless of batch
 settings. That rules out `xhard` entirely (§3.10) and puts `hard` on notice.
