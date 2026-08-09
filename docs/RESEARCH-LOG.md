@@ -334,7 +334,22 @@ one.
 
 `scripts/queue-judge.sh` replaces the process check with a free-VRAM check:
 ≥18 GiB, stable across three 60-second samples, naming the compute PIDs that
-hold the card while it waits. It **waits rather than kills**. The foreign job is
+hold the card while it waits.
+
+The three-sample requirement was carried over from `followup.sh`'s `GONE_LIMIT`
+as a precaution and was vindicated within the hour. At 12:43:27 the card read
+24,288 MiB free — the foreign job had finished a stage — and sixty seconds
+later a new process of theirs held it again:
+
+```
+[12:43:27] free 24288 MiB (1/3)
+[12:44:27] card reclaimed; restarting the count
+[12:44:27] free 7237 MiB, need 18000; compute pids: ...,17004
+```
+
+A single-sample gate, or a two-sample one, would have started a 15.3 GiB model
+into that gap. **"Free right now" and "free" are different measurements when
+the resource is contended**, and the difference is one poll interval wide. It **waits rather than kills**. The foreign job is
 mid-grid with `--resume` and is not ours to stop, and this is worth stating
 explicitly in a log that otherwise treats the GPU as a private resource.
 
