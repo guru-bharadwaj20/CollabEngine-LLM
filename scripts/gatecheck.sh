@@ -72,6 +72,17 @@ for m in METRICS:
 best = max(verdict)
 n = min(len(by['fraction']['solo']), len(by['fraction']['baseline']))
 print(f"\nn={n} per arm; largest effect across metrics d={best:+.2f}")
+
+# Refuse rather than caveat. An earlier version printed the warning below and
+# then a verdict anyway, and rendered "gate passes" off a single episode per
+# arm -- the integrity filter had removed the rest. A qualified verdict gets
+# quoted without its qualification; no verdict does not.
+if n < 5:
+    print(f"VERDICT: none. {n} usable episodes per arm is too few to read.")
+    print("  If the corpus looked larger than this, the integrity filter")
+    print("  removed the difference -- check errored turns per condition.")
+    raise SystemExit
+
 if best < 0.5:
     print("VERDICT: gate FAILS -- the team is not measurably better than one")
     print("  agent on any metric. An ablation grid here measures the noise")
