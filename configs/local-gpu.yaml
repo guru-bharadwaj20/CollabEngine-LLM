@@ -92,13 +92,24 @@ backend:
 team:
   n_agents: 4
   rounds: 3
-  # Measured, and the reason it is not `medium`. At medium, with the token cap
-  # finally large enough not to truncate the answer, one agent scores 0.879 and
-  # four agents score 0.905 over 12 episodes each -- a gap of +0.026 against a
-  # standard error of ~0.029, i.e. nothing. PLAN.md 4 makes that a stop
-  # condition: an operating point where the task does not reward collaboration
-  # cannot support an ablation study, because every drop would be measured
-  # against a team that was not contributing in the first place.
+  # `hard`, and the justification for it has changed twice -- read this before
+  # citing it.
+  #
+  # It was originally set here because medium showed one agent at 0.879 against
+  # four at 0.905, a gap of nothing. That comparison was **retracted**: its team
+  # arm had 96 of 144 turns errored (RESEARCH-LOG 4.1). The move to `hard` was
+  # therefore unsupported when it was made.
+  #
+  # `hard` was then measured properly and **fails the gate on its own terms** --
+  # team 0.871 vs solo 0.842, every metric non-significant (4.1b). So the
+  # difficulty is right for the wrong reason, and it is not currently an
+  # operating point where an ablation study can run.
+  #
+  # Medium is being re-measured on the fixed harness via
+  # configs/local-gpu-medium.yaml. Early read: `fraction` still shows nothing
+  # (+0.028, p=0.56) but whole-instance feasibility shows 0.667 vs 0.250. If
+  # that survives a full 12-episode arm, the operating point should move back
+  # to medium and this comment should say so.
   #
   # Worth noting how this was missed. `calibrate` chose medium while
   # max_tokens was 512, which truncated 72% of turns and pushed solo down to

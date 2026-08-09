@@ -852,8 +852,58 @@ were something else to Gemini (`synthesize`, `verify`). The small judge's
 characteristic error looks like reaching for the contentless category, which is
 exactly the direction that would suppress a differentiation signal.
 
-What would settle it: a paid key, or ~40 messages hand-coded against the same
-codebook — free, slow, and defensible.
+**A third rater settles it: the local judge is good enough, and the collapse is
+real.** 40 messages were sampled from team episodes, stratified to *oversample
+the rare labels* — the sample is 6 `compute`, 4 `other` and 1 `agree` against
+15 `propose` and 14 `verify`, deliberately loading it with the cases where a
+weak coder should fail. The rater saw message text only: no agent id, no local
+label, no episode context. The Gemini-coded episode was excluded so the two
+validations stay independent.
+
+| | κ | 95% CI | n |
+|---|---|---|---|
+| local 8B vs Gemini | +0.596 | [+0.24, +1.00] | 12 |
+| **local 8B vs third rater** | **+0.684** | **[+0.50, +0.85]** | **40** |
+
+κ = 0.68 is substantial agreement, the interval excludes everything below 0.50,
+and it contains the 0.78 of the prior-art paper. **PLAN.md's assumption that a
+local 7–8B is inadequate as a coder is not supported for this taxonomy on this
+corpus.** That assumption had been treated as the binding constraint on §4.8's
+null; it is not.
+
+The label distributions:
+
+| | propose | verify | compute | other | synthesize | organize | agree |
+|---|---|---|---|---|---|---|---|
+| local 8B | 15 | 14 | 6 | 4 | 0 | 0 | 1 |
+| third rater | 16 | 12 | 6 | 4 | 1 | 1 | 0 |
+
+The stronger rater used six labels to the 8B's five and did find one
+`synthesize` and one `organize` the 8B missed (calling them `agree` and
+`compute`). So the 8B *does* under-detect the interaction categories — but at
+roughly 2 in 40. Extrapolated over 468 messages that is ~23 additional
+messages, still far too thin to support a differentiation analysis in those
+categories. **The taxonomy collapse is a property of these transcripts, not of
+the judge.**
+
+The four `other` labels agreed perfectly. They are empty messages, and both
+raters declining to invent a category for them is the behaviour the
+`other` class exists for.
+
+**Consequence for §4.8.** The differentiation null was reported with the caveat
+that this corpus cannot distinguish "the agents did not differentiate" from
+"the instrument could not see it". That caveat is now substantially discharged:
+two independent validations, one at n=40 with κ = 0.68, say the instrument sees
+what a better instrument sees. **The null stands as a finding about the agents.**
+
+Two honest limits. The third rater is a large language model, not a human — this
+is model-vs-model agreement, and a shared family of failure modes would inflate
+κ in a way no amount of *n* corrects. And the rater had seen the corpus-level
+label distribution before coding, which could pull its labels toward the
+majority classes. Both push κ *up*, so the true agreement is if anything lower
+than 0.68 — but neither undermines the direction of the conclusion, since the
+rare-label oversampling was designed to expose exactly the disagreement that
+would matter.
 
 ## 5. Instrument validity work
 
