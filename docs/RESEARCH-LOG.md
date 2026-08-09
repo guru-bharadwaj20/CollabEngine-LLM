@@ -757,6 +757,104 @@ falsifiable, costs nothing beyond episodes already planned, and can be declared
 before the data exists — which is the only thing that would make the *p*-value
 mean anything. It is the first candidate for the preregistration in §7.7.
 
+### 4.8 Phase 2 — no differentiation, and an instrument that could not have seen it
+
+468 messages across all 48 episodes, coded by the local Qwen3-8B judge in about
+six minutes on the freed card. **0 unparseable, 0 judge errors** — the run
+itself was clean, which is what makes the rest of this section a finding about
+the corpus rather than about the harness.
+
+**The taxonomy collapsed to two labels.**
+
+| label | n | share |
+|---|---:|---:|
+| `propose` | 294 | 62.8% |
+| `verify` | 155 | 33.1% |
+| `compute` | 8 | 1.7% |
+| `other` | 6 | 1.3% |
+| `agree` | 4 | 0.9% |
+| `search` | 1 | 0.2% |
+| `synthesize` | **0** | — |
+| `organize` | **0** | — |
+
+Not a solo-episode artefact: in the 276 team messages, where `organize`,
+`synthesize` and `agree` are all possible, the same two labels take 98.1%.
+
+**This breaks Phase 4 independently of the failed gate.**
+`ACTION_TO_COMPONENT` maps exactly four actions onto graded components —
+`compute`→arithmetic, `search`→search, `verify`→verification,
+`synthesize`→synthesis. Three of the four have essentially no data. Even with
+an ablation grid in hand, convergent validity would have been a test of
+`verify` alone rather than of the mapping. (`converge` refused to run at all,
+correctly: `missing ablation.jsonl`.)
+
+**The one solid behavioural result: teams generate, lone agents audit.**
+Propose as a share of propose+verify, per episode:
+
+| | n | mean | sd |
+|---|---:|---:|---:|
+| solo | 12 | 0.403 | 0.132 |
+| team | 36 | 0.674 | 0.101 |
+
+Gap **+0.272**, episode-level permutation ***p* < 0.0001**. A single agent
+spends most of its turns auditing its own draft; agents in a group spend most
+of theirs putting assignments forward. This one is trustworthy where §4.1b's
+variance effect and §4.7's gradient were not: the mechanism was stated before
+the test was run, the permutation unit is the episode, and the separation is
+wide relative to both standard deviations.
+
+**And the central question comes back null.** On the only contrast with enough
+volume to test:
+
+| test | statistic | *p* |
+|---|---|---|
+| within-episode differentiation (do agents in an episode differ?) | mean within-episode sd of propose-share = 0.231 | **0.451** |
+| cross-episode stability (is `A1` reliably one way?) | max−min across agents = 0.093 | **1.000** |
+
+Agents within an episode differ no more than shuffling the same labels among
+them would produce, and no agent identity carries a stable tendency across
+episodes (A1 0.625, A2 0.676, A3 0.676, A4 0.718). Both nulls, at the right
+permutation unit, on a pre-stated test.
+
+**The caveat that matters more than the result.** A judge that never once
+emitted `organize` or `synthesize` cannot detect differentiation *in organizing
+or synthesizing*. So this corpus **cannot distinguish "the agents did not
+differentiate" from "the instrument could not see differentiation"** — and
+those have opposite implications for the thesis. PLAN.md's Phase 2 note, that a
+local 7–8B is an inadequate judge and is for smoke tests only, was written as a
+budget caveat; it is now the binding constraint on the result.
+
+That makes judge quality the critical path rather than a validity footnote.
+
+**The frontier subsample partly rescues the instrument.** One episode
+(`baseline:hard:9`, 12 messages) coded by Gemini against the same codebook —
+all the free daily quota allows:
+
+| | labels used | distribution |
+|---|---|---|
+| local 8B | 3 of 8 | verify 5, propose 5, agree 2 |
+| Gemini | 3 of 8 | propose 6, verify 5, synthesize 1 |
+
+**κ = +0.596**, raw agreement 0.75, 95% bootstrap CI **[+0.24, +1.00]**. The
+interval is nearly useless at n=12 — it contains the 0.78 of the prior-art
+paper and also contains "barely better than chance".
+
+But the *distribution* comparison is the one that was actually needed, and it
+is more legible than κ: **the frontier judge also concentrates on
+propose/verify**, using three labels on the same twelve messages. It did not
+find the organizing and synthesizing that the 8B missed. That is evidence for
+"these transcripts are genuinely uniform" over "the small judge is blind",
+which shifts the reading of the null in §4.8 from *probably an artefact* to
+*probably real*. Weakly — one episode.
+
+Where the two disagree is still informative: both of the 8B's `agree` labels
+were something else to Gemini (`synthesize`, `verify`). The small judge's
+characteristic error looks like reaching for the contentless category, which is
+exactly the direction that would suppress a differentiation signal.
+
+What would settle it: a paid key, or ~40 messages hand-coded against the same
+codebook — free, slow, and defensible.
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
