@@ -531,6 +531,72 @@ workers vs 5, 6 exclusions vs 4, 5 synthesis constraints vs 3, capacity slack
 comparison, so it was unsupported when made — and §4.1b then failed the gate at
 `hard` independently, which makes it the right move for the wrong reason.
 
+### 4.1d `medium` re-measured — it fails too, and the bias ran the other way
+
+The hole left by the §4.1 retraction, filled. 12 fresh team episodes on the
+fixed harness (`configs/local-gpu-medium.yaml`, identical to the `hard` config
+but for `name` and `difficulty`), against the original medium solo arm, which
+needed no regenerating: a solo episode is 3 turns peaking near 5700 tokens, so
+neither the 8192 truncation nor the 0.90 cap that destroyed the old team arm
+could reach it.
+
+**The first pass had 3 CUDA OOMs and looked like the best result in the
+project:**
+
+| metric | solo (n=12) | team (**n=9**) | gap | *d* | *p* |
+|---|---|---|---|---|---|
+| `fraction` | 0.879 | 0.907 | +0.028 | +0.27 | 0.560 |
+| `strict` | 0.616 | 0.718 | +0.102 | +0.31 | 0.490 |
+| `feasible` | 0.250 | **0.667** | **+0.417** | **+0.92** | 0.086 |
+
+Teams producing a feasible schedule 2.7× as often, at *d* = 0.92 — by a wide
+margin the largest effect ever measured here, and enough to restart the
+ablation grid. It was not reported, because n=9 with three OOM dropouts is the
+same defect that produced the withdrawn claim in §4.1b, and a defect does not
+become acceptable when the number it produces is the one you want.
+
+**The three OOMs turned out to be contention, not a ceiling.** They fired at
+prefills of 4476, 7180 and 8002 tokens — far too small to fail against 22.8 GiB
+at `memory_fraction` 0.95. The shared card (§3.9) was reclaimed by the other
+account during the 45-minute run. Regenerated on an empty card, all three
+completed with **zero** instrument failures.
+
+**With 12/12, the effect collapses:**
+
+| metric | solo (n=12) | team (n=12) | gap | *d* | perm *p* | 95% CI |
+|---|---|---|---|---|---|---|
+| `fraction` | 0.879 | 0.874 | **−0.005** | −0.05 | 0.915 | [−0.096, +0.084] |
+| `strict` | 0.616 | 0.625 | +0.009 | +0.03 | 0.939 | [−0.262, +0.281] |
+| `feasible` | 0.250 | 0.500 | +0.250 | +0.53 | 0.406 | [−0.167, +0.583] |
+
+`feasible` is 3/12 against 6/12 — twice as often, three episodes versus six, and
+nowhere near significance. **`medium` fails the gate as well.**
+
+**Why this is the cleanest confound demonstration in the log.** The three
+dropped episodes were not a random nine-twelfths:
+
+| | fraction | feasible | mean chars |
+|---|---|---|---|
+| the 9 that survived OOM | 0.907 | 0.667 | 8381 |
+| the 3 that OOMed | 0.775 | **0.000** | 8793 |
+
+The episodes the card could not finish were **longer and worse**. Not one of
+them produced a feasible schedule. §4.6 established that every resource limit
+lands on the arm being measured; this adds the part that section got wrong by
+omission — **the direction is not fixed**. OOM removes long episodes, and
+whether that flatters or damages the arm depends entirely on whether long
+episodes happen to score well. At `hard` it hid a real team episode and made
+the team look worse. At `medium` it hid three bad ones and made the team look
+dramatically better. The same mechanism, opposite signs, and neither is
+detectable from the surviving data alone.
+
+**The difficulty curve, complete.** Solo 0.879 at `medium` and 0.842 at `hard`;
+team 0.874 and 0.871. A 50% increase in instance size moves one agent by 0.037
+and four agents by 0.003, and at neither point does the team beat the solo
+baseline on any metric. Two operating points, both failing, is a far stronger
+negative than one — and it says the Phase 1 gate failure is a property of the
+task and the model scale, not of a badly chosen difficulty.
+
 ### 4.2 The scoring metric hides difficulty but is not what limits discrimination
 
 Solo scored 0.879 at `medium` and 0.842 at `hard` — a 50% increase in instance

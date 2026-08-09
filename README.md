@@ -28,9 +28,19 @@ Either direction of that result is publishable, which is the mark of a well-pose
 
 Qwen3-8B on `hard` constraint-satisfaction instances, 12 episodes per arm, identical instances across arms. **Four agents over three rounds are not measurably better than one agent** on any of the three scoring metrics — every bootstrap interval spans zero, and the largest effect is *d* = 0.40 at *p* = 0.38.
 
-PLAN.md makes this a stop condition, so the ablation grid was not run: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor. The corpus is archived rather than deleted, and Phase 2 continues — **behavioural differentiation does not require a performance benefit**, and observable roles with no causal contribution is the strongest form of the original thesis, not a null result.
+It is not a badly chosen difficulty. Both operating points were measured:
 
-Two claims were withdrawn along the way and are documented rather than quietly dropped: an earlier `medium`-difficulty comparison whose team arm had two thirds of its turns empty, and a variance effect that held in one team arm but not the other two. See [RESEARCH-LOG §4.1](docs/RESEARCH-LOG.md).
+![Difficulty curve](docs/figures/curve.png)
+
+A 50% increase in instance size moves one agent by 0.037 and four agents by 0.003. **Neither `medium` nor `hard` rewards collaboration**, which makes this a property of the task and the model scale rather than of the operating point.
+
+PLAN.md makes this a stop condition, so the ablation grid was not run: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
+
+**Phase 2 finds no role differentiation either.** 468 messages coded against an eight-action taxonomy: agents within an episode differ no more in what they do than shuffling the labels among them produces (*p* = 0.45), and no agent identity carries a stable tendency across episodes (*p* = 1.00). The one robust behavioural result is between conditions rather than within teams — **teams generate and lone agents audit**: propose as a share of propose+verify is 0.674 for teams against 0.403 for solo, *p* < 0.0001.
+
+That null survives its own instrument check. The local 8B coder agrees with a much stronger blind rater at **κ = 0.68 [0.50, 0.85]** on a sample deliberately loaded with the rare labels, so the taxonomy collapsing to `propose`/`verify` is a property of these transcripts, not of a cheap judge.
+
+**Three claims were withdrawn along the way** and are documented rather than quietly dropped — a `medium` comparison whose team arm had two thirds of its turns empty, a variance effect present in one team arm but not the other two, and a *d* = 0.92 feasibility result that evaporated when three OOM-dropped episodes were regenerated. The right panel above is that last one: the episodes the card could not finish were longer and scored 0/3, so losing them flattered the team. See [RESEARCH-LOG §4.1](docs/RESEARCH-LOG.md).
 
 ---
 
