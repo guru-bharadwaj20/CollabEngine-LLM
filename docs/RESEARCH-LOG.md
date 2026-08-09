@@ -368,6 +368,86 @@ by hand. With it, the check was delegated to nine lines of shell that returned
 grading 0.0) and the retraction in §4.1 (a filter that was bypassed): in each
 case the failure produced a *plausible permissive value* rather than a stop.
 
+### 3.10 A third corpus lost to the same cause, and the fix that should have come first
+
+The first `xhard` run reported `24 done, 0 failed` and was worthless. That
+count is episodes that *completed*, not turns that generated:
+
+```
+finish_reason: {'stop': 44, 'length': 46, 'error': 90}
+
+condition   eps  unusable   trunc
+baseline     12        12     19%     <- the entire team arm
+solo         12         7     53%
+```
+
+**19 of 24 episodes unusable, 90 of 180 agent turns errored.** The same shape as
+the retracted corpus in §4.1, five months of lessons later.
+
+The OOMs began at **5223-token prefills**, on a card that had run 10,661-token
+prefills at `hard` under an identical `memory_fraction`. Throughput fell from 24
+to 9 tok/s across the run.
+
+**My first diagnosis was wrong, and I acted on it before testing it.** The
+shared card (§3.9) had corrupted two corpora already, the symptom matched, and
+I concluded the other account had reclaimed the GPU mid-run. I then built a
+retry-with-backoff on that assumption, committed it, wrote it up here as fact,
+and relaunched. The relaunch OOMed at the same 5223 tokens **with the card
+empty** — 2% utilisation, 16 GB held by our own process, no other job. The
+evidence that refuted it took one screenshot of Task Manager.
+
+**The real cause, measured directly.** Loading the model exactly as the run
+does and walking prefill sizes up:
+
+| prefill | allocation attempted |
+|---|---|
+| 1 × 5,223 tok | 834 MiB *on top of 22.37 GiB already held* |
+| 1 × 8,000 tok | **7.63 GiB** |
+| 1 × 12,000 tok | **17.17 GiB** |
+| 3 × 5,223 tok | 9.76 GiB |
+
+The failing allocation scales with **prompt tokens**, at roughly 1–1.5 MB each,
+and is independent of batch size — 3 × 5,223 and 1 × 12,000 fail alike. That is
+the logits tensor: Qwen3's vocabulary is 151,936, and the prefill forward
+materialises a distribution for *every* position, upcast, plus a copy. The KV
+cache — the thing every memory knob in this project tunes, and the thing three
+sections of this log reason about — was never the constraint.
+
+`logits_to_keep=1` does not help: passed to `generate` **or** directly to
+`forward`, the attempted allocations are byte-identical. There is no fix from
+our side of the API.
+
+**Consequence: `xhard` is not runnable on this card at bf16.** Its prompts
+*start* near 5,200 tokens, which is already past the ceiling with 15.3 GiB of
+weights resident. Not a tuning problem — `max_batch_tokens`, `max_batch_size`
+and `max_model_len` all leave the per-token cost untouched. The tier needs
+quantised weights (which would confound the difficulty curve it exists to
+extend) or a larger card.
+
+**Why `hard` and `medium` were fine.** Their briefs render at 1704 tokens
+against `xhard`'s 2520. The whole tier sat on the far side of a cliff that the
+two measured operating points sit comfortably below — which is also why nothing
+before it exposed the bug.
+
+**The retry stays, with its justification corrected.** It is a reasonable safety
+net for genuine contention, which does happen here, and it costs only time. But
+it did not address this failure and was never going to: against a hard ceiling
+it burns two minutes per turn and then records the error anyway, which is
+exactly what it did while the card sat at 2% for several minutes. `oom_retries`
+is lowered accordingly.
+
+**The lesson is not about memory.** It is that a diagnosis matching a familiar
+pattern is not a tested diagnosis. Contention was real, recent, and had caused
+this exact symptom twice — which made it the most available explanation and the
+one least likely to be checked. The check cost one command.
+
+**The test drives the real `_generate_batch`.** Every other test in
+`test_hf_local.py` goes through `FakeHF`, which overrides that method — the
+subclass exists to avoid touching CUDA. An earlier OOM fix passed all 283 tests
+while doing nothing for exactly that reason (§3.3), so this one stubs the
+tokenizer and model and drives the real code path, asserting the backoff
+schedule and that the recorded error says retries were spent.
+
 ---
 
 ## 4. Results

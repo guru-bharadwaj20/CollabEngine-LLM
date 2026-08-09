@@ -49,12 +49,13 @@ class BackendConfig:
     """Fraction of the card the process may allocate. See `hf_local`: above
     this Windows pages rather than raising OOM, and a paging run looks
     healthy everywhere except PCIe traffic."""
-    oom_retries: int = 4
+    oom_retries: int = 2
     """Waits before a single sequence that OOMs is recorded as an error.
 
-    Set above zero because this study's card is shared: every OOM recorded here
-    has been transient foreign memory pressure rather than a real ceiling, and
-    without retries that writes empty turns into the corpus."""
+    Above zero because the card is shared and transient foreign pressure would
+    otherwise write empty turns into the corpus. Kept small because it does not
+    help against a real ceiling -- see `hf_local` and RESEARCH-LOG 3.10, where
+    the ceiling turned out to be per-prompt-token logits memory, not KV."""
     oom_retry_s: float = 8.0
 
     def build(self) -> LLMBackend:
