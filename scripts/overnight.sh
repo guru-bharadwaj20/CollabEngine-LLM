@@ -1,56 +1,34 @@
 #!/usr/bin/env bash
-# The night's queue, chained so no card time is lost between stages.
+# The night's queue.
 #
-# Runs only what a hypothesis depends on, in the order that the preregistration
-# (docs/PREREG-xhard.md) needs it:
+# `xhard` is NOT here. It was the plan, and it is not runnable on this card:
+# a single 5223-token prefill OOMs with 15.3 GiB of bf16 weights resident,
+# measured directly (RESEARCH-LOG 3.10). xhard prompts *start* at ~5200 tokens,
+# so the tier is infeasible at this precision on 24 GB, and no amount of batch
+# tuning changes that -- the failing allocation is per prompt token and
+# independent of batch size.
 #
-#   1. xhard to 24 episodes per arm   -- H1/H2, the newest and least certain point
-#   2. hard  to 24 episodes per arm   -- H1's trend has three points; this is the
-#                                        middle one and it was the thinnest
-#   3. behavioural coding on xhard    -- differentiation at the largest instance
+# What is left is worth more than a third operating point anyway: both existing
+# points are at n=12 per arm, which is why every interval in the project spans
+# zero. Doubling them is the difference between "we could not detect a benefit"
+# and "we can bound the benefit". A tighter null is a stronger result.
 #
-# Not run: the symmetry sweep and fixed-order control at xhard. No hypothesis
-# mentions them, and card time spent on arms nobody predicted anything about is
-# how a study ends up with results it has to explain rather than test.
+#   1. hard   -> 24 episodes per arm
+#   2. medium -> 24 episodes per arm (team; solo already n=12, extended here)
 #
-# Each stage resumes. Episodes already on disk are skipped, so a stage that dies
-# costs only its unfinished episodes, and re-running this script is safe.
+# Both resume: episodes on disk are skipped, so re-running this is safe and a
+# stage that dies costs only its unfinished episodes.
 set -u
 
 LOG=runs/overnight.log
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
 
-wait_for_pipeline() {
-  # Absent five times running before believing it, as in followup.sh: a restart
-  # leaves a gap of seconds, and firing into it starts a second 15 GiB model
-  # against the first. Both then page instead of failing.
-  local gone=0
-  while true; do
-    alive=$(powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { \$_.CommandLine -like '*collabengine.cli*' } | Measure-Object).Count" | tr -d '\r ')
-    if [ "${alive:-0}" = "0" ]; then
-      gone=$((gone + 1))
-      [ "$gone" -ge 5 ] && return 0
-    else
-      gone=0
-    fi
-    sleep 30
-  done
-}
-
-say "waiting for the in-flight xhard run to finish"
-wait_for_pipeline
-say "card is idle; starting the queue"
-
-say "=== 1/3  xhard -> 24 episodes per arm ==="
-python -u -m collabengine.cli pipeline --config configs/local-gpu-xhard.yaml \
-  --phases baseline,solo --episodes 24 2>&1 | tee -a "$LOG"
-
-say "=== 2/3  hard -> 24 episodes per arm ==="
+say "=== 1/2  hard -> 24 episodes per arm ==="
 python -u -m collabengine.cli pipeline --config configs/local-gpu.yaml \
   --phases baseline,solo --episodes 24 2>&1 | tee -a "$LOG"
 
-say "=== 3/3  behavioural coding on the xhard corpus ==="
-python -u -m collabengine.cli code --config configs/local-gpu-xhard.yaml \
-  --judge self --judge-name local8b --episode-concurrency 8 2>&1 | tee -a "$LOG"
+say "=== 2/2  medium -> 24 episodes per arm ==="
+python -u -m collabengine.cli pipeline --config configs/local-gpu-medium.yaml \
+  --phases baseline,solo --episodes 24 2>&1 | tee -a "$LOG"
 
 say "ALL DONE"

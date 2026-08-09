@@ -111,23 +111,26 @@ class HFLocalBackend(LLMBackend):
     PCIe traffic. Capping turns that into an OOM the batcher can recover from.
     0.85 of 24 GiB leaves ~20.4 GiB against ~15.3 GiB of weights."""
 
-    oom_retries: int = 4
+    oom_retries: int = 2
     """Times to wait and retry a single sequence that OOMs before recording it.
 
-    This exists because the card is shared. "Does not fit" and "does not fit
-    right now" are different claims, and every OOM this project has recorded
-    turned out to be the second: prefills of 5223 tokens failing on hardware
-    that had run 10,661-token prefills an hour earlier, because another
-    account's job had reclaimed the GPU. Without retries that condition writes
-    empty turns into the corpus, and an empty turn grades 0.0 -- a silent
-    corruption indistinguishable from a team that answered badly.
+    For *contention* only. The card is shared, foreign memory pressure is
+    transient, and without any retry that condition writes empty turns into the
+    corpus -- an empty turn grades 0.0, indistinguishable in the means from a
+    team that answered badly.
 
-    4 retries at exponential backoff spans roughly two minutes, which covers
-    the observed gaps. A genuine ceiling pays that cost once per turn and is
-    then reported exactly as before, so the failure mode this trades against is
-    only wasted time."""
+    It does not help against a real ceiling, and the distinction cost this
+    project a corpus to learn. A 5223-token prefill OOMs here with 15.3 GiB of
+    bf16 weights resident *on an idle card*, because the prefill materialises
+    logits over a 151,936-token vocabulary for every position -- roughly 1 MB
+    per prompt token, independent of batch size. Retrying that waits two
+    minutes and then fails anyway. See RESEARCH-LOG 3.10.
+
+    So: 2 rather than 4. Enough to ride out a neighbour's job, cheap enough
+    that a genuine ceiling is reported promptly. The error message names the
+    spent retries so the two causes stay distinguishable in the log."""
     oom_retry_s: float = 8.0
-    """Base backoff. Doubles each attempt: 8s, 16s, 32s, 64s."""
+    """Base backoff. Doubles each attempt: 8s, 16s."""
 
     heartbeat_s: float = 120.0
     """Seconds between mid-stage throughput lines. 0 disables them.
