@@ -31,12 +31,17 @@ PERMUTATIONS = 20000
 BOOTSTRAPS = 10000
 SEED = 20260810
 
-# (label, team corpus, solo corpus). Solo at `medium` lives in its own
-# directory: it was generated before the team arm was regenerated, and it is
-# reused rather than re-run because a 3-turn solo episode never came near the
-# truncation or memory limits that forced the team arm's regeneration.
+# (label, team corpus, solo corpus). Both arms of every point now live in the
+# same run directory.
+#
+# `medium` briefly did not: its solo arm was reused from `runs/medium-corpus`
+# while only the team arm had been regenerated. That was correct while it was
+# true and became wrong the moment 24 fresh solo episodes were generated
+# alongside the team arm -- the report went on reading the stale 12-episode
+# file and printed `solo n=12, team n=21`, an arm mismatch it had no way to
+# flag because both files were valid. Keep both arms in one directory.
 CORPORA = [
-    ("medium", "runs/qwen3-8b-medium/baseline.jsonl", "runs/medium-corpus/baseline.medium.jsonl"),
+    ("medium", "runs/qwen3-8b-medium/baseline.jsonl", "runs/qwen3-8b-medium/baseline.jsonl"),
     ("hard", "runs/qwen3-8b-local/baseline.jsonl", "runs/qwen3-8b-local/baseline.jsonl"),
     ("xhard", "runs/qwen3-8b-xhard/baseline.jsonl", "runs/qwen3-8b-xhard/baseline.jsonl"),
 ]
