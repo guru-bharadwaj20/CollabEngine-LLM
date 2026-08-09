@@ -342,7 +342,48 @@ cannot tell you the real path exists.**
 > uncorrupted four-agent episodes to answer — cheap to obtain, since the solo
 > arm does not need regenerating.
 
-### 4.1b Phase 1 gate at `hard` — in progress
+### 4.1b Phase 1 gate at `hard` — **fails**
+
+The first valid team-vs-solo measurement the project has produced. Qwen3-8B,
+`hard`, `max_tokens` 1024, `max_model_len` 12288, `memory_fraction` 0.95 —
+the first configuration in which a four-agent episode survives round three
+intact.
+
+| metric | solo (n=12) | team (n=9) | gap | Cohen's *d* |
+|---|---|---|---|---|
+| `fraction` | 0.842 | 0.862 | +0.020 | +0.31 |
+| `strict` | 0.490 | 0.508 | +0.018 | +0.09 |
+| `feasible` | 0.083 | 0.000 | −0.083 | −0.43 |
+
+Four agents over three rounds do not beat one agent. On the strictest reading
+the team is *worse*: no team episode produced a fully feasible schedule, while
+one solo episode did. `strict` at *d* = 0.09 is indistinguishable from zero.
+
+Other arms, same corpus: `symmetry:name_seed_scratch` 0.865 (n=11),
+`fixed_order` 0.784 (n=4). The fixed-order arm being lowest would, if it holds,
+say randomised turn order *helps* — but four episodes is not a finding.
+
+**Three caveats, the first serious.** The arms are not equally clean: solo is
+12/12, team 9/12. The three dropped episodes failed on long-context OOM, a
+mechanism that can only affect team episodes, so the surviving nine may be a
+non-random subset — plausibly the shorter, less elaborate ones. At n=9 that
+matters. Second, `feasible` = 0.083 is one solo episode out of twelve, so the
+−0.083 "gap" is a single episode, not an effect. Third, at n≈10 per arm only a
+very large effect could reach significance; this design cannot distinguish
+"no benefit" from "a benefit too small to see here".
+
+**What it does establish.** Across both difficulties, a 50% increase in
+instance size moved a single agent from 0.879 to 0.842 and moved the team
+nowhere. The task does not reward collaboration at this model scale, which is
+the Phase 1 stop condition, and the ablation grid was not run. An
+agent × component interaction measured where the team contributes nothing would
+be measuring the noise floor.
+
+Phase 2 remains open and worth running on this corpus: **behavioural
+differentiation does not require a performance benefit.** Agents may divide
+labour visibly while the division buys nothing, and that combination —
+observable roles, no causal contribution — is the strongest form of the
+project's original thesis rather than a null result.
 
 Qwen3-8B, 12 episodes per condition, identical instances, `max_tokens: 1024`:
 
