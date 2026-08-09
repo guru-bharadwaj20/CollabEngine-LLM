@@ -66,10 +66,10 @@ def _style() -> None:
     )
 
 
-def load(run_dir: Path) -> dict[str, dict[str, list[float]]]:
+def load(run_dir: Path, name: str = "baseline.jsonl") -> dict[str, dict[str, list[float]]]:
     """metric -> condition -> scores, instrument failures excluded."""
     by: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
-    for rec in TranscriptReader(str(run_dir / "baseline.jsonl")):
+    for rec in TranscriptReader(str(run_dir / name)):
         if is_instrument_failure(rec):
             continue
         scored = rescore(rec)
@@ -233,6 +233,63 @@ def fig_selftest(out: Path) -> None:
     plt.close(fig)
 
 
+def fig_curve(hard, out: Path) -> None:
+    """Both operating points, and what the OOM dropouts did to one of them.
+
+    The right panel is the methodological point: the same three episodes are
+    present or absent, and that alone moves `feasible` from a project-reviving
+    effect to nothing.
+    """
+    med_dir = Path("runs/qwen3-8b-medium")
+    if not (med_dir / "baseline.jsonl").exists():
+        return
+    med = load(med_dir)
+    solo_med = load(Path("runs/medium-corpus"), name="baseline.medium.jsonl")
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.6, 4.0))
+
+    xs = [0, 1]
+    solo = [st.mean(solo_med["fraction"]["solo"]), st.mean(hard["fraction"]["solo"])]
+    team = [st.mean(med["fraction"]["baseline"]), st.mean(hard["fraction"]["baseline"])]
+    ax1.plot(xs, solo, "o-", color=SOLO, lw=2.4, ms=9, label="solo (1 agent)")
+    ax1.plot(xs, team, "s-", color=TEAM, lw=2.4, ms=9, label="team (4 agents)")
+    for x, (a, b) in enumerate(zip(solo, team)):
+        side = 34 if x == 0 else -34   # keep labels off the axis edges
+        ax1.annotate(f"{a:.3f}", (x, a), textcoords="offset points",
+                     xytext=(side, -12), ha="center", fontsize=9, color=SOLO)
+        ax1.annotate(f"{b:.3f}", (x, b), textcoords="offset points",
+                     xytext=(side, 8), ha="center", fontsize=9, color=TEAM)
+    ax1.set_xticks(xs)
+    ax1.set_xticklabels(["medium\n16 jobs, 5 workers", "hard\n24 jobs, 6 workers"])
+    ax1.set_ylabel("score (fraction)")
+    ax1.set_ylim(0.80, 0.94)
+    ax1.set_title("Neither operating point rewards collaboration")
+    ax1.legend(frameon=False, fontsize=9, loc="lower left")
+    ax1.grid(axis="y", color=RULE, lw=0.7)
+    ax1.set_axisbelow(True)
+
+    # Right: medium `feasible`, with and without the three OOM dropouts.
+    labels = ["solo\nn=12", "team\nn=9\n(OOM dropouts)", "team\nn=12\n(regenerated)"]
+    vals = [0.250, 0.667, 0.500]
+    bars = ax2.bar(labels, vals, color=[SOLO, "#b8860b", TEAM], width=0.6, zorder=3)
+    for bar, v in zip(bars, vals):
+        ax2.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.3f}",
+                 ha="center", fontsize=10, fontweight="bold")
+    ax2.annotate("the 3 episodes the card could not\nfinish were longer, and scored 0/3",
+                 xy=(1.0, 0.69), xytext=(0.30, 0.76), fontsize=8.5, color="#b8860b",
+                 ha="left",
+                 arrowprops=dict(arrowstyle="->", color="#b8860b", lw=1.3))
+    ax2.set_ylabel("whole-instance feasibility")
+    ax2.set_ylim(0, 0.82)
+    ax2.set_title("Subset bias, in the flattering direction")
+    ax2.grid(axis="y", color=RULE, lw=0.7)
+    ax2.set_axisbelow(True)
+
+    fig.tight_layout()
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", default="runs/qwen3-8b-local")
@@ -247,6 +304,7 @@ def main() -> None:
     fig_gate(by, out / "gate.png")
     fig_throughput(out / "throughput.png")
     fig_selftest(out / "selftest.png")
+    fig_curve(by, out / "curve.png")
 
     for name, conds in [("fraction", by["fraction"])]:
         for cond in sorted(conds):
