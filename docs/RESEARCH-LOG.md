@@ -547,6 +547,45 @@ corpus — but the diagnostic now answers it rather than assuming.
 
 ---
 
+### 4.6 Every resource limit lands on the arm being measured
+
+Four separate failures tonight damaged the team arm and left the solo arm
+untouched. That is not coincidence, and it generalises past this project.
+
+| limit | solo (3 turns, ~5.7k tok) | team (12 turns, ~10k tok) |
+|---|---|---|
+| `max_tokens` 512 | mild truncation | penalised the verbose agents |
+| right-side truncation at 8192 | never triggered | deleted the answer contract |
+| single-sequence OOM at 0.90 | 0/12 affected | 11/12 affected |
+| single-sequence OOM at 0.95 | 0/12 affected | 3/12 affected |
+
+The mechanism is the same each time: **on fixed hardware, whatever limit you
+reach is reached first by the longest transcripts, and transcript length is a
+function of how much the agents collaborate.** The confound is therefore
+correlated with the independent variable by construction, and it points in one
+direction — against the team.
+
+Measured directly on the stage-1 corpus before the tainted episodes were
+regenerated:
+
+| | n | mean transcript | median |
+|---|---|---|---|
+| clean | 28 | ~3054 tok | 2986 |
+| tainted | 8 | ~3478 tok | 3319 |
+
+The episodes lost were 14% longer on the mean, and that understates it, because
+a tainted transcript is cut off at the point of failure so its true length was
+greater. The failing instance seeds recur across conditions -- `:6`, `:8`,
+`:11` appear in both `baseline` and `fixed_order` -- confirming these are
+instances that generate long transcripts rather than random victims.
+
+**Consequence for the method.** A team-vs-solo comparison on constrained
+hardware must report per-arm instrument-failure counts as standard output, not
+inspect them when a number looks surprising. Dropping the affected episodes is
+not sufficient either: it leaves a non-random subset. They have to be
+regenerated, which is only possible because instances are deterministic in
+`(seed, difficulty)`.
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
