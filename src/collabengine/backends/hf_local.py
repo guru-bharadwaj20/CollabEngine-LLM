@@ -111,6 +111,24 @@ class HFLocalBackend(LLMBackend):
     PCIe traffic. Capping turns that into an OOM the batcher can recover from.
     0.85 of 24 GiB leaves ~20.4 GiB against ~15.3 GiB of weights."""
 
+    oom_retries: int = 4
+    """Times to wait and retry a single sequence that OOMs before recording it.
+
+    This exists because the card is shared. "Does not fit" and "does not fit
+    right now" are different claims, and every OOM this project has recorded
+    turned out to be the second: prefills of 5223 tokens failing on hardware
+    that had run 10,661-token prefills an hour earlier, because another
+    account's job had reclaimed the GPU. Without retries that condition writes
+    empty turns into the corpus, and an empty turn grades 0.0 -- a silent
+    corruption indistinguishable from a team that answered badly.
+
+    4 retries at exponential backoff spans roughly two minutes, which covers
+    the observed gaps. A genuine ceiling pays that cost once per turn and is
+    then reported exactly as before, so the failure mode this trades against is
+    only wasted time."""
+    oom_retry_s: float = 8.0
+    """Base backoff. Doubles each attempt: 8s, 16s, 32s, 64s."""
+
     heartbeat_s: float = 120.0
     """Seconds between mid-stage throughput lines. 0 disables them.
 
@@ -311,7 +329,9 @@ class HFLocalBackend(LLMBackend):
 
     # -------------------------------------------------------------- generation
 
-    def _generate_batch(self, batch: list[_Waiter]) -> list[GenResponse]:
+    def _generate_batch(
+        self, batch: list[_Waiter], attempt: int = 0
+    ) -> list[GenResponse]:
         """Run one forward pass. Blocking; called in a worker thread."""
         import torch
         from transformers import set_seed
@@ -452,6 +472,32 @@ class HFLocalBackend(LLMBackend):
             del encoded
             _release(torch)
             if len(batch) == 1:
+                # Nothing left to halve, but "does not fit" and "does not fit
+                # *right now*" are different claims, and on a shared card the
+                # second is the common one. A 36-job xhard run recorded 90
+                # errored turns with OOMs starting at 5223-token prefills --
+                # while the same card had run 10,661-token prefills at `hard`
+                # under an identical memory cap. Nothing had changed except
+                # that another account's job reclaimed the GPU mid-run
+                # (RESEARCH-LOG 3.9). Half the corpus was destroyed by a
+                # condition that had cleared minutes later.
+                #
+                # So wait and retry before giving up. Foreign memory pressure
+                # is transient; a real ceiling is not, and a real ceiling costs
+                # only the retry budget before being reported exactly as
+                # before.
+                if attempt < self.oom_retries:
+                    delay = self.oom_retry_s * (2**attempt)
+                    print(
+                        f"  [hf_local] OOM on a single {padded}-token sequence; "
+                        f"waiting {delay:.0f}s for memory "
+                        f"(attempt {attempt + 1}/{self.oom_retries})",
+                        file=sys.stderr,
+                    )
+                    time.sleep(delay)
+                    _release(torch)
+                    return self._generate_batch(batch, attempt=attempt + 1)
+
                 # Report the one turn that cannot fit rather than raising. A
                 # raise here escapes through every enclosing chunk and the
                 # caller fails the entire batch, so one 6000-token context
@@ -463,9 +509,11 @@ class HFLocalBackend(LLMBackend):
                         text="",
                         finish_reason="error",
                         error=(
-                            f"CUDA OOM on a single {padded}-token sequence: no "
-                            "batch left to halve. Lower backend.max_model_len "
-                            "or raise memory_fraction."
+                            f"CUDA OOM on a single {padded}-token sequence "
+                            f"after {self.oom_retries} retries: no batch left "
+                            "to halve. Lower backend.max_model_len, raise "
+                            "memory_fraction, or check whether another process "
+                            "holds the card."
                         ),
                     )
                 ]
