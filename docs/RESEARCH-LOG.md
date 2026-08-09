@@ -699,6 +699,64 @@ not sufficient either: it leaves a non-random subset. They have to be
 regenerated, which is only possible because instances are deterministic in
 `(seed, difficulty)`.
 
+### 4.7 Propagation on real transcripts, and a gradient I could not establish
+
+Run while the card was held by another user (§3.9), on transcripts already on
+disk. Three results, in descending order of how much they can be trusted.
+
+**1. Excision is untrustworthy on real data, as it was on the mock.** The
+propagation index — the fraction of an agent's distinct content tokens that
+reappear in later messages by *other* agents — is **0.633** across 132
+agent-episodes (sd 0.216, range 0.150–1.000), and is flat across conditions
+(baseline 0.625, fixed_order 0.627, symmetry 0.645). Nearly two thirds of what
+an agent contributes is already duplicated elsewhere in the transcript by the
+end of the episode.
+
+This confirms on real transcripts what §4.5 found on the mock, and it settles a
+question that was left open there: `frozen_excise` is not measuring an agent's
+contribution on this corpus, because deleting an agent's messages does not
+delete the agent's content. **`frozen_replay` is the mode to trust.** Had the
+ablation grid run, reporting excision drops without this check would have
+produced a corpus-wide "agents contribute nothing" artefact.
+
+**2. The propagation index is strongly length-dependent — an instrument
+caveat.** It correlates with the author's message length at **r = −0.70**
+(unique words per message). This is close to mechanical: the index is a
+*fraction* of distinct tokens, and a longer message has more distinct tokens
+that must all be echoed to score highly. Anyone using this index as a measure
+of influence is partly measuring brevity. It remains fit for its actual purpose
+— deciding whether excision is safe — because that only needs the population
+mean, not per-agent comparisons.
+
+**3. A per-agent gradient that does not survive its own omnibus test.** Agents
+appeared to differ by name: in randomised-order episodes, `A1`/`A2` scored
+0.774/0.723 on propagation against `A3`/`A4` at 0.494/0.551, and wrote shorter
+messages (64/73 unique words vs 86/85). Speaking position was fully balanced by
+randomisation (0.489–0.511 across all four), so this is not the positional
+confound, and the same rank order appeared independently in both symmetry
+conditions.
+
+It is still not a finding:
+
+| test | result |
+|---|---|
+| omnibus max−min spread, agent labels permuted **within episode** | 21.3 words, *p* = **0.156** |
+| trend: corr(agent numeral, verbosity) | *r* = +0.268, *p* = 0.019 |
+| `A1+A2` vs `A3+A4` propagation split | +0.226, *p* < 0.0001 |
+
+The two significant tests are both contrasts **chosen after seeing the
+pattern**. The omnibus — which does not require choosing one — fails. This is
+the same error as the withdrawn variance effect in §4.1b, encountered twice in
+one day, and the second time it was more tempting because the effect is larger
+and replicates across conditions.
+
+**Recorded as a prediction rather than a result.** If minimal symmetry breaking
+(a name and a seed) really does produce stable behavioural differences, then on
+a fresh corpus verbosity should again increase with the agent numeral. That is
+falsifiable, costs nothing beyond episodes already planned, and can be declared
+before the data exists — which is the only thing that would make the *p*-value
+mean anything. It is the first candidate for the preregistration in §7.7.
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
