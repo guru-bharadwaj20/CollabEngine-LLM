@@ -96,6 +96,28 @@ PRESETS: dict[str, DifficultySpec] = {
         n_planted_errors=4,
         value_floor_ratio=0.72,
     ),
+    # Scaled from `hard` along the same axes to test one prediction: a single
+    # agent degrades as instances grow (0.879 -> 0.842 from medium to hard)
+    # while four agents do not (0.874 -> 0.871), so the lines should cross
+    # somewhere above `hard`. See docs/PREREG-xhard.md, written before any
+    # episode at this tier was generated.
+    #
+    # The per-agent budget is deliberately left alone (max_tokens 1024, 3
+    # rounds, 4 agents). That is the whole design: total work grows while
+    # individual capacity does not, which is the first condition under which
+    # dividing the work would pay rather than being redundant.
+    "xhard": DifficultySpec(
+        name="xhard",
+        n_jobs=36,
+        n_workers=8,
+        n_blocks=5,
+        skills_per_worker=2,
+        capacity_slack=1.05,
+        n_exclusions=9,
+        n_synthesis=7,
+        n_planted_errors=6,
+        value_floor_ratio=0.78,
+    ),
 }
 
 
