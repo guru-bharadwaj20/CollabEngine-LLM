@@ -78,9 +78,32 @@ index holds or rises while H1 fails, the duplication reading is supported.
 does *not* degrade further, the instance size is not biting and H1 is untestable
 on this run rather than false.
 
+## Amendment 1 — 2026-08-09 22:50, before any `xhard` result was analysed
+
+**n rises from 12 to 24 episodes per arm** (seeds 0–23), and the `hard` arms are
+extended from 12 to 24 to match.
+
+Two things prompted this and neither is a result. First, the card became
+available for an uninterrupted night, removing the resource constraint that set
+n=12 in the first place. Second, the original `xhard` corpus was discarded
+before any hypothesis was tested: 19 of 24 episodes were instrument failures
+under GPU contention (90 errored turns), and the **only** analysis run on it was
+the integrity audit. No score, gap, or *p*-value from that corpus has been
+computed or seen.
+
+This is recorded as an amendment rather than a silent edit because increasing n
+after glimpsing a result is one of the standard ways a preregistration is
+laundered. The protection here is that there is nothing to have glimpsed. The
+power change: minimum detectable difference at 80% power falls from roughly
+0.12 to 0.085 for a single-point contrast.
+
+Nothing else changes — hypotheses, tests, metrics and the falsification
+condition are all as written above.
+
 ## Analysis, fixed in advance
 
-- n = 12 episodes per arm, seeds 0–11, identical instances across arms.
+- n = 24 episodes per arm (amended from 12), seeds 0–23, identical instances
+  across arms.
 - Arms: `solo` and `baseline` only. No symmetry sweep, no fixed-order control —
   they are not part of any hypothesis here.
 - Instrument failures excluded via `analysis.integrity`, and **any episode lost
