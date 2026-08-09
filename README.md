@@ -146,5 +146,6 @@ The random effect is not decoration. The same instance is played by the un-ablat
 | `transcripts/` | JSONL episode records, sharded for parallel writers |
 | `scripts/figures.py` | Regenerates every figure above from the corpus |
 | `docs/RESEARCH-LOG.md` | Full record: every failure, pivot and measurement, with what each cost |
+| `docs/PREREG-xhard.md` | A preregistered prediction, its amendment, and why the tier turned out to be unrunnable |
 
 **Orchestration is hand-written on purpose.** Every mainstream agent framework ships role scaffolding in its prompt templates, which would silently plant the structure this project claims to observe emerging.

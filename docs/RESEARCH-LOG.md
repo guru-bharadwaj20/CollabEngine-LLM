@@ -1222,7 +1222,9 @@ Matter*' finding that introspective judgment diverges from ablation.
 
 ## Appendix A — Commit ledger
 
-<!-- 44 commits; `git log --reverse --format='%h %ad %s' --date=short` -->
+<!-- 71 commits; `git log --reverse --format='%h %ad %s' --date=short` -->
+<!-- The table below covers days 1-2; later commits are summarised in the
+     sections above, each of which names the change it came from. -->
 
 | Day 1 | |
 |---|---|
@@ -1287,19 +1289,43 @@ Matter*' finding that introspective judgment diverges from ablation.
 
 | Module | Lines | Role |
 |---|---|---|
-| `cli.py` | 1292 | Commands: calibrate, baseline, ablate, pipeline, analyze, code, kappa, converge |
-| `backends/hf_local.py` | 607 | CUDA generation, token-budgeted micro-batching, memory cap, heartbeat |
-| `analysis/coding.py` | 520 | Behavioral coding, identity stripping, κ, differentiation vs null |
-| `tasks/generator.py` | 311 | Instance generator with tagged constraint classes |
+| `cli.py` | 1344 | Commands: calibrate, baseline, ablate, pipeline, analyze, code, kappa, converge |
+| `backends/hf_local.py` | 757 | CUDA generation, token-budgeted micro-batching, memory cap, OOM retry, heartbeat |
+| `analysis/coding.py` | 520 | Behavioural coding, identity stripping, κ, differentiation vs null |
+| `tasks/generator.py` | 333 | Instance generator with tagged constraint classes; tiny→xhard presets |
+| `ablation/modes.py` | 329 | live, frozen_replay, frozen_excise, capacity, random_message, propagation index |
 | `backends/mock.py` | 309 | Full-pipeline debugging and null-world validation |
-| `ablation/modes.py` | 329 | live, frozen_replay, frozen_excise, capacity, random_message |
 | `backends/gemini_judge.py` | 243 | Free-tier judge with per-day quota discrimination |
 | `analysis/mixed.py` | 218 | Mixed-effects interaction, joint Wald test |
 | `tasks/schema.py` / `grader.py` / `render.py` | 214 / 191 / 209 | Components, per-component grading, prompt/answer |
 | `analysis/convergent.py` | 192 | Convergent validity with double-centering |
 | `analysis/integrity.py` | 191 | Instrument-failure classification |
 | `analysis/interaction.py` | 160 | Ablation matrix, double-centering, dominance |
+| `analysis/scoring.py` | 104 | `fraction` / `strict` / `feasible`, re-scorable offline from `(seed, difficulty)` |
 
-**Tests: 277 across 12 files** (~2,450 lines), notably
-`test_instrument_validity.py` (null-world checks) and `test_integrity.py`
-(harness-zero vs team-zero).
+**Tests: 323 across 13 files** (~2,780 lines). The ones that have actually
+caught something: `test_instrument_validity.py` (null-world checks),
+`test_integrity.py` (harness-zero vs team-zero), and the OOM-retry test in
+`test_hf_local.py`, which drives the real `_generate_batch` rather than the
+`FakeHF` subclass — an earlier fix passed all 283 tests while doing nothing
+because every test went through that subclass (§3.3).
+
+### Appendix C — Scripts
+
+| Script | Role |
+|---|---|
+| `scripts/figures.py` | Regenerates every README figure from the corpus, through the same integrity filter and scoring module the analysis uses |
+| `scripts/rescore.py` | Offline re-scoring of archived corpora under alternative metrics — no GPU, since instances are deterministic in `(seed, difficulty)` |
+| `scripts/gatecheck.sh` | Evaluates the Phase 1 gate as soon as the episodes exist; refuses a verdict below 5 usable episodes per arm |
+| `scripts/queue-judge.sh` | Waits for ≥18 GiB free, stable across three checks, before starting a second model on the shared card |
+| `scripts/followup.sh` | Chains analyze → code → κ → converge once a pipeline finishes |
+| `scripts/overnight.sh` | The n=24 extensions at `hard` and `medium` |
+
+### Appendix D — Configs
+
+| Config | Operating point |
+|---|---|
+| `configs/local-gpu.yaml` | `hard` — 24 jobs, 6 workers. Measured; fails the gate (§4.1b) |
+| `configs/local-gpu-medium.yaml` | `medium` — 16 jobs, 5 workers. Measured; fails the gate (§4.1d). The largest instance this card evaluates without censoring the team arm (§4.6) |
+| `configs/local-gpu-xhard.yaml` | `xhard` — 36 jobs, 8 workers. **Not runnable on 24 GB at bf16** (§3.10); kept because the preregistration that motivated it is part of the record |
+| `configs/vllm-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |

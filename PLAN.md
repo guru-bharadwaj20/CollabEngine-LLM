@@ -57,6 +57,36 @@ Your premise: *"One quantized 7–8B model serving all agent turns fits 24GB eas
 
 An 8B model at bf16 is ~16.4 GB of weights, leaving ~7 GB for KV cache on a 24 GB card — enough for a batch of 16–32 at 4–8k context. Sustained batched throughput in that regime is a few hundred to ~1k aggregate output tok/s, putting the full grid at **roughly 4–12 hours of local wall clock**. Overnight, at zero marginal cost.
 
+> **Measured, and the paragraph above is wrong in both directions.** Every
+> figure in it was an estimate; here is what the card actually did.
+>
+> | | planned | measured |
+> |---|---|---|
+> | aggregate throughput | "a few hundred to ~1k tok/s" | **15–108 tok/s**, depending on context length |
+> | batch at 4–8k context | 16–32 | **1.7–3.6** |
+> | binding memory constraint | KV cache | **prefill logits**, ~1 MB per *prompt* token |
+> | full grid | 4–12 h | Phase 1 alone took ~3 days including failures |
+>
+> The throughput miss is an order of magnitude and it comes from one wrong
+> assumption: that KV cache is the limit. It is not. `generate` materialises a
+> distribution over the 151,936-token vocabulary for **every prefill position**,
+> costing ~1 MB per prompt token independent of batch size, and there is no way
+> to switch it off from the API (RESEARCH-LOG §3.10). That single fact caps the
+> batch at 2–4 rather than 16–32 and is most of the missing throughput.
+>
+> **Consequence for scope, and it is the important one.** The plan sized the
+> study at ~100 episodes per condition across ~12 conditions. On this hardware
+> the achievable figure is **12–24 episodes per arm across 2–4 arms** — which is
+> why every confidence interval in the results spans zero. The study is
+> underpowered by construction, not by accident, and the honest framing of the
+> negative result has to say so: it bounds the effect rather than excluding it.
+>
+> Also measured: the ceiling censors **28.9% of team turns at `hard` and 0% of
+> solo turns** (§4.6), so `medium` is the largest instance size this card can
+> evaluate without biasing the comparison. Phase 4's robustness sweep, which
+> this section calls "a convenience rather than a blocker", is where a rented
+> box stops being optional.
+
 **Decision: develop and execute locally.** Rental is no longer on the critical path. It returns only for the Phase 4 robustness sweep (2–3 model families × 3–5 team sizes), which is the one part of the plan that genuinely wants more than one card, and even that is a convenience rather than a blocker.
 
 **Serving caveat — Windows.** vLLM ships no supported Windows build, so the batching server the plan assumed is not directly available. Two paths exist: vLLM inside the WSL2 Ubuntu instance already present on this box, or in-process generation via `transformers` on CUDA. The phases below run against `backends/hf_local.py` — a CUDA `transformers` backend that micro-batches concurrent turns — which keeps the OpenAI-compatible backend intact and unused-but-ready for a WSL vLLM server or a rented box. **The backend abstraction earns its keep here:** switching between them is a config line, exactly as Phase 0 required.
