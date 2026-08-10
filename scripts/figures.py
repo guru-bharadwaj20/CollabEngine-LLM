@@ -244,7 +244,13 @@ def fig_curve(hard, out: Path) -> None:
     if not (med_dir / "baseline.jsonl").exists():
         return
     med = load(med_dir)
-    solo_med = load(Path("runs/medium-corpus"), name="baseline.medium.jsonl")
+    # Both medium arms live in the same run directory. Reading solo from
+    # runs/medium-corpus was correct until 24 fresh solo episodes were
+    # generated beside the team arm; after that it silently plotted the stale
+    # 12-episode mean (0.879) against the new team mean, overstating the gap by
+    # 0.031. The same bug was fixed in gate_report.py and missed here, because
+    # a figure that looks plausible is not checked the way a table is.
+    solo_med = med
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.6, 4.0))
 
@@ -268,20 +274,22 @@ def fig_curve(hard, out: Path) -> None:
     ax1.grid(axis="y", color=RULE, lw=0.7)
     ax1.set_axisbelow(True)
 
-    # Right: medium `feasible`, with and without the three OOM dropouts.
-    labels = ["solo\nn=12", "team\nn=9\n(OOM dropouts)", "team\nn=12\n(regenerated)"]
-    vals = [0.250, 0.667, 0.500]
-    bars = ax2.bar(labels, vals, color=[SOLO, "#b8860b", TEAM], width=0.6, zorder=3)
+    # Right: what censoring did to the `hard` team mean. Every time OOM-dropped
+    # episodes were recovered, the team's apparent advantage shrank -- the gap
+    # was tracking what the instrument discarded, not an effect.
+    labels = ["team n=19\n21% censored", "team n=23\n4% censored", "solo n=24"]
+    vals = [0.892, 0.883, 0.851]
+    bars = ax2.bar(labels, vals, color=["#b8860b", TEAM, SOLO], width=0.6, zorder=3)
     for bar, v in zip(bars, vals):
-        ax2.text(bar.get_x() + bar.get_width() / 2, v + 0.02, f"{v:.3f}",
+        ax2.text(bar.get_x() + bar.get_width() / 2, v + 0.004, f"{v:.3f}",
                  ha="center", fontsize=10, fontweight="bold")
-    ax2.annotate("the 3 episodes the card could not\nfinish were longer, and scored 0/3",
-                 xy=(1.0, 0.69), xytext=(0.30, 0.76), fontsize=8.5, color="#b8860b",
-                 ha="left",
+    ax2.annotate("recovering censored episodes\nshrinks the gap: p 0.093 → 0.185",
+                 xy=(0.85, 0.888), xytext=(0.15, 0.925), fontsize=8.5,
+                 color="#b8860b", ha="left",
                  arrowprops=dict(arrowstyle="->", color="#b8860b", lw=1.3))
-    ax2.set_ylabel("whole-instance feasibility")
-    ax2.set_ylim(0, 0.82)
-    ax2.set_title("Subset bias, in the flattering direction")
+    ax2.set_ylabel("score (fraction), `hard`")
+    ax2.set_ylim(0.80, 0.95)
+    ax2.set_title("The gap tracked the censoring")
     ax2.grid(axis="y", color=RULE, lw=0.7)
     ax2.set_axisbelow(True)
 

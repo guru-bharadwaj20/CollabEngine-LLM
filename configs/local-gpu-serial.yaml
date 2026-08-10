@@ -1,0 +1,54 @@
+# `hard`, run nearly serially — for regenerating episodes that OOMed.
+#
+# The `hard` counterpart of configs/local-gpu-medium-serial.yaml, and needed
+# more than that one: `hard` lost 5 of 24 team episodes to OOM against
+# `medium`'s 3, because its contexts are longer (28.9% of team turns exceed the
+# prefill ceiling, against 0% at medium — RESEARCH-LOG 4.6).
+#
+# Identical to configs/local-gpu.yaml except `max_concurrency` (24 -> 2) and
+# the retry budget. At medium this recovered 2 of 3 failures, which is the
+# evidence that the exhaustions are lost races against sibling batches rather
+# than a fixed ceiling. The one that did not recover failed at only 4871
+# tokens, so a long prefill is a necessary but not sufficient condition — some
+# episodes have an unlucky turn-length distribution within the batch.
+#
+# Expect a lower recovery rate here than at medium. These failed at 6515-10221
+# tokens, which needs ~7-10 GiB of transient logits memory on top of 15.3 GiB
+# of weights; the largest are close to the card's limit even alone.
+#
+#   1. remove the instrument-failure episodes (scripts/repair.py does this)
+#   2. collabengine baseline --config configs/local-gpu-serial.yaml
+#
+# Only the `baseline` condition is regenerable this way. `fixed_order:hard:3`
+# and `:6` are also instrument failures and stay failed — `baseline` does not
+# plan them, and deleting them would lose them for good.
+name: qwen3-8b-local
+seed_start: 0
+n_episodes: 24
+out_dir: runs
+
+max_concurrency: 2
+
+backend:
+  kind: hf
+  model: Qwen/Qwen3-8B
+  device: cuda
+  dtype: bfloat16
+  max_batch_size: 32
+  max_batch_tokens: 30000
+  memory_fraction: 0.95
+  batch_window_s: 0.05
+  max_model_len: 12288
+  enable_thinking: false
+  oom_retries: 6
+  oom_retry_s: 10.0
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: hard
+  symmetry: name_seed
+  randomize_turn_order: true
+  max_tokens: 1024
+  temperature: 0.8
+  top_p: 0.95
