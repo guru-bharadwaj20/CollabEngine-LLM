@@ -26,13 +26,22 @@ Either direction of that result is publishable, which is the mark of a well-pose
 
 ![Phase 1 gate](docs/figures/gate.png)
 
-Qwen3-8B on `hard` constraint-satisfaction instances, 12 episodes per arm, identical instances across arms. **Four agents over three rounds are not measurably better than one agent** on any of the three scoring metrics — every bootstrap interval spans zero, and the largest effect is *d* = 0.40 at *p* = 0.38.
+Qwen3-8B on constraint-satisfaction instances, **24 episodes per arm**, identical instances across arms, both arms from the same run:
+
+| | metric | solo (n=24) | team (n=23) | gap | *d* | perm *p* |
+|---|---|---|---|---|---|---|
+| **medium** | `fraction` | 0.848 | 0.885 | +0.037 | +0.24 | 0.511 |
+| **hard** | `fraction` | 0.851 | 0.883 | +0.032 | +0.40 | 0.185 |
+
+**Four agents over three rounds are not measurably better than one agent** on any of the three scoring metrics at either operating point. Every bootstrap interval spans zero.
+
+The result is trustworthy mainly because of what happened while measuring it: **every artifact removed made the gap smaller.** At `hard` the gap read +0.040 (*p* = 0.093) when 21% of team episodes had been lost to out-of-memory failures, and +0.032 (*p* = 0.185) once four of them were recovered. The one moment this looked like it might clear the gate was the moment its team arm was most censored — the gap was tracking what the instrument discarded, not an effect.
 
 It is not a badly chosen difficulty. Both operating points were measured:
 
 ![Difficulty curve](docs/figures/curve.png)
 
-A 50% increase in instance size moves one agent by 0.037 and four agents by 0.003. **Neither `medium` nor `hard` rewards collaboration**, which makes this a property of the task and the model scale rather than of the operating point.
+At n=24 both curves are flat — solo 0.848 → 0.851, team 0.885 → 0.883 across a 50% increase in instance size. **Neither `medium` nor `hard` rewards collaboration**, which makes this a property of the task and the model scale rather than of the operating point.
 
 PLAN.md makes this a stop condition, so the ablation grid was not run: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
 

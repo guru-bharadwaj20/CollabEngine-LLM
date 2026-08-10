@@ -677,7 +677,50 @@ baseline on any metric. Two operating points, both failing, is a far stronger
 negative than one — and it says the Phase 1 gate failure is a property of the
 task and the model scale, not of a badly chosen difficulty.
 
-### 4.2 The scoring metric hides difficulty but is not what limits discrimination
+### 4.1e Final Phase 1 result, n=24 per arm
+
+Both operating points, doubled, repaired, and read from a single tool
+(`scripts/gate_report.py`). Team arms are 23 of 24 at each point — one episode
+each remains unrecoverable — so censoring is **4%**, against the 21% that made
+the first n=24 `hard` read untrustworthy.
+
+| | metric | solo (n=24) | team (n=23) | gap | *d* | perm *p* | 95% CI |
+|---|---|---|---|---|---|---|---|
+| **medium** | `fraction` | 0.848 | 0.885 | +0.037 | +0.24 | 0.511 | [−0.042, +0.136] |
+| | `strict` | 0.614 | 0.636 | +0.022 | +0.07 | 0.810 | [−0.154, +0.196] |
+| | `feasible` | 0.292 | 0.348 | +0.056 | +0.12 | 0.758 | [−0.201, +0.313] |
+| **hard** | `fraction` | 0.851 | 0.883 | +0.032 | +0.40 | 0.185 | [−0.014, +0.077] |
+| | `strict` | 0.473 | 0.558 | +0.086 | +0.39 | 0.198 | [−0.039, +0.213] |
+| | `feasible` | 0.042 | 0.130 | +0.089 | +0.32 | 0.352 | [−0.042, +0.261] |
+
+**Nothing reaches significance at either point on any metric.** The Phase 1
+gate fails, now on 94 episodes rather than 24.
+
+**Every artifact removed shrank the gap.** This is the through-line of the
+whole exercise and the reason the null is trustworthy:
+
+| correction | team − solo at `hard` |
+|---|---|
+| n=12, 8% censored | +0.029 |
+| n=24, 21% censored | +0.040 (*p* = 0.093) |
+| n=24, 4% censored (repaired) | **+0.032** (*p* = 0.185) |
+
+The one moment this project looked like it might clear the gate — *d* = 0.56 at
+*p* = 0.088 — was the moment its team arm was most censored. Recovering four
+episodes moved *p* from 0.093 to 0.185. The gap was tracking what the
+instrument discarded.
+
+**The `xhard` premise was itself an n=12 artifact.** The preregistered
+hypothesis (docs/PREREG-xhard.md) rested on solo degrading with instance size
+while the team held flat: 0.879 → 0.842 against 0.874 → 0.871. At n=24 with
+both arms read from the same run directory, **solo does not degrade at all** —
+0.848 → 0.851, while team goes 0.885 → 0.883. Both curves are flat. There is no
+crossover to chase, and the tier being unrunnable (§3.10) cost nothing.
+
+That is worth stating plainly because the preregistration was written carefully,
+with a competing hypothesis and a falsification condition, and it was still
+built on a difference that did not survive doubling n. **Preregistration
+disciplines the test, not the premise.**
 
 Solo scored 0.879 at `medium` and 0.842 at `hard` — a 50% increase in instance
 size moved the score by 0.037. The hypothesis was that
