@@ -422,7 +422,8 @@ our side of the API.
 weights resident. Not a tuning problem — `max_batch_tokens`, `max_batch_size`
 and `max_model_len` all leave the per-token cost untouched. The tier needs
 quantised weights (which would confound the difficulty curve it exists to
-extend) or a larger card.
+extend) or a larger card. *Superseded by §3.11: the confound is real, and the
+answer is to move all three points rather than one.*
 
 **Why `hard` and `medium` were fine.** Their briefs render at 1704 tokens
 against `xhard`'s 2520. The whole tier sat on the far side of a cliff that the
@@ -447,6 +448,75 @@ subclass exists to avoid touching CUDA. An earlier OOM fix passed all 283 tests
 while doing nothing for exactly that reason (§3.3), so this one stubs the
 tokenizer and model and drives the real code path, asserting the backoff
 schedule and that the recorded error says retries were spent.
+
+### 3.11 Stop tuning around the ceiling; serve the model instead
+
+*Written before any episode was generated on the new instrument. No result below
+this line — this section records a decision and its cost, not a finding.*
+
+§3.10 ends with two options for `xhard`, quantised weights or a larger card, and
+dismisses the first in a parenthesis: it "would confound the difficulty curve it
+exists to extend". That parenthesis was right about the confound and wrong about
+what follows from it. A confound you can measure is not a reason to abandon a
+test; it is a reason to measure it. The curve is confounded only if one point is
+moved. Moving all three costs card time and nothing else.
+
+**The change.** Meta-Llama-3.1-8B-Instruct at Q4_K_M, served by llama.cpp over
+the existing `openai_compat` backend, replacing Qwen3-8B at bf16 loaded
+in-process. All three tiers regenerate; the Qwen3 curve is superseded, not
+extended. Registered as Amendment 2 to `docs/PREREG-xhard.md` before any episode
+ran, along with the two confounds it introduces and the direction each biases.
+
+**Why this removes the failure rather than tuning around it.** The failing
+allocation in §3.10 was the prefill logits tensor: every prompt position, over a
+151,936-entry vocabulary, upcast, plus a copy. Three things change at once, and
+only the third is decisive.
+
+| | in-process bf16 | served Q4_K_M |
+|---|---|---|
+| weights resident | 15.3 GiB | ~4.6 GiB |
+| prefill | whole prompt in one forward | micro-batches of `-ub` tokens |
+| prefill logits | every position | the sampled position only |
+
+Freeing 10 GiB by quantising would have bought roughly 7,000 more prompt tokens
+against a cost of 1–1.5 MB each — enough for `xhard`, and still the same cliff
+one tier further on. Chunked prefill removes the term instead of shrinking its
+coefficient: the activation peak of a 15k-token prompt becomes the peak of a
+512-token one, and the logits are never materialised for the other 14,848
+positions. The vocabulary size stops mattering, which is why this is the fix and
+the quantisation is the enabler.
+
+**Two things the pivot buys that were not the point.**
+
+*A slot size that does not vary along the curve.* The bf16 configs could not
+manage it — `xhard` needed `max_model_len` 18432 where `hard` ran at 12288 — so
+the three points differed in the instrument as well as the instance. The served
+configs hold 17408 across all three.
+
+*Overflow that announces itself.* A served backend cannot silently left-truncate
+the way §3.x's tokenizer did; a prompt that does not fit comes back as an HTTP
+error. The backend now labels it `context_overflow` and does not retry, because
+unlike an OOM it is deterministic in the prompt and the preregistration's
+regenerate-don't-drop rule would otherwise loop forever against it.
+
+**Two new ways to lose a corpus, and what checks them.** Neither is hypothetical:
+both are the served forms of failures already in this log.
+
+1. *The slot is smaller than it looks.* llama.cpp divides `-c` across
+   `--parallel` slots, so raising concurrency to fill the card shrinks every
+   window. At `--parallel 24` — the concurrency the bf16 configs used — a
+   73,728-token context gives each request 3,072 tokens, and every team turn is
+   rejected. `max_concurrency` is 4 in all three configs for this reason, and it
+   matches `--parallel` exactly: an episode issues one request at a time, so
+   episodes in flight *are* concurrent requests.
+2. *The server holds different weights than the config names.* The
+   identical-weights control was enforced by nothing but the launch command.
+   `preflight` now compares the served model id against the config.
+
+`scripts/preflight.py` runs both checks plus a live request at the worst-case
+size, in about a minute, before any stage starts. Three corpora in this project
+were lost to conditions that were true before the first episode ran and
+detectable in seconds. That is the whole argument for it.
 
 ---
 
@@ -1236,6 +1306,29 @@ Steps 2 and 3 below are what the grid would have produced and are not
 recoverable at this operating point; they need either a task the team is better
 at or a larger model.
 
+**0. The served run, and it is what the card is queued for.** Three tiers on
+Meta-Llama-3.1-8B-Instruct Q4_K_M over llama.cpp — §3.11, registered as
+PREREG-xhard Amendment 2. In order, and stopping at the first one that answers
+the question:
+
+```
+llama-server -m models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf \
+    --host 127.0.0.1 --port 8000 -ngl 99 -c 73728 --parallel 4 \
+    -b 2048 -ub 512 --flash-attn
+
+for tier in medium hard xhard; do
+  python scripts/preflight.py --config configs/llamacpp-$tier.yaml || break
+  collabengine pipeline --config configs/llamacpp-$tier.yaml \
+                        --phases baseline,solo
+done
+```
+
+144 episodes, 6 arms, n=24 each. Everything before the pipeline line is
+runnable and tested; the pipeline lines are the only part that needs the GPU.
+Run `medium` first — it is the cheapest tier and its solo arm is H4's anchor,
+so if solo does not degrade across the three tiers on this model, H1 is
+untestable on this run and the remaining card time should not be spent.
+
 3. **Behavioural coding with the local 8B**; κ against the frontier subsample.
    *In progress.* This is the live thread — behavioural differentiation does
    not require a performance benefit, so a failed gate does not touch it.
@@ -1364,6 +1457,7 @@ Matter*' finding that introspective judgment diverges from ablation.
 | `ablation/modes.py` | 329 | live, frozen_replay, frozen_excise, capacity, random_message, propagation index |
 | `backends/mock.py` | 309 | Full-pipeline debugging and null-world validation |
 | `backends/gemini_judge.py` | 243 | Free-tier judge with per-day quota discrimination |
+| `backends/openai_compat.py` | 370 | vLLM / llama.cpp client, bounded concurrency, jittered retry, preflight, context-overflow labelling |
 | `analysis/mixed.py` | 218 | Mixed-effects interaction, joint Wald test |
 | `tasks/schema.py` / `grader.py` / `render.py` | 214 / 191 / 209 | Components, per-component grading, prompt/answer |
 | `analysis/convergent.py` | 192 | Convergent validity with double-centering |
@@ -1371,7 +1465,7 @@ Matter*' finding that introspective judgment diverges from ablation.
 | `analysis/interaction.py` | 160 | Ablation matrix, double-centering, dominance |
 | `analysis/scoring.py` | 104 | `fraction` / `strict` / `feasible`, re-scorable offline from `(seed, difficulty)` |
 
-**Tests: 323 across 13 files** (~2,780 lines). The ones that have actually
+**Tests: 330 across 14 files** (~3,000 lines). The ones that have actually
 caught something: `test_instrument_validity.py` (null-world checks),
 `test_integrity.py` (harness-zero vs team-zero), and the OOM-retry test in
 `test_hf_local.py`, which drives the real `_generate_batch` rather than the
@@ -1388,6 +1482,7 @@ because every test went through that subclass (§3.3).
 | `scripts/queue-judge.sh` | Waits for ≥18 GiB free, stable across three checks, before starting a second model on the shared card |
 | `scripts/followup.sh` | Chains analyze → code → κ → converge once a pipeline finishes |
 | `scripts/overnight.sh` | The n=24 extensions at `hard` and `medium` |
+| `scripts/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, in a minute, before the night is spent (§3.11) |
 
 ### Appendix D — Configs
 
@@ -1396,4 +1491,7 @@ because every test went through that subclass (§3.3).
 | `configs/local-gpu.yaml` | `hard` — 24 jobs, 6 workers. Measured; fails the gate (§4.1b) |
 | `configs/local-gpu-medium.yaml` | `medium` — 16 jobs, 5 workers. Measured; fails the gate (§4.1d). The largest instance this card evaluates without censoring the team arm (§4.6) |
 | `configs/local-gpu-xhard.yaml` | `xhard` — 36 jobs, 8 workers. **Not runnable on 24 GB at bf16** (§3.10); kept because the preregistration that motivated it is part of the record |
+| `configs/llamacpp-medium.yaml` | `medium` on the served Q4 instrument (§3.11) |
+| `configs/llamacpp-hard.yaml` | `hard`, same. Regenerated because H1 is a trend and H4 a comparison, and neither survives a change of instrument at one point only |
+| `configs/llamacpp-xhard.yaml` | `xhard`, same — the tier bf16 could not reach. Identical to the two above but for `name` and `difficulty` |
 | `configs/vllm-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |

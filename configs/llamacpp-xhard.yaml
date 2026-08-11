@@ -1,0 +1,97 @@
+# The `xhard` operating point, served from a 4-bit GGUF instead of bf16 weights.
+#
+# Why this config exists: `xhard` is not runnable in-process on this card
+# (RESEARCH-LOG 3.10). Its prompts start near 5,200 tokens, and the prefill
+# forward materialises a logits distribution for *every* prompt position over a
+# 151,936-entry vocabulary, which costs 1-1.5 MB per prompt token on top of 15.3
+# GiB of resident bf16 weights. No knob on our side of the `transformers` API
+# touches that. Serving the model instead removes the whole class of failure:
+# llama.cpp prefills in micro-batches of `-ub` tokens and only materialises
+# logits for the position it samples from.
+#
+# Start the server first -- see docs/LLAMACPP-SETUP.md for the arithmetic behind
+# every number, and run scripts/preflight.py before spending a night:
+#
+#   llama-server -m models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf \
+#       --host 127.0.0.1 --port 8000 \
+#       -ngl 99 -c 73728 --parallel 4 -b 2048 -ub 512 --flash-attn
+#
+#   python scripts/preflight.py --config configs/llamacpp-xhard.yaml
+#   collabengine pipeline --config configs/llamacpp-xhard.yaml \
+#                         --phases baseline,solo
+#
+# Only two arms. The symmetry sweep and the fixed-order control are not part of
+# any hypothesis in the preregistration (docs/PREREG-xhard.md), and running them
+# would spend the card on arms nobody predicted anything about.
+#
+# One model serves every agent, exactly as before. Quantisation changes which
+# weights the study is about; it does not touch the identical-weights control,
+# because all four agents draw from the same server process.
+name: llama31-8b-q4-xhard
+seed_start: 0
+n_episodes: 24            # per PREREG-xhard Amendment 1
+out_dir: runs
+
+# Matched to the server's --parallel, and it has to be, in both directions.
+#
+# An episode issues one request at a time -- agents speak in turn -- so N
+# episodes in flight is exactly N concurrent requests. Setting this above
+# --parallel does not add throughput, it queues turns inside llama.cpp where
+# the runner's progress reporting cannot see them. Setting it below leaves
+# slots idle whose KV cache is already paid for.
+max_concurrency: 4
+
+backend:
+  kind: openai
+  model: Meta-Llama-3.1-8B-Instruct-Q4_K_M
+  base_url: http://127.0.0.1:8000/v1
+  max_concurrency: 4
+  timeout_s: 900          # a 15k-token prefill plus 1024 decoded tokens, unshared
+  max_retries: 4
+  verify_model: true      # the identical-weights control, actually checked
+
+  # An assertion here, not a truncation point. The `hf` backend truncates to
+  # this from the left; a served backend cannot, so preflight instead demands a
+  # slot of at least max_model_len + team.max_tokens = 18432 and refuses to run
+  # otherwise. Overflow then arrives as a labelled `context_overflow` error
+  # rather than as a brief quietly missing its head -- which is where worker
+  # capacities are defined, and which biased the team arm once already
+  # (RESEARCH-LOG 3.x, max_model_len 8192).
+  #
+  # The worst case is 14,474 tokens: the `xhard` brief at ~2,810, eleven prior
+  # turns at the 1024-token cap for 11,264, and 400 for banners and the
+  # answer-format block. `scripts/preflight.py` prints that sum and, on a
+  # llama.cpp server, measures the brief exactly instead of estimating it.
+  #
+  # 17408 rather than 15360 because the brief figure above is an *estimate*, at
+  # 2.6 characters per token measured under a different tokenizer. Being wrong
+  # by 15% costs 2.25 GiB of KV cache at this setting and costs a rejected
+  # final-round turn at the tighter one -- and a rejected final round is the
+  # turn that submits the answer, in the arm with the longest contexts. Every
+  # version of that error this project has made has biased the team arm down.
+  #
+  # Deliberately identical across llamacpp-medium / -hard / -xhard. The bf16
+  # curve could not manage that -- `xhard` needed 18432 where `hard` ran at
+  # 12288 -- so the three points differed in the instrument as well as the
+  # instance. Here they do not.
+  max_model_len: 17408
+
+  # Recorded, unused: `kind: openai` reads none of the in-process knobs. Left at
+  # their defaults rather than deleted, because the resolved config is written
+  # beside the transcript and a reader months from now should not have to guess
+  # whether a missing key meant "not applicable" or "forgotten".
+  enable_thinking: false  # inherent to Llama 3.1; there is no thinking mode
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: xhard
+  symmetry: name_seed
+  randomize_turn_order: true
+
+  # Unchanged from every other tier, and that is the design: total work grows
+  # while per-agent capacity does not, which is the first condition under which
+  # dividing the work pays rather than being redundant.
+  max_tokens: 1024
+  temperature: 0.8
+  top_p: 0.95
