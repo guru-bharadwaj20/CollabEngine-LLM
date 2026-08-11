@@ -1,9 +1,9 @@
 """OpenAI-compatible backend, for vLLM or a llama.cpp server.
 
-Untested against real hardware at time of writing -- the development machine has
-no CUDA device. It is exercised end to end against a stub server in
-`tests/test_openai_backend.py`, so the wire format, retry behavior, and error
-handling are covered; only throughput characteristics are unknown.
+Exercised end to end against an httpx stub in `tests/test_backend_and_runner.py`
+and `tests/test_openai_preflight.py`, so the wire format, retry behavior, and
+error handling are covered; only throughput characteristics are unknown until it
+meets a card.
 
 Design notes for the real run:
 
@@ -11,9 +11,26 @@ Design notes for the real run:
   bad turn in a twelve-turn episode should degrade that episode, not abort a
   batch of hundreds that has been running for an hour.
 * Concurrency is bounded here rather than at the runner, because the limit is a
-  property of the server (its max_num_seqs) rather than of the experiment.
+  property of the server (its --max-num-seqs or --parallel) rather than of the
+  experiment.
 * `seed` is forwarded. vLLM honors it per request, which is what makes an
-  episode reproducible from config alone.
+  episode reproducible from config alone. llama.cpp honors it per slot; see
+  docs/LLAMACPP-SETUP.md for what continuous batching does to that guarantee.
+
+Two failures specific to a served model are handled here rather than left to the
+analysis, because both have already cost this project a corpus in their
+in-process form (RESEARCH-LOG 3.10, 3.11):
+
+* **Context overflow.** A prompt longer than the slot's context is a 400 with a
+  server-specific message. It is not retried -- the next attempt is the same
+  length -- and it is labelled `context_overflow:` so it cannot be read as a
+  transient server hiccup. This is the served analogue of the OOM that killed
+  the first `xhard` corpus, and unlike an OOM it is deterministic, so
+  regenerating the episode cannot fix it. Only a larger slot can.
+* **Serving the wrong weights.** The identical-weights control is what rules out
+  model heterogeneity as the source of any differentiation observed, and it is
+  enforced by nothing at all if the config's model id is never compared against
+  what the server actually loaded. `preflight` compares them.
 """
 
 from __future__ import annotations
@@ -29,6 +46,73 @@ from collabengine.backends.base import GenRequest, GenResponse, LLMBackend
 
 RETRYABLE_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504})
 
+CONTEXT_OVERFLOW_MARKERS = (
+    # llama.cpp server
+    "exceeds the available context size",
+    "context shift is disabled",
+    "context size exceeded",
+    # vLLM
+    "maximum context length",
+    "longer than the maximum",
+    # generic
+    "context_length_exceeded",
+)
+"""Substrings that identify a prompt-too-long rejection.
+
+Phrases rather than tokens, and that is the whole design of this list. A bare
+`n_ctx` would match it too -- and would also match half of llama.cpp's routine
+diagnostics, turning a transient error into one that is never retried. The
+asymmetry is small either way (an unretried turn is regenerated under the
+preregistration, not dropped), so the list is drawn where it can be read: each
+entry is a sentence a server writes only when a prompt did not fit."""
+
+CONTEXT_OVERFLOW = "context_overflow"
+"""Prefix on `GenResponse.error` when the prompt did not fit the slot.
+
+The integrity audit already treats any errored turn as an instrument failure, so
+this changes no analysis. It exists so the operator reading the error tally can
+tell "the slot is too small" -- which regenerating will never fix -- from "the
+server hiccuped", which regenerating does fix."""
+
+
+@dataclass(frozen=True, slots=True)
+class PreflightReport:
+    """What the server says about itself, checked against what the run needs.
+
+    Cheap enough to run before every stage. Its whole purpose is to convert an
+    eight-hour night that produces a corpus of errored turns into a refusal that
+    takes two seconds, which is a trade this project has already paid for three
+    times in the other direction (RESEARCH-LOG 4.1d)."""
+
+    reachable: bool
+    served_models: tuple[str, ...] = ()
+    ctx_per_slot: int | None = None
+    """Context window one request may use, as reported by llama.cpp `/props`.
+
+    Recent llama.cpp divides `-c` across `--parallel` slots and reports the
+    per-slot figure here; a request is bounded by that, not by the total. Older
+    builds and vLLM do not serve `/props` at all, in which case this is None and
+    the check is skipped rather than guessed at."""
+    total_slots: int | None = None
+    required_ctx: int | None = None
+    problems: tuple[str, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        return self.reachable and not self.problems
+
+    def lines(self) -> list[str]:
+        rows = [f"reachable        {self.reachable}"]
+        if self.served_models:
+            rows.append(f"served model     {', '.join(self.served_models)}")
+        if self.ctx_per_slot is not None:
+            need = "" if self.required_ctx is None else f" (need {self.required_ctx})"
+            rows.append(f"ctx per slot     {self.ctx_per_slot}{need}")
+        if self.total_slots is not None:
+            rows.append(f"slots            {self.total_slots}")
+        rows.extend(f"PROBLEM          {p}" for p in self.problems)
+        return rows
+
 
 @dataclass
 class OpenAICompatBackend(LLMBackend):
@@ -41,9 +125,20 @@ class OpenAICompatBackend(LLMBackend):
     """Cap on in-flight requests.
 
     Set at or slightly above the server's --max-num-seqs. Higher just queues in
-    the client where you cannot see it; lower leaves the GPU idle."""
+    the client where you cannot see it; lower leaves the GPU idle.
+
+    Under llama.cpp the ceiling is `--parallel`, and exceeding it is worse than
+    merely queueing: the context is divided across slots, so a run that raises
+    concurrency without raising `-c` shrinks every slot's window until long
+    prompts stop fitting."""
     timeout_s: float = 600.0
     max_retries: int = 4
+    verify_model: bool = True
+    """Whether `preflight` fails when the served model id is not `model`.
+
+    On by default. The served id is a free, exact check on the one control that
+    the whole design rests on -- every agent drawing from identical weights --
+    and it is the kind of mismatch that produces a perfectly plausible corpus."""
     name: str = "openai_compat"
 
     _client: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
@@ -98,6 +193,13 @@ class OpenAICompatBackend(LLMBackend):
                     if response.status_code == 200:
                         return _parse(response.json())
                     last_error = f"HTTP {response.status_code}: {response.text[:300]}"
+                    if is_context_overflow(response.text):
+                        # Deterministic in the prompt, so every retry fails
+                        # identically and the backoff only wastes wall clock.
+                        # Checked before the status class because llama.cpp has
+                        # reported this as a 500 as well as a 400.
+                        last_error = f"{CONTEXT_OVERFLOW}: {last_error}"
+                        break
                     if response.status_code not in RETRYABLE_STATUS:
                         break
 
@@ -115,10 +217,134 @@ class OpenAICompatBackend(LLMBackend):
         except (httpx.TimeoutException, httpx.TransportError):
             return False
 
+    async def preflight(self, required_ctx: int | None = None) -> PreflightReport:
+        """Check the server is the one this config describes, before spending a night.
+
+        `required_ctx` is the longest single request the run will make, in
+        tokens: the worst-case rendered context plus `max_tokens`. Pass it and
+        the slot size is checked; omit it and only reachability and model
+        identity are.
+
+        Every check degrades to "skipped" rather than "failed" when the server
+        does not serve the endpoint, because vLLM has no `/props` and refusing
+        to run against vLLM would be a regression.
+        """
+        client, _ = self._ensure()
+        problems: list[str] = []
+
+        try:
+            models_response = await client.get("/models")
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            return PreflightReport(
+                reachable=False,
+                required_ctx=required_ctx,
+                problems=(
+                    f"cannot reach {self.base_url}: {type(exc).__name__}: {exc}",
+                ),
+            )
+        if models_response.status_code != 200:
+            return PreflightReport(
+                reachable=False,
+                required_ctx=required_ctx,
+                problems=(f"GET /models returned HTTP {models_response.status_code}",),
+            )
+
+        served = _served_model_ids(models_response.json())
+        if self.verify_model and served and not _model_matches(self.model, served):
+            problems.append(
+                f"config asks for model {self.model!r} but the server is serving "
+                f"{', '.join(served)!r}; the identical-weights control is only "
+                "as good as this line"
+            )
+
+        ctx_per_slot, total_slots = await self._props()
+        if required_ctx is not None and ctx_per_slot is not None:
+            if ctx_per_slot < required_ctx:
+                problems.append(
+                    f"slot context is {ctx_per_slot} tokens but the worst-case "
+                    f"request needs {required_ctx}; raise -c to at least "
+                    f"{required_ctx * (total_slots or 1)} "
+                    f"(-c is divided across --parallel slots) or lower --parallel"
+                )
+
+        return PreflightReport(
+            reachable=True,
+            served_models=served,
+            ctx_per_slot=ctx_per_slot,
+            total_slots=total_slots,
+            required_ctx=required_ctx,
+            problems=tuple(problems),
+        )
+
+    async def _props(self) -> tuple[int | None, int | None]:
+        """llama.cpp `/props`. Absent on vLLM, so absence is not a failure."""
+        client, _ = self._ensure()
+        try:
+            response = await client.get("/props")
+        except (httpx.TimeoutException, httpx.TransportError):
+            return None, None
+        if response.status_code != 200:
+            return None, None
+        try:
+            body = response.json()
+        except ValueError:
+            return None, None
+        if not isinstance(body, dict):
+            return None, None
+
+        settings = body.get("default_generation_settings")
+        n_ctx = settings.get("n_ctx") if isinstance(settings, dict) else None
+        slots = body.get("total_slots")
+        return (
+            int(n_ctx) if isinstance(n_ctx, (int, float)) else None,
+            int(slots) if isinstance(slots, (int, float)) else None,
+        )
+
     async def aclose(self) -> None:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+
+def is_context_overflow(body_text: str) -> bool:
+    """Whether a server's rejection means the prompt did not fit the slot."""
+    lowered = body_text.lower()
+    return any(marker in lowered for marker in CONTEXT_OVERFLOW_MARKERS)
+
+
+def _served_model_ids(body: Any) -> tuple[str, ...]:
+    if not isinstance(body, dict):
+        return ()
+    data = body.get("data")
+    if not isinstance(data, list):
+        return ()
+    return tuple(
+        str(entry["id"]) for entry in data if isinstance(entry, dict) and "id" in entry
+    )
+
+
+def _model_matches(configured: str, served: tuple[str, ...]) -> bool:
+    """Whether the configured id names one of the served ones.
+
+    Loose on both sides on purpose. llama.cpp reports the GGUF's file stem or
+    path while the config carries a readable name, so an exact comparison would
+    fail on every correct setup. Matching on the basename without extension,
+    case-folded, catches the failure that matters -- a different model entirely
+    -- without crying wolf over `Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf` versus
+    the path it was loaded from.
+    """
+    want = _model_key(configured)
+    return any(
+        want == _model_key(s) or want in _model_key(s) or _model_key(s) in want
+        for s in served
+    )
+
+
+def _model_key(model_id: str) -> str:
+    stem = model_id.replace("\\", "/").rsplit("/", 1)[-1]
+    if stem.lower().endswith(".gguf"):
+        stem = stem[: -len(".gguf")]
+    return stem.strip().lower()
 
 
 def _parse(body: dict[str, Any]) -> GenResponse:

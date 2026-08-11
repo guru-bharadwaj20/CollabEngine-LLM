@@ -1,0 +1,123 @@
+# Serving the model instead of loading it
+
+Every number here is arithmetic, not lore. Redo it if you change the model, the
+quantisation, the tier, or `--parallel`.
+
+## Why the pivot
+
+`xhard` is not runnable in-process on this card. The failing allocation scales
+with **prompt** tokens at 1–1.5 MB each and is independent of batch size: it is
+the logits tensor, materialised for every prefill position over Qwen3's 151,936
+-entry vocabulary, on top of 15.3 GiB of resident bf16 weights. `logits_to_keep`
+does not touch it, whether passed to `generate` or to `forward`. There is no fix
+on our side of the `transformers` API (RESEARCH-LOG §3.10).
+
+Serving the model removes the class of failure rather than tuning around it:
+
+| | in-process bf16 | served Q4_K_M |
+|---|---|---|
+| weights resident | 15.3 GiB | ~4.6 GiB |
+| prefill | whole prompt at once | micro-batches of `-ub` tokens |
+| prefill logits | every position, upcast, plus a copy | the sampled position only |
+| ceiling on prompt length | ~5,200 tokens at `xhard` | the slot size |
+
+The cost is that the weights are different weights, which is a change to what
+the study is about and is registered as one — see `PREREG-xhard.md` Amendment 2.
+It is not a change to the identical-weights control: all four agents draw from
+one server process, exactly as they drew from one loaded model.
+
+## Memory, per slot
+
+Llama-3.1-8B is GQA with 32 layers, 8 KV heads, and a head dimension of 128, so
+one token of KV cache at f16 costs
+
+    32 layers x 8 heads x 128 dim x 2 (K and V) x 2 bytes = 131,072 B = 128 KiB
+
+**128 KiB per token** is the number to carry around. Then:
+
+| | tokens | KV |
+|---|---|---|
+| one slot (17,408 prompt + 1,024 generated) | 18,432 | 2.25 GiB |
+| four slots | 73,728 | 9.0 GiB |
+
+Against a 24 GiB card: 4.6 (weights) + 9.0 (KV) + ~0.6 (compute buffers at
+`-ub 512`) ≈ **14.2 GiB**, leaving room for the shared-card reality of §3.9 and
+for the local judge that `scripts/queue-judge.sh` waits to start.
+
+The slot is larger than the measured worst case (14,474 tokens at `xhard`) by
+about 4,000. That margin is deliberate: the brief's token count is estimated
+under a different tokenizer, and the two sides of being wrong are not
+symmetric — 15% too generous costs 2.25 GiB of cache, 15% too tight costs the
+final-round turn in the arm with the longest contexts, which is the turn that
+submits the answer.
+
+Six slots would be 13.5 GiB of KV and ~18.7 GiB total. That still fits, and it
+is still not recommended: the card is shared, and the failure mode when it is
+not free is Windows paging the working set over PCIe while every dashboard
+reports 100% utilisation (§3.4).
+
+## The `--parallel` trap
+
+**`-c` is the total context, divided across `--parallel` slots.** A request is
+bounded by its slot, not by `-c`. So
+
+    -c 73728 --parallel 4    ->  18,432 tokens per request   correct for xhard
+    -c 73728 --parallel 24   ->   3,072 tokens per request   every team turn rejected
+    -c 18432 --parallel 4    ->   4,608 tokens per request   every team turn rejected
+
+The middle row is the shape of the mistake: raising concurrency to fill the card
+quietly shrinks the window until the longest prompts — the final-round turns
+that submit the answer — stop fitting. `scripts/preflight.py` reads the real
+per-slot figure from `/props` and refuses the run, which is the only reason this
+is a paragraph rather than another entry in the research log.
+
+## Launch
+
+```
+llama-server -m models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf \
+    --host 127.0.0.1 --port 8000 \
+    -ngl 99 \
+    -c 73728 --parallel 4 \
+    -b 2048 -ub 512 \
+    --flash-attn
+```
+
+| flag | why |
+|---|---|
+| `-ngl 99` | every layer on the GPU. A partial offload is the one configuration that looks like it works and runs at CPU speed. |
+| `-c 73728 --parallel 4` | 18,432 tokens per slot. See above; do not change one without the other. |
+| `-ub 512` | the physical micro-batch, and the actual defence against the OOM that started all this. It bounds the activation peak of a 15k-token prefill to that of a 512-token one. |
+| `-b 2048` | logical batch. Larger is faster to prefill and costs nothing extra in peak memory, since `-ub` is what is resident. |
+| `--flash-attn` | attention without the quadratic scratch buffer. Newer builds spell it `-fa on`. |
+
+Then, always:
+
+```
+python scripts/preflight.py --config configs/llamacpp-xhard.yaml
+```
+
+## LM Studio
+
+LM Studio serves the same OpenAI-compatible surface (default
+`http://localhost:1234/v1`) and works with `kind: openai` unchanged — set
+`base_url` and the model id to whatever it lists. Two things to know:
+
+* Context length and GPU offload are set per model in the UI, not on a command
+  line, and the per-slot arithmetic above still applies.
+* It does not serve llama.cpp's `/props` or `/tokenize`, so preflight's slot
+  check degrades to "unverified" and prints so. The live probe is then the only
+  check on the context, which is why the probe exists and why `--skip-probe`
+  should not be used on an LM Studio server.
+
+`llama-server` is preferred here for the plain reason that its context geometry
+is visible in the launch line and readable from `/props`, and this project has
+lost three corpora to instrument settings nobody could read back afterwards.
+
+## Determinism
+
+`seed` is forwarded per request and llama.cpp honours it per slot. It is not a
+guarantee of bit-identical output across runs: with continuous batching, what
+else is resident in the batch can change the arithmetic. Reproducibility here
+rests on where it has always rested — instances are deterministic in
+`(seed, difficulty)`, so any corpus can be re-scored offline without generating
+anything (`scripts/rescore.py`).

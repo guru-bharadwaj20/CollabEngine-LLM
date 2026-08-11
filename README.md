@@ -57,7 +57,7 @@ That null survives its own instrument check. The local 8B coder agrees with a mu
 
 ```bash
 pip install -e ".[dev,analysis]"
-pytest -q          # 287 tests, seconds, no GPU
+pytest -q          # 330 tests, seconds, no GPU
 ```
 
 Python 3.10+. `dev` brings the test suite, `analysis` brings pandas and statsmodels for the mixed-effects test; the module that needs them imports lazily and says so if they are missing.
@@ -85,7 +85,16 @@ collabengine analyze  --config configs/local-gpu.yaml
 
 `pipeline` calibrates, picks the operating point, then runs baseline, the symmetry sweep, the fixed-order control and the ablation grid in one process — weights load once, the phases share a work queue so the batcher never drains, and no phase waits on a human to read a table. The individual steps (`calibrate`, `baseline`, `ablate`) still exist on their own. Runs resume, and resume is covered by a test asserting planned and recorded episode ids match, because they once did not and every restart silently re-ran the entire grid.
 
-The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving Qwen3-8B at bf16 to every agent. vLLM has no supported Windows build, so the default path generates in-process through `transformers` and supplies its own token-budget batching. To serve with vLLM instead (WSL2 or a rented Linux box) point at `configs/vllm-8b.yaml`; only `backend.kind` differs.
+The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving one model at bf16 to every agent. vLLM has no supported Windows build, so the default path generates in-process through `transformers` and supplies its own token-budget batching. To serve with vLLM instead (WSL2 or a rented Linux box) point at `configs/vllm-8b.yaml`; only `backend.kind` differs.
+
+**The largest tier does not fit that path, and the reason is not a tuning knob.** A bf16 prefill materialises a logits distribution for every prompt position over a 151,936-entry vocabulary, at 1–1.5 MB per prompt token on top of 15.3 GiB of resident weights; `xhard` prompts start near 5,200 tokens. The tier runs instead against a llama.cpp server holding a 4-bit GGUF, where prefill is chunked into `-ub`-sized micro-batches and logits are materialised only for the sampled position — the vocabulary size stops mattering, which is the actual fix. Weights drop to ~4.6 GiB and the whole difficulty curve moves onto that instrument together, because a curve with one point measured elsewhere measures the instrument. See [`docs/LLAMACPP-SETUP.md`](docs/LLAMACPP-SETUP.md) for the memory arithmetic and [PREREG Amendment 2](docs/PREREG-xhard.md) for what the change costs.
+
+```bash
+python scripts/preflight.py --config configs/llamacpp-xhard.yaml   # a minute
+collabengine pipeline --config configs/llamacpp-xhard.yaml --phases baseline,solo
+```
+
+Preflight is not ceremony. Three corpora here were lost to conditions true before the first episode ran: a context ceiling nothing checked, and — new to a served backend — a server quietly holding weights other than the ones the config names, which breaks the identical-weights control while leaving every score plausible.
 
 ### The one performance fact worth knowing up front
 
@@ -148,13 +157,15 @@ The random effect is not decoration. The same instance is played by the un-ablat
 |---|---|
 | `tasks/` | Instance generation (satisfiable by construction), per-component grading, prompt rendering |
 | `orchestrator/` | Episode loop, team composition, turn scheduling |
-| `backends/` | `mock` (no GPU), `hf_local` (in-process CUDA, token-budget batching), `openai_compat` (vLLM), plus the `anthropic` / `gemini` judges |
+| `backends/` | `mock` (no GPU), `hf_local` (in-process CUDA, token-budget batching), `openai_compat` (vLLM or llama.cpp, with preflight and context-overflow labelling), plus the `anthropic` / `gemini` judges |
 | `ablation/` | Live, frozen-replay, frozen-excise, plus capacity and random-message controls |
 | `analysis/` | `interaction`, `mixed`, `coding`, `convergent`, `integrity` (instrument failures vs team failures), `scoring` (three metrics, re-scorable offline) |
 | `runner/` | Bounded-concurrency execution with resume |
 | `transcripts/` | JSONL episode records, sharded for parallel writers |
 | `scripts/figures.py` | Regenerates every figure above from the corpus |
+| `scripts/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, before the night is spent |
 | `docs/RESEARCH-LOG.md` | Full record: every failure, pivot and measurement, with what each cost |
-| `docs/PREREG-xhard.md` | A preregistered prediction, its amendment, and why the tier turned out to be unrunnable |
+| `docs/PREREG-xhard.md` | A preregistered prediction, its two amendments, and why the tier had to change instrument to run at all |
+| `docs/LLAMACPP-SETUP.md` | Serving arithmetic: KV per token, the `--parallel` trap, and why `-ub` is the fix |
 
 **Orchestration is hand-written on purpose.** Every mainstream agent framework ships role scaffolding in its prompt templates, which would silently plant the structure this project claims to observe emerging.

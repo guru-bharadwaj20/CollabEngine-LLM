@@ -100,6 +100,79 @@ power change: minimum detectable difference at 80% power falls from roughly
 Nothing else changes — hypotheses, tests, metrics and the falsification
 condition are all as written above.
 
+## Amendment 2 — 2026-08-11, before any episode on the new instrument
+
+**The instrument changes from Qwen3-8B at bf16, loaded in-process, to
+Meta-Llama-3.1-8B-Instruct at Q4_K_M, served over llama.cpp.** Consequently
+**all three tiers are regenerated on the new instrument**, and the Qwen3-8B
+curve is superseded rather than extended.
+
+### Why
+
+`xhard` cannot run on this card at bf16 and the reason is not a tuning
+parameter. The prefill materialises a logits distribution for every prompt
+position over a 151,936-entry vocabulary, costing 1–1.5 MB per prompt token
+above 15.3 GiB of resident weights; `xhard` prompts *start* near 5,200 tokens
+(§3.10). Serving a 4-bit model removes the mechanism: weights drop to ~4.6 GiB,
+prefill runs in `-ub`-sized micro-batches, and logits are materialised only for
+the sampled position. The tier becomes runnable at an 18,432-token slot.
+
+The alternative was to abandon the crossover test for want of hardware. Between
+a hypothesis tested on different weights and a hypothesis not tested, this
+registers the first.
+
+### What it costs, stated plainly
+
+**The three published Qwen3-8B numbers — solo 0.879 / 0.842 and team 0.874 /
+0.871 — are not comparable to anything measured after this amendment.** They are
+a different model family at a different precision. Specifically:
+
+* **H1** is a trend across {medium, hard, xhard}. A trend whose third point came
+  from a different instrument measures the instrument. All three points must be
+  re-measured, hence `configs/llamacpp-medium.yaml`, `-hard.yaml`, `-xhard.yaml`
+  at n=24 per arm.
+* **H4** is stated against the literal value 0.842. On the new instrument it is
+  restated as *solo at `xhard` < solo at `hard`, both measured here*. The
+  numeral is retired, not the check.
+* **H3** is stated against a propagation index of 0.633, also a Qwen3-8B
+  measurement. Same treatment: the comparison is `xhard` against `hard` on the
+  new instrument.
+
+Under no circumstances are Qwen3-8B and Llama-3.1-8B episodes pooled, and the
+config `name` fields differ (`llama31-8b-q4-*`) so the corpora land in separate
+run directories and cannot be pooled by accident.
+
+### Two confounds this introduces, named before the data
+
+1. **Quantisation.** Q4_K_M is lossy, and it is not obviously neutral between
+   the arms: if 4-bit weights degrade long-context instruction-following more
+   than short-context, the team arm — whose contexts are four times longer —
+   absorbs more of the loss. That biases *against* H1, which is the safe
+   direction for a hypothesis this project is trying to falsify honestly, but it
+   is a reason a null result here is weaker evidence than a null at bf16 would
+   have been. It will be reported as such.
+2. **Model family.** Llama-3.1-8B is a different generalist. Its instruction
+   following, verbosity, and willingness to divide labour are all unmeasured
+   here. This is why `medium` and `hard` are regenerated rather than assumed:
+   without them there is no way to tell a crossover from a family effect.
+
+### What does not change
+
+Hypotheses H1–H4 as stated (with the two numerals retired above), the tests, the
+metrics, the n=24 per arm, the exclusion-and-regenerate rule, the two-arm
+design, and the falsification condition. The `xhard` `DifficultySpec` is
+untouched: the instances are byte-identical to those the original
+preregistration described, because they are deterministic in
+`(seed, difficulty)` and no generator constant has been edited.
+
+### Falsification, restated for the new instrument
+
+If H1 fails and H4 holds across the three tiers measured here, the conclusion is
+that no operating point in this task family rewards collaboration **at 8B, in
+either of two model families, across a 2.25× range in instance size**. That is a
+stronger negative result than the one Amendment 1 anticipated, not a weaker one
+— the same claim, replicated across a second set of weights.
+
 ## Analysis, fixed in advance
 
 - n = 24 episodes per arm (amended from 12), seeds 0–23, identical instances

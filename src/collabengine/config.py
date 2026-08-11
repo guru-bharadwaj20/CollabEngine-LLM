@@ -43,8 +43,18 @@ class BackendConfig:
     max_batch_tokens: int = 32768
     batch_window_s: float = 0.05
     max_model_len: int = 8192
+    """Longest prompt a single request may present, in tokens.
+
+    Two backends read it two different ways, and the difference is the point.
+    `hf` truncates to it -- silently, from the left, which has biased an arm
+    once already. A served backend cannot truncate on our behalf, so here it is
+    an *assertion*: `scripts/preflight.py` checks the server's slot is at least
+    this large plus `team.max_tokens`, and refuses the run otherwise. Overflow
+    then arrives as a labelled error instead of a quietly shortened brief."""
     enable_thinking: bool = False
     trust_remote_code: bool = False
+    verify_model: bool = True
+    """openai backend: fail preflight if the server serves a different model."""
     memory_fraction: float = 0.85
     """Fraction of the card the process may allocate. See `hf_local`: above
     this Windows pages rather than raising OOM, and a paging run looks
@@ -110,6 +120,7 @@ class BackendConfig:
                 max_concurrency=self.max_concurrency,
                 timeout_s=self.timeout_s,
                 max_retries=self.max_retries,
+                verify_model=self.verify_model,
             )
         raise ValueError(
             f"unknown backend kind {self.kind!r}; "
@@ -138,6 +149,7 @@ class BackendConfig:
             "oom_retries": self.oom_retries,
             "oom_retry_s": self.oom_retry_s,
             "trust_remote_code": self.trust_remote_code,
+            "verify_model": self.verify_model,
         }
 
 
