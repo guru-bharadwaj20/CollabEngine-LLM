@@ -30,10 +30,12 @@ LLAMACPP_OVERFLOW = (
 )
 
 
-def _backend(handler, **kwargs) -> OpenAICompatBackend:
-    backend = OpenAICompatBackend(model=MODEL, max_retries=2, **kwargs)
+def _backend(handler, base_url: str = "http://stub/v1", **kwargs) -> OpenAICompatBackend:
+    backend = OpenAICompatBackend(
+        model=MODEL, max_retries=2, base_url=base_url, **kwargs
+    )
     backend._client = httpx.AsyncClient(
-        transport=httpx.MockTransport(handler), base_url="http://stub/v1"
+        transport=httpx.MockTransport(handler), base_url=base_url
     )
     backend._sem = asyncio.Semaphore(4)
     return backend
@@ -46,14 +48,24 @@ def _server(
     slots: int = 4,
     models_status: int = 200,
 ):
-    """A stub llama-server. `ctx_per_slot=None` serves no /props, like vLLM."""
+    """A stub llama-server. `ctx_per_slot=None` serves no /props, like vLLM.
+
+    Paths are matched exactly, and that is the whole point of this stub rather
+    than a looser one. It previously matched `endswith("/props")`, which answers
+    `/v1/props` as readily as `/props` -- so the suite passed for every build
+    while the real check was requesting the wrong URL against a real server and
+    reading the 404 as "this server has no /props" (RESEARCH-LOG 3.12). A stub
+    laxer than the server it stands in for cannot fail on the difference.
+    """
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("/models"):
+        # Measured against llama-server b10369: `models` answers at both paths,
+        # `props` only at the root. The asymmetry is the bug's whole habitat.
+        if request.url.path in ("/v1/models", "/models"):
             return httpx.Response(
                 models_status, json={"data": [{"id": model, "object": "model"}]}
             )
-        if request.url.path.endswith("/props"):
+        if request.url.path == "/props":
             if ctx_per_slot is None:
                 return httpx.Response(404, text="not found")
             return httpx.Response(
@@ -116,6 +128,34 @@ def test_a_server_without_props_is_unverified_not_failed() -> None:
 
     assert report.ok
     assert report.ctx_per_slot is None
+
+
+def test_props_is_requested_at_the_root_not_under_the_v1_prefix() -> None:
+    """The slot check is only as good as the URL it asks.
+
+    llama-server serves `/props` at the root and 404s `/v1/props`. Resolving it
+    relative to a `/v1` base_url therefore produced a 404 that the check read as
+    "no /props on this server" -- so the --parallel trap went unguarded against
+    every real llama-server, while the suite stayed green (RESEARCH-LOG 3.12).
+    """
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        return _server()(request)
+
+    report = asyncio.run(_backend(handler).preflight(required_ctx=16384))
+
+    assert "/props" in seen and "/v1/props" not in seen
+    assert report.ctx_per_slot == 16384, "slot size must come back verified"
+
+
+def test_a_base_url_without_a_v1_prefix_still_finds_props() -> None:
+    report = asyncio.run(
+        _backend(_server(), base_url="http://stub").preflight(required_ctx=16384)
+    )
+
+    assert report.ctx_per_slot == 16384
 
 
 def test_preflight_reports_an_unreachable_server_rather_than_raising() -> None:

@@ -277,10 +277,21 @@ class OpenAICompatBackend(LLMBackend):
         )
 
     async def _props(self) -> tuple[int | None, int | None]:
-        """llama.cpp `/props`. Absent on vLLM, so absence is not a failure."""
+        """llama.cpp `/props`. Absent on vLLM, so absence is not a failure.
+
+        `/props` is served at the server **root**, not under the OpenAI-compatible
+        `/v1` prefix, so it is requested by absolute URL. Asking the client for
+        the relative `/props` resolves it against `base_url` and hits
+        `/v1/props`, which llama-server answers 404 -- indistinguishable here
+        from a server that has no `/props` at all. That is what happened: this
+        check silently degraded to "unverified" against a healthy llama-server
+        for every run before 2026-08-12, and said so while blaming the server
+        (RESEARCH-LOG 3.12). A guard that explains its own silence with a
+        plausible wrong reason is worse than one that is merely absent.
+        """
         client, _ = self._ensure()
         try:
-            response = await client.get("/props")
+            response = await client.get(_root_url(self.base_url) + "/props")
         except (httpx.TimeoutException, httpx.TransportError):
             return None, None
         if response.status_code != 200:
@@ -304,6 +315,19 @@ class OpenAICompatBackend(LLMBackend):
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+
+def _root_url(base_url: str) -> str:
+    """Server root for a base URL that may carry an OpenAI-compatible prefix.
+
+    llama-server serves `/props`, `/health` and `/tokenize` at the root while
+    the chat endpoints live under `/v1`. Only a trailing `/v1` is stripped: a
+    server mounted at `/llama/v1` keeps its `/llama`.
+    """
+    root = base_url.rstrip("/")
+    if root.endswith("/v1"):
+        root = root[: -len("/v1")]
+    return root
 
 
 def is_context_overflow(body_text: str) -> bool:
