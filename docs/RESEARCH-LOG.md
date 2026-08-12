@@ -827,6 +827,21 @@ The one moment this project looked like it might clear the gate — *d* = 0.56 a
 episodes moved *p* from 0.093 to 0.185. The gap was tracking what the
 instrument discarded.
 
+> **Later note (2026-08-12).** The table above corrects for *errored* turns and
+> for censoring. It does not correct for the artifact §4.9 found on the served
+> instrument: the output cap truncates solo's answer-bearing turn far more often
+> than the team's, because solo's last of three turns carries the whole answer
+> and the team's last of twelve carries a summary. §4.6 already measured the raw
+> asymmetry at these operating points — solo truncated 38.9% of turns against the
+> team's 18.1% — so the mechanism was present here and in the same direction.
+> The gaps above are therefore upper bounds on the team's advantage, by an amount
+> this run cannot now recover: the bf16 corpora were deleted in the move to the
+> served instrument, so the final-turn sensitivity cannot be rerun on them. That
+> is a real cost of deleting corpora, and it is recorded here rather than in a
+> lessons section because it belongs beside the numbers it qualifies. It does not
+> threaten the conclusion, which is a null in both readings at every point
+> measured since — it would only make the null more null.
+
 **The `xhard` premise was itself an n=12 artifact.** The preregistered
 hypothesis (docs/PREREG-xhard.md) rested on solo degrading with instance size
 while the team held flat: 0.879 → 0.842 against 0.874 → 0.871. At n=24 with
