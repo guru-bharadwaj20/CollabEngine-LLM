@@ -1333,6 +1333,33 @@ project removed, and the fifth to have flattered the team: +0.029 → +0.040 →
 +0.032 → +0.067 → −0.023. The sequence has never once gone the other way, which
 is itself the most robust quantitative result the project has.
 
+**The withdrawn variance finding comes back, and is the same artifact.** The
+score distributions are not floor-limited — solo spans 0.00–0.85 and the team
+0.42–0.88, with no episode perfect in either arm — but their spreads differ
+sharply: solo sd 0.281, team sd 0.107. A permutation Levene test on all usable
+episodes returns **p = 0.040**. That is §4.1b's withdrawn claim, apparently
+replicated on a new model, a new instrument, and equal arms.
+
+It does not survive the same control:
+
+| | solo sd | team sd | Levene perm p |
+|---|---|---|---|
+| all usable | 0.281 (n=22) | 0.107 (n=24) | **0.040** |
+| final-turn truncation dropped | 0.191 (n=17) | 0.107 (n=24) | 0.430 |
+
+Solo's excess variance *is* the four zeros, and the four zeros are the cap. Had
+`final_turn_truncated` not been built two hours earlier, this corpus would have
+produced a significant variance result that reads as a genuine replication of a
+finding this log had already retracted for being fragile. The retraction was
+right, and it was right for a reason the second dataset would have disguised.
+
+What can be said without the artifact: solo's non-zero episodes average **0.690**
+against the team's 0.631, and the team's distribution is narrower at *both* ends
+— it never falls below 0.42 and never rises above 0.88. That is the shape of
+consensus, not of capability: four agents conferring converge on a middling
+answer more reliably than one agent reaches a good one. It is offered as a
+description of these 46 episodes, not as a tested claim.
+
 **The confound underneath it, which the design never listed.** §1.3 names three
 confounds. None is this one: the team arm takes 12 agent turns to solo's 3 and
 emits **4,443 output tokens to solo's 2,055**, across 4× the forward passes. The
