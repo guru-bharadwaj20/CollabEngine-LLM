@@ -222,7 +222,9 @@ def _sensitivity(
         print(f"     {metric:<11}{st.mean(a):>8.3f}{st.mean(b):>8.3f}{gap:>+9.3f}"
               f"{p:>9.3f}{moved:>+14.3f}")
     print("     A gap that changes sign or loses its ordering here was being")
-    print("     carried by the cap, not by the condition.")
+    print("     carried by the cap, not by the condition. Neither row is the")
+    print("     unbiased one: truncation is post-treatment, so this is a")
+    print("     complete-case analysis and the two bracket rather than settle.")
 
 
 def headline_n(path: Path, condition: str) -> list[float]:

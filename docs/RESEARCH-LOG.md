@@ -1328,7 +1328,17 @@ reverses the ordering:**
 
 Both readings are non-significant, so this is not a team result overturned into
 a solo one. It is a gap that was never there, and whose *entire* apparent
-magnitude was the output cap. That is now the fifth measurement artifact in this
+magnitude was the output cap.
+
+*Neither number is the unbiased one, and the sensitivity arm should not be read
+as the truth the headline was hiding.* Truncation is a post-treatment variable:
+it is caused by the instrument, but which episodes hit the cap also depends on
+how the model wrote, which is not independent of how well it reasoned. So the
+headline is biased against solo by a measured structural mechanism, and the
+sensitivity is a complete-case analysis that assumes truncation is ignorable
+given the arm. They bracket rather than settle, and both fall inside the same
+null. The estimator that needs no such assumption is `solo_budget` (C4), where
+the cap is not doing different work in the two arms in the first place. That is now the fifth measurement artifact in this
 project removed, and the fifth to have flattered the team: +0.029 → +0.040 →
 +0.032 → +0.067 → −0.023. The sequence has never once gone the other way, which
 is itself the most robust quantitative result the project has.
