@@ -88,6 +88,30 @@ def is_instrument_failure(record: EpisodeRecord) -> bool:
     return all(was_truncated(m) for m in turns)
 
 
+def final_turn_truncated(record: EpisodeRecord) -> bool:
+    """Whether the answer-submitting turn was cut off at `max_tokens`.
+
+    This is the truncation that costs a score, and it does not fall equally on
+    the two arms. A solo episode is three turns and the last one carries the
+    entire answer; a team episode is twelve and the last one commits an answer
+    the transcript already contains. So the same cap lands on solo's answer and
+    on the team's summary of one.
+
+    Measured on the served `medium` corpus: of 7 solo episodes whose final turn
+    was truncated, 5 were malformed, against 1 of the 17 whose final turn
+    finished. In the team arm the final turn was truncated 0 times in 24.
+
+    `is_instrument_failure` does not catch this. Its truncation rule requires
+    *every* turn to be cut off, which at the measured per-turn rates is a 1-in-70
+    event over three solo turns and a 1-in-10^13 event over twelve team turns --
+    so the exclusion it offers is one the team arm can essentially never
+    qualify for. That rule stays as the preregistered one; this is the sensitivity
+    check reported beside it (RESEARCH-LOG 4.9).
+    """
+    turns = _agent_turns(record.messages)
+    return bool(turns) and was_truncated(turns[-1])
+
+
 @dataclass(slots=True)
 class ConditionIntegrity:
     condition: str
@@ -97,6 +121,7 @@ class ConditionIntegrity:
     agent_turns: int = 0
     truncated_turns: int = 0
     errored_turns: int = 0
+    final_truncated: int = 0
 
     @property
     def truncation_rate(self) -> float:
@@ -141,9 +166,22 @@ class IntegrityReport:
     def truncation_rate(self) -> float:
         return self.truncated_turns / self.agent_turns if self.agent_turns else 0.0
 
+    @property
+    def final_truncated(self) -> int:
+        return sum(c.final_truncated for c in self.by_condition.values())
+
     def lines(self) -> list[str]:
-        """A table, widest column first, ordered by how damaged the cell is."""
-        head = f"{'condition':<28}{'eps':>5}{'unusable':>10}{'trunc':>9}"
+        """A table, widest column first, ordered by how damaged the cell is.
+
+        `cut@end` is here rather than in a separate report because it is the
+        column that reads differently across arms: it counts episodes whose
+        answer-bearing turn hit the cap, which is a score lost to the instrument
+        even when `unusable` stays 0.
+        """
+        head = (
+            f"{'condition':<28}{'eps':>5}{'unusable':>10}{'trunc':>9}"
+            f"{'malformed':>11}{'cut@end':>9}"
+        )
         rows = [head, "-" * len(head)]
         for name in sorted(
             self.by_condition,
@@ -152,12 +190,13 @@ class IntegrityReport:
             c = self.by_condition[name]
             rows.append(
                 f"{name:<28}{c.episodes:>5}{c.instrument_failures:>10}"
-                f"{c.truncation_rate:>8.0%}"
+                f"{c.truncation_rate:>8.0%}{c.malformed:>11}{c.final_truncated:>9}"
             )
         rows.append("-" * len(head))
         rows.append(
             f"{'all':<28}{self.episodes:>5}{self.instrument_failures:>10}"
-            f"{self.truncation_rate:>8.0%}"
+            f"{self.truncation_rate:>8.0%}{self.malformed:>11}"
+            f"{self.final_truncated:>9}"
         )
         return rows
 
@@ -173,6 +212,8 @@ def audit(records: Iterable[EpisodeRecord]) -> IntegrityReport:
             cell.malformed += 1
         if is_instrument_failure(record):
             cell.instrument_failures += 1
+        if final_turn_truncated(record):
+            cell.final_truncated += 1
         for message in _agent_turns(record.messages):
             cell.agent_turns += 1
             if was_truncated(message):
