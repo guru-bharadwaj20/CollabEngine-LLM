@@ -42,13 +42,55 @@ TEAM_BRIEF = (
 )
 
 
-def build_system_prompt(agent: Agent, instance: Instance, n_agents: int) -> str:
+#: The honest long-form single-agent brief, for `solo_long` (C5).
+#:
+#: `solo_budget` (C4) gave one agent the team's turn budget under TEAM_BRIEF and
+#: lost to the team at two of three tiers -- but it restated its own answer on
+#: 25-33% of consecutive turns, because the brief tells it the group's *last*
+#: message is what gets scored and it is the only member of the group
+#: (RESEARCH-LOG 4.12). That is the harness degrading the baseline, not the
+#: model, and it makes the C4 margin an upper bound rather than an estimate.
+#:
+#: This brief removes the three things that caused it: no phantom co-workers, no
+#: instruction that the last message is the answer of record, and an explicit
+#: licence to think without re-emitting the whole assignment every turn. It is
+#: otherwise the same task, the same answer format, and the same budget.
+SOLO_BRIEF = (
+    "You are working alone on the task below, across {rounds} turns.\n\n"
+    "Use the early turns to think: try an assignment, check it against the "
+    "requirements, and revise what does not hold. You do not need to restate "
+    "the full assignment every turn -- work on whatever part still needs it.\n\n"
+    "Your **final** turn is what gets scored, and it must contain the complete "
+    "answer in the format below."
+)
+
+
+def build_system_prompt(
+    agent: Agent,
+    instance: Instance,
+    n_agents: int,
+    *,
+    solo_long: bool = False,
+    rounds: int | None = None,
+) -> str:
     """The per-agent system prompt.
 
     Identical across agents except for the label and, at the highest symmetry-
     breaking level, a vague disposition line. No agent is told what to do, what
     anyone else will do, or that the work can be divided.
+
+    `solo_long` swaps in SOLO_BRIEF, which is the C5 baseline and the only place
+    the wording differs. Everything else -- task, answer format, caps, seeds --
+    is held.
     """
+    if solo_long:
+        return "\n\n".join(
+            [
+                SOLO_BRIEF.format(rounds=rounds if rounds is not None else "several"),
+                render_instance(instance),
+                render_answer_format(),
+            ]
+        )
     parts = [TEAM_BRIEF.format(n=n_agents, agent_id=agent.agent_id)]
     if agent.scratch:
         parts.append(agent.scratch)
@@ -143,15 +185,33 @@ async def run_episode(
 
         for position, agent_id in enumerate(round_ids):
             agent = by_id[agent_id]
+            # The last agent turn of the last round is the one the parser reads,
+            # so it is the only turn where hitting the cap costs the episode its
+            # score rather than some of its reasoning. It gets its own budget
+            # when the config asks for one -- see TeamConfig.answer_max_tokens
+            # and RESEARCH-LOG 4.10 for what a single shared cap did here.
+            is_answer_turn = (
+                round_index == len(turn_order) - 1
+                and position == len(round_ids) - 1
+            )
+            turn_cap = config.max_tokens
+            if is_answer_turn and config.answer_max_tokens is not None:
+                turn_cap = config.answer_max_tokens
             request = GenRequest(
                 messages=[
                     ChatMessage(
                         role="system",
-                        content=build_system_prompt(agent, instance, len(roster)),
+                        content=build_system_prompt(
+                            agent,
+                            instance,
+                            len(roster),
+                            solo_long=(condition == "solo_long"),
+                            rounds=config.rounds,
+                        ),
                     ),
                     *build_context(agent, history),
                 ],
-                max_tokens=config.max_tokens,
+                max_tokens=turn_cap,
                 temperature=config.temperature,
                 top_p=config.top_p,
                 seed=agent.seed,
@@ -176,6 +236,13 @@ async def run_episode(
                         "position": position,
                         "completion_tokens": response.completion_tokens,
                         "finish_reason": response.finish_reason,
+                        # The cap in force for this turn, recorded per turn
+                        # because it is no longer constant within an episode.
+                        # A `length` finish means nothing without the number it
+                        # ran into, and lesson 3 of section 8 is that instrument
+                        # settings are part of a measurement's identity.
+                        "max_tokens": turn_cap,
+                        "answer_turn": is_answer_turn,
                         **({"error": response.error} if response.error else {}),
                     },
                 )

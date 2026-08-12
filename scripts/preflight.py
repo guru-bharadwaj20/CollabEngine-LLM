@@ -101,7 +101,13 @@ async def _run(config: ExperimentConfig, *, seed: int | None, probe: bool) -> in
     backend = config.backend.build()
     assert isinstance(backend, OpenAICompatBackend)
 
-    required_ctx = config.backend.max_model_len + config.team.max_tokens
+    # The answer turn is the largest single request the run makes, so it is the
+    # one the slot has to hold. Checking against `max_tokens` when
+    # `answer_max_tokens` is set would under-state the requirement by exactly
+    # the amount the answer-budget fix adds -- a guard that passes because it is
+    # measuring the wrong turn (cf. 3.12).
+    answer_cap = config.team.answer_max_tokens or config.team.max_tokens
+    required_ctx = config.backend.max_model_len + answer_cap
     failed = False
 
     try:
@@ -231,7 +237,7 @@ async def _probe(
             ChatMessage("user", filler),
             ChatMessage("user", "Reply with the single word ACK."),
         ],
-        max_tokens=config.team.max_tokens,
+        max_tokens=config.team.answer_max_tokens or config.team.max_tokens,
         temperature=config.team.temperature,
         top_p=config.team.top_p,
         seed=0,
@@ -264,7 +270,7 @@ async def _probe(
             "   The slot is too small for this tier. Under llama.cpp, -c is "
             f"divided across --parallel slots: for {config.max_concurrency} "
             f"slots this run needs -c "
-            f"{(config.backend.max_model_len + config.team.max_tokens) * config.max_concurrency}. "
+            f"{(config.backend.max_model_len + (config.team.answer_max_tokens or config.team.max_tokens)) * config.max_concurrency}. "
             "Regenerating episodes will not help -- the failure is "
             "deterministic in the prompt length."
         )

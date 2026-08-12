@@ -1,0 +1,58 @@
+# `medium` with the answer-bearing turn given its own budget.
+#
+# RESEARCH-LOG 4.9-4.11: a single `max_tokens` is identical across arms and not
+# symmetric across them. Solo's last of three turns carries the whole answer;
+# the team's last of twelve commits one the transcript already holds. The same
+# cap therefore truncated an answer in one arm and a summary in the other, which
+# produced d = 1.09 at p < 0.0001 at `hard` -- entirely artifact -- and an
+# apparent H1 trend, since harder instances need longer answers and solo's
+# answer cut count ran 7 / 10 / 15 against the team's 0 / 1 / 2.
+#
+# The fix is not a larger cap everywhere: that changes the whole instrument and
+# every prior corpus with it. It is a cap for the one turn that gets parsed, so
+# reasoning and answer stop competing for one budget.
+#
+# The arithmetic, which must hold or the run is rejected before it starts:
+#
+#     max_model_len 15360 + answer_max_tokens 3072 = 18432 = tokens per slot
+#     worst measured `medium` prompt: well inside 15360 (14169 at xhard)
+#
+# The slot is unchanged at 18432, so the server does not restart and the card
+# does not need a byte more than the previous runs took.
+#
+# New run directory on purpose. The corpora in runs/llama31-8b-q4-medium were
+# generated under the shared cap and stay exactly as they are; this instrument
+# is a different instrument and its results are not appended to theirs.
+#
+#   python scripts/preflight.py --config configs/llamacpp-medium-ans.yaml
+#   collabengine pipeline --config configs/llamacpp-medium-ans.yaml #                         --phases baseline,solo,solo_budget,solo_long
+name: llama31-8b-q4-medium-ans
+seed_start: 0
+n_episodes: 24
+out_dir: runs
+
+max_concurrency: 4
+
+backend:
+  kind: openai
+  model: Meta-Llama-3.1-8B-Instruct-Q4_K_M
+  base_url: http://127.0.0.1:8000/v1
+  max_concurrency: 4
+  timeout_s: 900
+  max_retries: 4
+  verify_model: true
+  # Lowered from 17408 to make room for the answer turn inside the same slot.
+  max_model_len: 15360
+  enable_thinking: false
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: medium
+  symmetry: name_seed
+  randomize_turn_order: true
+  max_tokens: 1024
+  # The one turn whose truncation costs the episode its score.
+  answer_max_tokens: 3072
+  temperature: 0.8
+  top_p: 0.95

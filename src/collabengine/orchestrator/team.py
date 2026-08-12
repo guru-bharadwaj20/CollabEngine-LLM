@@ -52,6 +52,20 @@ class TeamConfig:
     n_agents: int = 4
     rounds: int = 3
     max_tokens: int = 512
+    answer_max_tokens: int | None = None
+    """Cap for the final agent turn, which is the one that gets parsed.
+
+    `None` means "same as `max_tokens`", which is the behaviour every corpus
+    before 2026-08-12 was generated under and the reason this field exists.
+
+    A single cap is not symmetric across arms even though it is identical across
+    arms. A solo episode's last of three turns carries the whole answer; a team
+    episode's last of twelve commits an answer the transcript already holds. So
+    the same number truncated an answer in one arm and a summary in the other,
+    which produced a *d* = 1.09 at *p* < 0.0001 that was entirely artifact
+    (RESEARCH-LOG 4.10). Raising `max_tokens` everywhere would change the whole
+    instrument; raising it for the answer-bearing turn alone stops reasoning and
+    answer competing for one budget, which is the actual defect."""
     temperature: float = 0.8
     top_p: float = 0.95
     symmetry: SymmetryBreaking = SymmetryBreaking.NAME_SEED
@@ -69,6 +83,7 @@ class TeamConfig:
             "n_agents": self.n_agents,
             "rounds": self.rounds,
             "max_tokens": self.max_tokens,
+            "answer_max_tokens": self.answer_max_tokens,
             "temperature": self.temperature,
             "top_p": self.top_p,
             "symmetry": self.symmetry.value,
@@ -83,6 +98,11 @@ class TeamConfig:
             n_agents=int(d.get("n_agents", 4)),
             rounds=int(d.get("rounds", 3)),
             max_tokens=int(d.get("max_tokens", 512)),
+            answer_max_tokens=(
+                int(d["answer_max_tokens"])
+                if d.get("answer_max_tokens") is not None
+                else None
+            ),
             temperature=float(d.get("temperature", 0.8)),
             top_p=float(d.get("top_p", 0.95)),
             symmetry=SymmetryBreaking(d.get("symmetry", "name_seed")),

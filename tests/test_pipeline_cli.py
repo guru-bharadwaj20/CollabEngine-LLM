@@ -303,3 +303,46 @@ def test_seed_blind_backends_skip_the_redundant_symmetry_arm(run) -> None:
     assert any("name_only" in i for i in with_seeds)
     assert not any("name_only" in i for i in without)
     assert any("name_seed_scratch" in i for i in without)
+
+
+def test_solo_long_matches_solo_budget_in_everything_but_the_brief(run) -> None:
+    """C5's whole value is that exactly one thing differs from C4.
+
+    If turn count, caps or difficulty drift between them, the comparison stops
+    measuring what the wording cost and starts measuring two changes at once --
+    which is the mistake RESEARCH-LOG 4.1c was written about.
+    """
+    config_path, _ = run
+
+    from collabengine.cli import _solo_budget_plans, _solo_long_plans
+    from collabengine.config import ExperimentConfig
+
+    config = ExperimentConfig.load(config_path)
+    backend = config.backend.build()
+
+    budget = {p.episode_id.split(":", 1)[1] for p in _solo_budget_plans(config, backend)}
+    long_ = {p.episode_id.split(":", 1)[1] for p in _solo_long_plans(config, backend)}
+
+    assert budget == long_, "same instances and seeds, different condition prefix"
+    assert all(p.episode_id.startswith("solo_long:") for p in _solo_long_plans(config, backend))
+
+
+def test_the_solo_long_brief_does_not_invent_teammates() -> None:
+    """The defect it exists to remove: TEAM_BRIEF at n=1 tells a lone agent it
+    is "one of 1 participants" who can see what "the others" write, and that the
+    group's last message is what gets scored (RESEARCH-LOG 4.12)."""
+    from collabengine.orchestrator.episode import build_system_prompt
+    from collabengine.orchestrator.team import Agent
+    from collabengine.tasks.generator import generate
+
+    instance = generate(0, "medium")
+    agent = Agent(agent_id="A1", index=0, seed=1, scratch=None)
+
+    solo = build_system_prompt(agent, instance, 1, solo_long=True, rounds=12)
+    team = build_system_prompt(agent, instance, 1)
+
+    for phantom in ("the others", "participants", "the group"):
+        assert phantom not in solo, f"solo_long brief still says {phantom!r}"
+    assert "the others" in team, "TEAM_BRIEF is unchanged and still the C4 arm's brief"
+    assert "12 turns" in solo, "the agent is told the budget it actually has"
+    assert "final" in solo.lower()

@@ -121,9 +121,10 @@ def main(argv: list[str] | None = None) -> int:
         "--phases",
         default="baseline,solo,symmetry,c2,ablate",
         help=(
-            "comma-separated subset of: baseline, solo, solo_budget, symmetry, "
-            "c2, ablate. solo_budget is off by default: it is one agent given "
-            "the team's whole turn budget, and it costs as much as the team arm"
+            "comma-separated subset of: baseline, solo, solo_budget, solo_long, "
+            "symmetry, c2, ablate. solo_budget and solo_long are off by default: "
+            "each is one agent given the team's whole turn budget, and each "
+            "costs as much as the team arm"
         ),
     )
     p.add_argument(
@@ -816,6 +817,8 @@ async def _pipeline(config: ExperimentConfig, backend, phases: set[str]) -> int:
         stage1 += _solo_plans(config, backend)
     if "solo_budget" in phases:
         stage1 += _solo_budget_plans(config, backend)
+    if "solo_long" in phases:
+        stage1 += _solo_long_plans(config, backend)
     if "symmetry" in phases:
         stage1 += _symmetry_plans(config, backend)
     if "c2" in phases:
@@ -982,6 +985,40 @@ def _solo_budget_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
                     config=team,
                     episode_seed=seed,
                     condition="solo_budget",
+                )
+            ),
+        )
+        for seed in config.seeds
+    ]
+
+
+def _solo_long_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
+    """C5: the same budget as `solo_budget`, on a brief written for one agent.
+
+    `solo_budget` lost to the team at two of three tiers while restating its own
+    answer on 25-33% of consecutive turns (RESEARCH-LOG 4.12). It runs under
+    TEAM_BRIEF, which tells it the group's last message is what gets scored and
+    that it can see what "the others" write -- while it is the only member of the
+    group. That is the harness degrading the baseline, which makes every C4
+    margin an upper bound rather than an estimate.
+
+    This arm holds turn count, per-turn cap, answer-turn cap, model, instances
+    and seeds identical to `solo_budget` and changes exactly one thing: the
+    brief. Its comparison against `solo_budget` measures what the wording cost,
+    and its comparison against the team is the honest version of C4.
+    """
+    team = replace(
+        config.team, n_agents=1, rounds=config.team.rounds * config.team.n_agents
+    )
+    return [
+        RunPlan(
+            episode_id=_run_id("solo_long", config.team.difficulty, seed),
+            factory=(
+                lambda seed=seed: run_episode(
+                    backend=backend,
+                    config=team,
+                    episode_seed=seed,
+                    condition="solo_long",
                 )
             ),
         )
