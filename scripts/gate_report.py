@@ -23,7 +23,11 @@ import statistics as st
 from collections import defaultdict
 from pathlib import Path
 
-from collabengine.analysis.integrity import audit, is_instrument_failure
+from collabengine.analysis.integrity import (
+    audit,
+    final_turn_truncated,
+    is_instrument_failure,
+)
 from collabengine.analysis.scoring import METRICS, rescore
 from collabengine.transcripts.store import TranscriptReader
 
@@ -70,12 +74,16 @@ def corpora() -> list[tuple[str, str, str]]:
     return out
 
 
-def scores(path: Path, condition: str) -> dict[str, list[float]]:
+def scores(
+    path: Path, condition: str, drop_final_truncated: bool = False
+) -> dict[str, list[float]]:
     out: dict[str, list[float]] = defaultdict(list)
     if not path.exists():
         return out
     for rec in TranscriptReader(str(path)):
         if rec.condition != condition or is_instrument_failure(rec):
+            continue
+        if drop_final_truncated and final_turn_truncated(rec):
             continue
         scored = rescore(rec)
         for metric in METRICS:
@@ -143,7 +151,53 @@ def report(label: str, team_path: Path, solo_path: Path, rng: random.Random) -> 
     sig = [m for m, v in out.items() if v[4] < 0.05]
     print(f"\n  largest |d| = {best:.2f}; metrics significant at 0.05: "
           f"{', '.join(sig) if sig else 'none'}")
+
+    _sensitivity(team_path, solo_path, out, rng)
     return out
+
+
+def _sensitivity(
+    team_path: Path, solo_path: Path, headline: dict, rng: random.Random
+) -> None:
+    """Re-report with answer-bearing truncated turns dropped from both arms.
+
+    Printed always, not on a flag, and printed under the headline rather than
+    instead of it. The preregistered exclusion rule is the one above; this is
+    the check on whether that rule's known asymmetry is carrying the result.
+    Making it opt-in would mean the one number nobody runs is the one that
+    could overturn the other.
+    """
+    team = scores(team_path, "baseline", drop_final_truncated=True)
+    solo = scores(solo_path, "solo", drop_final_truncated=True)
+    if not team.get("fraction") or not solo.get("fraction"):
+        return
+    n_t, n_s = len(team["fraction"]), len(solo["fraction"])
+    dropped_t = len(headline_n(team_path, "baseline")) - n_t
+    dropped_s = len(headline_n(solo_path, "solo")) - n_s
+    if not (dropped_t or dropped_s):
+        print("\n  sensitivity (drop final-turn truncation): nothing to drop.")
+        return
+
+    print(f"\n  -- sensitivity: final-turn truncation dropped "
+          f"(solo -{dropped_s}, team -{dropped_t}) --")
+    if min(n_t, n_s) < 5:
+        print(f"     solo n={n_s}, team n={n_t}: too few left to read.")
+        return
+    print(f"     {'metric':<11}{'solo':>8}{'team':>8}{'gap':>9}{'perm p':>9}"
+          f"{'  vs headline':>14}")
+    for metric in METRICS:
+        a, b = solo[metric], team[metric]
+        gap = st.mean(b) - st.mean(a)
+        p = perm_p(a, b, rng)
+        moved = gap - headline[metric][2]
+        print(f"     {metric:<11}{st.mean(a):>8.3f}{st.mean(b):>8.3f}{gap:>+9.3f}"
+              f"{p:>9.3f}{moved:>+14.3f}")
+    print("     A gap that changes sign or loses its ordering here was being")
+    print("     carried by the cap, not by the condition.")
+
+
+def headline_n(path: Path, condition: str) -> list[float]:
+    return scores(path, condition)["fraction"]
 
 
 def main() -> None:

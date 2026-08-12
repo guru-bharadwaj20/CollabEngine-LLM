@@ -12,6 +12,7 @@ import pytest
 
 from collabengine.analysis.integrity import (
     audit,
+    final_turn_truncated,
     finish_reasons,
     is_instrument_failure,
 )
@@ -75,6 +76,49 @@ def test_truncation_without_a_malformed_answer_is_kept() -> None:
     """Most turns hit the cap. That alone costs nothing if an answer survived."""
     record = _record(finishes=["length", "length"], malformed=False)
     assert not is_instrument_failure(record)
+
+
+def test_the_answer_bearing_turn_is_the_one_truncation_costs() -> None:
+    """Only the last agent turn can cut off the answer being submitted."""
+    assert final_turn_truncated(_record(finishes=["stop", "stop", "length"],
+                                        malformed=True))
+    assert not final_turn_truncated(_record(finishes=["length", "length", "stop"],
+                                            malformed=True))
+
+
+def test_final_turn_truncation_is_flagged_even_when_the_answer_parsed() -> None:
+    """It is a diagnostic on the instrument, not a verdict on the episode.
+
+    A cut-off final turn whose answer still parsed is exactly the case that
+    makes the flag worth reporting separately: nothing else in the audit would
+    show that the cap reached the answer at all.
+    """
+    record = _record(finishes=["stop", "length"], malformed=False)
+    assert final_turn_truncated(record)
+    assert not is_instrument_failure(record)
+
+
+def test_a_moderator_turn_after_the_answer_does_not_hide_truncation() -> None:
+    """The last *agent* turn is the answer-bearing one, not the last message."""
+    record = _record(finishes=["stop", "length"], malformed=True)
+    record.messages.append(_msg(9, finish="stop", speaker=Speaker.MODERATOR))
+    assert final_turn_truncated(record)
+
+
+def test_audit_counts_final_truncation_per_condition() -> None:
+    """The column exists because it reads differently across arms: on the
+    served `medium` corpus it was 7 of 24 solo episodes and 0 of 24 team."""
+    report = audit(
+        [
+            _record(finishes=["stop", "length"], malformed=True, condition="solo"),
+            _record(finishes=["stop", "stop"], malformed=False, condition="solo"),
+            _record(finishes=["length", "stop"], malformed=False),
+        ]
+    )
+
+    assert report.by_condition["solo"].final_truncated == 1
+    assert report.by_condition["baseline"].final_truncated == 0
+    assert report.final_truncated == 1
 
 
 def test_an_episode_with_no_agent_turns_is_not_charged_to_the_cap() -> None:
