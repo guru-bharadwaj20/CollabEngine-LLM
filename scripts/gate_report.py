@@ -246,21 +246,47 @@ def main() -> None:
         return
 
     results = {}
+    paths = {}
     for label, team_p, solo_p in sources:
         got = report(label, Path(team_p), Path(solo_p), rng)
         if got:
             results[label] = got
+            paths[label] = Path(team_p)
 
     # The difficulty curve, which is the actual hypothesis: does the team-solo
     # gap grow with instance size? Printed rather than tested -- with two or
     # three points and n<=24 per arm, a slope test would be theatre.
     if len(results) > 1:
         print(f"\n{'=' * 74}\nDIFFICULTY CURVE (fraction)\n{'=' * 74}")
-        print(f"  {'point':<10}{'solo':>8}{'team':>8}{'gap':>9}")
+        # cut@end is printed *inside* the curve, not left in the per-tier audits
+        # above, because the trend in this column has the same shape as the
+        # trend the hypothesis predicts. Harder instances need longer answers,
+        # so solo's single answer-bearing turn hits the cap more often while the
+        # team's summary turn does not -- an instrument that manufactures a
+        # growing team advantage. A curve read without this column beside it
+        # cannot be distinguished from that.
+        print(f"  {'point':<10}{'solo':>8}{'team':>8}{'gap':>9}"
+              f"{'cut@end s/t':>14}{'sens. gap':>11}")
         for label in ("medium", "hard", "xhard"):
-            if label in results:
-                s, t, gap, _, _ = results[label]["fraction"]
-                print(f"  {label:<10}{s:>8.3f}{t:>8.3f}{gap:>+9.3f}")
+            if label not in results:
+                continue
+            s, t, gap, _, _ = results[label]["fraction"]
+            rec = list(TranscriptReader(str(paths[label])))
+            cells = audit(rec).by_condition
+            cut_s = cells.get("solo", None)
+            cut_t = cells.get("baseline", None)
+            cut = (f"{cut_s.final_truncated if cut_s else 0}"
+                   f"/{cut_t.final_truncated if cut_t else 0}")
+            sens_solo = scores(paths[label], "solo", drop_final_truncated=True)
+            sens_team = scores(paths[label], "baseline", drop_final_truncated=True)
+            if sens_solo.get("fraction") and sens_team.get("fraction"):
+                sens = (f"{st.mean(sens_team['fraction']) - st.mean(sens_solo['fraction']):+.3f}")
+            else:
+                sens = "n/a"
+            print(f"  {label:<10}{s:>8.3f}{t:>8.3f}{gap:>+9.3f}{cut:>14}{sens:>11}")
+        print("\n  `sens. gap` is the same gap with answer-turn truncation")
+        print("  dropped from both arms. If the headline gaps trend upward and")
+        print("  the sensitivity gaps do not, the trend is the cap.")
         print("\n  Read the `unusable` column above beside every mean. On the")
         print("  bf16 instrument the prefill ceiling censored 28.9% of team")
         print("  turns at `hard` and 0% of solo turns, and the apparent gap")
