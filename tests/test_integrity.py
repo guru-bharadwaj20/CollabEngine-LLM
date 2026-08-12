@@ -207,3 +207,21 @@ def test_an_oom_cascade_is_counted_per_turn_not_just_per_episode() -> None:
     assert report.instrument_failures == 2
     assert report.errored_turns == 6
     assert report.by_condition["baseline"].usable == 0
+
+
+# ---------------------------------------------- answer-turn budget (C, 4.10) --
+
+
+def test_answer_turn_cap_defaults_to_the_shared_cap() -> None:
+    """`answer_max_tokens=None` must reproduce every pre-2026-08-12 corpus."""
+    from collabengine.orchestrator.team import TeamConfig
+
+    assert TeamConfig(max_tokens=1024).answer_max_tokens is None
+    assert TeamConfig.from_dict(TeamConfig(max_tokens=1024).to_dict()).answer_max_tokens is None
+
+
+def test_answer_turn_cap_survives_a_round_trip() -> None:
+    from collabengine.orchestrator.team import TeamConfig
+
+    cfg = TeamConfig(max_tokens=1024, answer_max_tokens=3072)
+    assert TeamConfig.from_dict(cfg.to_dict()).answer_max_tokens == 3072
