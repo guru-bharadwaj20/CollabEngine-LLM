@@ -12,7 +12,7 @@ So this file is the one path. It applies `analysis.integrity`, scores through
 censored arm cannot be read without seeing that it was censored.
 
     python scripts/gate_report.py                     # every corpus it can find
-    python scripts/gate_report.py --run-dir runs/qwen3-8b-local
+    python scripts/gate_report.py --run-dir runs/llama31-8b-q4-hard
 """
 
 from __future__ import annotations
@@ -40,11 +40,34 @@ SEED = 20260810
 # alongside the team arm -- the report went on reading the stale 12-episode
 # file and printed `solo n=12, team n=21`, an arm mismatch it had no way to
 # flag because both files were valid. Keep both arms in one directory.
-CORPORA = [
-    ("medium", "runs/qwen3-8b-medium/baseline.jsonl", "runs/qwen3-8b-medium/baseline.jsonl"),
-    ("hard", "runs/qwen3-8b-local/baseline.jsonl", "runs/qwen3-8b-local/baseline.jsonl"),
-    ("xhard", "runs/qwen3-8b-xhard/baseline.jsonl", "runs/qwen3-8b-xhard/baseline.jsonl"),
-]
+#: Tier -> config. The run directory is read from the config rather than
+#: written here, because a hardcoded path is exactly what went wrong twice: it
+#: silently pointed at a stale arm (above), and then at directories that no
+#: longer existed at all after the move to the served instrument. The config is
+#: the one place the run directory is already declared.
+TIER_CONFIGS = {
+    "medium": "configs/llamacpp-medium.yaml",
+    "hard": "configs/llamacpp-hard.yaml",
+    "xhard": "configs/llamacpp-xhard.yaml",
+}
+
+
+def corpora() -> list[tuple[str, str, str]]:
+    """(label, team path, solo path) for every tier whose config resolves.
+
+    Both arms come from one run directory. They always should — the one time
+    they did not, the report read a 12-episode solo arm against a 21-episode
+    team arm and could not flag it, because both files were valid.
+    """
+    from collabengine.config import ExperimentConfig
+
+    out = []
+    for tier, cfg_path in TIER_CONFIGS.items():
+        if not Path(cfg_path).exists():
+            continue
+        path = str(ExperimentConfig.load(cfg_path).run_dir / "baseline.jsonl")
+        out.append((tier, path, path))
+    return out
 
 
 def scores(path: Path, condition: str) -> dict[str, list[float]]:
@@ -129,13 +152,16 @@ def main() -> None:
     args = ap.parse_args()
 
     rng = random.Random(SEED)
-    corpora = CORPORA
+    sources = corpora()
     if args.run_dir:
         p = str(Path(args.run_dir) / "baseline.jsonl")
-        corpora = [(Path(args.run_dir).name, p, p)]
+        sources = [(Path(args.run_dir).name, p, p)]
+    if not sources:
+        print("no corpora found; has anything run yet?")
+        return
 
     results = {}
-    for label, team_p, solo_p in corpora:
+    for label, team_p, solo_p in sources:
         got = report(label, Path(team_p), Path(solo_p), rng)
         if got:
             results[label] = got
@@ -150,10 +176,14 @@ def main() -> None:
             if label in results:
                 s, t, gap, _, _ = results[label]["fraction"]
                 print(f"  {label:<10}{s:>8.3f}{t:>8.3f}{gap:>+9.3f}")
-        print("\n  Read against RESEARCH-LOG 4.6: at `hard`, 28.9% of team turns")
-        print("  exceed the prefill ceiling and 0% of solo turns do, so the hard")
-        print("  team arm is measured on a distribution with its tail censored.")
-        print("  `medium` is clean on both arms.")
+        print("\n  Read the `unusable` column above beside every mean. On the")
+        print("  bf16 instrument the prefill ceiling censored 28.9% of team")
+        print("  turns at `hard` and 0% of solo turns, and the apparent gap")
+        print("  tracked that censoring rather than any effect (RESEARCH-LOG")
+        print("  4.1e, 4.6). The served instrument removes that failure mode")
+        print("  but not the need to check: context overflow here is")
+        print("  deterministic in the prompt, so it lands on the same long")
+        print("  team turns, only labelled rather than silent.")
 
 
 if __name__ == "__main__":

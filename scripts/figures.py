@@ -6,7 +6,7 @@ by this file, through the same integrity filter and the same scoring module the
 analysis uses. A figure that disagrees with the tables would otherwise be
 impossible to catch.
 
-    python scripts/figures.py [--run-dir runs/qwen3-8b-local]
+    python scripts/figures.py [--run-dir runs/llama31-8b-q4-hard]
 
 The one exception is the throughput panel, whose numbers come from a batch-size
 sweep that needs the GPU; those are transcribed from RESEARCH-LOG 4.3 and
@@ -29,6 +29,20 @@ import matplotlib.pyplot as plt
 from collabengine.analysis.integrity import is_instrument_failure
 from collabengine.analysis.scoring import METRICS, rescore
 from collabengine.transcripts.store import TranscriptReader
+
+
+def _run_dir(config_path: str) -> Path:
+    """Read a tier's run directory from its config rather than hardcoding it.
+
+    Hardcoded paths in this file have been wrong twice: once pointing at a
+    stale solo arm, which overstated a gap by 0.031 in a published figure, and
+    once at directories that no longer existed after the move to the served
+    instrument. A figure that looks plausible does not get checked the way a
+    table does, so it should not be the place a path is repeated.
+    """
+    from collabengine.config import ExperimentConfig
+
+    return ExperimentConfig.load(config_path).run_dir
 
 # One palette across every figure. Team arms share a hue so that the eye groups
 # them against solo, which is the comparison every panel is making.
@@ -240,9 +254,10 @@ def fig_curve(hard, out: Path) -> None:
     present or absent, and that alone moves `feasible` from a project-reviving
     effect to nothing.
     """
-    med_dir = Path("runs/qwen3-8b-medium")
+    med_dir = _run_dir("configs/llamacpp-medium.yaml")
     if not (med_dir / "baseline.jsonl").exists():
-        return
+        print(f"no corpus at {med_dir}; skipping curve.png")
+        return False
     med = load(med_dir)
     # Both medium arms live in the same run directory. Reading solo from
     # runs/medium-corpus was correct until 24 fresh solo episodes were
@@ -296,11 +311,12 @@ def fig_curve(hard, out: Path) -> None:
     fig.tight_layout()
     fig.savefig(out, bbox_inches="tight")
     plt.close(fig)
+    return True
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run-dir", default="runs/qwen3-8b-local")
+    ap.add_argument("--run-dir", default=str(_run_dir("configs/llamacpp-hard.yaml")))
     ap.add_argument("--out-dir", default="docs/figures")
     args = ap.parse_args()
 
@@ -308,17 +324,31 @@ def main() -> None:
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    by = load(Path(args.run_dir))
-    fig_gate(by, out / "gate.png")
+    # The corpus-independent panels always regenerate. The two that need a
+    # corpus are skipped with a note when the tier has not run yet, because
+    # this script is run repeatedly while tiers are still landing and a
+    # traceback there reads as "the figures are broken" rather than "the data
+    # is not in yet".
     fig_throughput(out / "throughput.png")
     fig_selftest(out / "selftest.png")
-    fig_curve(by, out / "curve.png")
+    written = 2
 
-    for name, conds in [("fraction", by["fraction"])]:
-        for cond in sorted(conds):
-            vals = conds[cond]
-            print(f"{cond:<28} n={len(vals):2d} mean={st.mean(vals):.3f}")
-    print(f"wrote 3 figures to {out}")
+    corpus = Path(args.run_dir) / "baseline.jsonl"
+    if not corpus.exists():
+        print(f"no corpus at {corpus}; skipping gate.png and curve.png")
+        print(f"wrote {written} figures to {out}")
+        return
+
+    by = load(Path(args.run_dir))
+    fig_gate(by, out / "gate.png")
+    written += 1
+    if fig_curve(by, out / "curve.png"):
+        written += 1
+
+    for cond in sorted(by["fraction"]):
+        vals = by["fraction"][cond]
+        print(f"{cond:<28} n={len(vals):2d} mean={st.mean(vals):.3f}")
+    print(f"wrote {written} figures to {out}")
 
 
 if __name__ == "__main__":
