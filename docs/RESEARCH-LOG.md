@@ -1430,6 +1430,81 @@ a candidate for a later run where it is the only thing that changes.
 
 ---
 
+### 4.10 Served `hard`: the gate passes, and the pass is the token cap
+
+48 episodes, 24 per arm, 24.0 minutes, 122 tok/s, **zero errored turns and zero
+context overflows**. The instrument is clean in every sense §4.6 was about.
+
+**The Phase 1 gate passes here, for the first time in the project:**
+
+| metric | solo (n=23) | team (n=24) | gap | *d* | perm *p* | 95% CI |
+|---|---|---|---|---|---|---|
+| `fraction` | 0.342 | 0.591 | **+0.249** | **+1.09** | **0.000** | [+0.119, +0.386] |
+| `strict` | 0.096 | 0.124 | +0.028 | +0.19 | 0.520 | [−0.055, +0.108] |
+| `feasible` | 0.000 | 0.000 | +0.000 | 0.00 | 1.000 | [+0.000, +0.000] |
+
+*d* = 1.09 at *p* < 0.0001, with a confidence interval clear of zero. Nothing in
+this project has come close. Taken at face value it is the headline the whole
+design was built to detect: four agents beat one, decisively, at the harder
+operating point.
+
+**It is the output cap.** The solo arm's 23 usable episodes contain **10 zeros.
+Every one is a malformed answer, and 9 of the 10 had the answer-bearing turn cut
+off at `max_tokens`.** The team arm has zero of each.
+
+| | zeros | malformed | answer turn cut | non-zero mean |
+|---|---|---|---|---|
+| solo | 10 / 23 | 10 | 9 | **0.605** |
+| team | 0 / 24 | 0 | 1 | **0.591** |
+
+*When solo produces a parseable answer at all it scores 0.605, against the
+team's 0.591.* The entire effect is 10 episodes in which one agent, given three
+turns to think and one turn to write the answer, ran out of tokens mid-answer.
+
+Dropping answer-turn truncation from both arms (solo −9, team −1):
+
+| metric | solo | team | gap | perm *p* | vs headline |
+|---|---|---|---|---|---|
+| `fraction` | 0.561 | 0.585 | **+0.024** | 0.641 | −0.225 |
+| `strict` | 0.159 | 0.108 | **−0.051** | 0.282 | −0.078 |
+
+*d* = 1.09 becomes a gap of +0.024 at *p* = 0.64, and `strict` changes sign.
+
+**And the artifact grows with instance size, which is the shape of H1.** This is
+the part that matters beyond this corpus. Harder instances need longer answers,
+so solo's single answer-bearing turn hits the 1024-token cap more often — while
+the team's final turn, which commits an answer the transcript already contains,
+does not:
+
+| | solo answer cut | solo malformed | team answer cut | headline gap | sensitivity gap |
+|---|---|---|---|---|---|
+| `medium` | 7 / 24 | 6 | 0 | +0.067 | −0.023 |
+| `hard` | 10 / 24 | 11 | 1 | **+0.249** | +0.024 |
+
+The headline gaps trend upward by a factor of nearly four. The sensitivity gaps
+do not trend at all — they sit either side of zero. **H1 predicts a team
+advantage that grows with instance size, and that is exactly what an output cap
+applied to two arms with different answer geometries produces on its own.** A
+curve read without this column beside it is indistinguishable from the
+hypothesis it was built to test.
+
+**What this run nearly published.** Twelve hours ago this corpus would have been
+scored by the preregistered filter alone, which excludes a malformed episode only
+when *every* turn was truncated. That rule caught **1** of the 10. The report
+would have read *d* = 1.09, *p* < 0.0001, gap growing +0.067 → +0.249 across
+difficulty — the gate passing and H1 confirmed on the same page — and it would
+have been wrong in the same direction as every artifact before it. The
+difference was one predicate written that morning because a `cut@end` column
+looked asymmetric on `medium`.
+
+The generalisable version, and the reason this belongs above the fold: **an
+instrument limit applied identically to both arms is not a fair limit if the
+arms use the resource differently.** `max_tokens` was identical everywhere. What
+differed was that one arm spends its last turn writing the answer and the other
+spends its last turn summarising one it has already written.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
