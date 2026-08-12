@@ -89,16 +89,53 @@ JUDGE_SYSTEM = (
     "fixed behavioral taxonomy. You will see one message with no information "
     "about who wrote it. Choose the single label that best describes what the "
     "message primarily DOES.\n\n"
-    "propose     - puts forward or revises a concrete assignment of jobs to workers\n"
+    "The task in the transcript is an ALLOCATION PUZZLE: participants assign "
+    "jobs (J1, J2, ...) to workers (W1, W2, ...) subject to skill, capacity and "
+    "exclusion requirements. Read the labels below as descriptions of what a "
+    "participant is doing IN THE CONVERSATION, never as descriptions of the "
+    "puzzle's content.\n\n"
+    "propose     - puts forward or revises an assignment of jobs to workers. This "
+    "is the label for any message whose substance is 'J4 -> W2, J5 -> W1, ...', "
+    "however it is worded and however much reasoning surrounds it.\n"
     "compute     - works through capacity, duration or value arithmetic\n"
     "search      - explores alternative placements or tests whether one is feasible\n"
     "verify      - audits the draft or another participant's claim for errors\n"
     "synthesize  - merges partial results from several participants into one answer\n"
-    "organize    - divides up the work or sets procedure, without doing the task\n"
+    "organize    - coordinates the PARTICIPANTS with each other: who should do "
+    "which part, what order to work in, what to do next as a group. For example "
+    "'A2, you check the capacity constraints and I will do the arithmetic'. "
+    "Assigning JOBS to WORKERS is never organize -- that is the puzzle being "
+    "solved, not the participants being organised. If the message divides work "
+    "among W1..Wn it is propose; only dividing work among the participants "
+    "themselves is organize.\n"
     "agree       - endorses what was already said without adding content\n"
     "other       - none of the above\n\n"
     "Reply with the label and nothing else."
 )
+"""The codebook. `organize` carries the long gloss for a measured reason.
+
+Against a human rater the previous wording -- "divides up the work or sets
+procedure, without doing the task" -- put 17 of 40 messages in `organize`,
+including 7 the human called `propose`, and produced kappa = 0.072 with 20% raw
+agreement (RESEARCH-LOG 4.13). The failure was not judge weakness but a collision
+between the label and the task: this task *is* dividing up work, so a message
+reading "J5 -> W4, J9 -> W5" satisfies the old definition literally while being
+the plainest possible `propose`.
+
+So the definition now names the distinction the taxonomy always meant --
+coordinating *participants* rather than allocating *jobs* -- and says which way
+the ambiguous case resolves. Any change to this string invalidates every
+previously coded corpus, because the labels are only comparable under one
+codebook; re-code rather than mix.
+"""
+
+
+#: Bumped whenever JUDGE_SYSTEM changes meaning. Stamped on every code so a
+#: file coded under one codebook can never be silently compared with another --
+#: the labels are only comparable within a version. v1 is the wording that
+#: returned kappa = 0.072 against a human (RESEARCH-LOG 4.13); v2 disambiguates
+#: `organize` from the puzzle's own job-to-worker allocation.
+CODEBOOK_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +147,7 @@ class MessageCode:
     agent_id: str
     action: ActionType
     judge: str = ""
+    codebook: int = CODEBOOK_VERSION
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -118,6 +156,7 @@ class MessageCode:
             "agent_id": self.agent_id,
             "action": self.action.value,
             "judge": self.judge,
+            "codebook": self.codebook,
         }
 
     @classmethod
@@ -128,6 +167,8 @@ class MessageCode:
             agent_id=d["agent_id"],
             action=ActionType(d["action"]),
             judge=d.get("judge", ""),
+            # Files written before the field existed are v1 by construction.
+            codebook=int(d.get("codebook", 1)),
         )
 
     @property
