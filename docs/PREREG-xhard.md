@@ -196,3 +196,57 @@ negative one, reported at three points rather than two.
 That outcome is not a failed run. It converts "we could not find a benefit" into
 "we looked across the full usable range of the task and there is none", which is
 the difference between an inconclusive study and a finding.
+
+---
+
+## Postscript — 2026-08-12, after the three tiers were analysed
+
+Two things happened in the run that this document did not anticipate, and both
+belong here rather than only in the research log, because a preregistration that
+is silent about what it failed to predict is worth less than one that says so.
+
+### H1 appeared to hold, and did not
+
+The falsification clause above reads: *"If H1 fails (p ≥ 0.05) and H4 holds, the
+conclusion is that no operating point in this task family rewards collaboration
+at 8B."* On the preregistered analysis — the integrity filter as specified, the
+metrics as specified, the tests as specified — **H1 did not fail.** `hard`
+returned *d* = 1.09 at *p* < 0.001 and `xhard` *p* = 0.020, and the gap grew with
+instance size exactly as H1 predicts.
+
+It was the output cap. The two arms have different answer geometries: a solo
+episode's last of three turns carries the whole answer, a team episode's last of
+twelve commits one the transcript already holds, so an identical `max_tokens`
+truncates solo's answer and the team's summary. Answer-turn truncation ran 7 / 10
+/ 15 for solo against 0 / 1 / 2 for the team across the three tiers, and the
+artifact therefore grows with instance size — the same shape H1 predicts. With it
+controlled the gaps are −0.023, +0.024, −0.056. RESEARCH-LOG §4.9–4.11.
+
+**The preregistered analysis was not sufficient to reach the preregistered
+conclusion.** The specified integrity filter excludes a malformed episode only
+when *every* turn was truncated, which at these rates the team arm can
+essentially never qualify for; it caught 1 of the 10 relevant episodes at `hard`.
+The correction that mattered — `final_turn_truncated` — was written on
+2026-08-12, after the `medium` corpus landed and before `hard` and `xhard` were
+analysed. It is a post-hoc analytic decision. It is reported as one.
+
+That is the honest position, and it cuts both ways: preregistering the test does
+not preregister the instrument's failure modes, and this document fixed the
+analysis in advance without being able to fix the thing the analysis was blind to.
+
+### C4 is not preregistered
+
+`solo_budget` — one agent given the team's whole turn budget — was built and run
+on 2026-08-12 in response to a measurement made the same day: that the team spends
+roughly twice solo's output tokens across four times the forward passes, so the
+gate has never separated "four agents conferring" from "one agent thinking less".
+
+It is exploratory. Its hypothesis was formed after seeing the data that motivated
+it, its analysis was not fixed in advance, and its result — the team ahead by
++0.082 and +0.059 controlled at the two tiers analysed so far — carries a known
+upward bias, since the lone agent is driven through a protocol built for four and
+degenerates into restatement on 25–33% of consecutive turns.
+
+Nothing in §4.12 should be read at preregistered strength. If that comparison is
+worth making, it is worth preregistering and running again against a purpose-built
+long-form single-agent baseline.

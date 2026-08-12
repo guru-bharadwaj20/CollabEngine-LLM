@@ -1708,6 +1708,26 @@ every component.
 | Difficulty | `hard` — 24 jobs, 6 workers, 6 exclusions, 5 synthesis constraints, capacity slack 1.1, value floor 0.72 |
 | Figures | `python scripts/figures.py` regenerates all three from the corpus |
 
+**The served instrument, which produced every result from §4.9 onward.** The
+table above describes the bf16 path and is retained because §4.1–4.8 were
+measured on it. It is superseded, and its corpora no longer exist.
+
+| | |
+|---|---|
+| Model | Meta-Llama-3.1-8B-Instruct, **Q4_K_M GGUF**, ~4.6 GiB resident |
+| Server | `llama-server` build `b10369-6e62ba538`, CUDA 12.4, `-ngl 99 -c 73728 --parallel 4 -b 2048 -ub 512 --flash-attn on` |
+| Geometry | 18,432 tokens per slot (`-c` ÷ `--parallel`), confirmed by the server's own `n_ctx_slot` line and by `/props` |
+| Client | `backends/openai_compat.py` against `http://127.0.0.1:8000/v1`, `max_concurrency` 4 — matched to `--parallel`, since an episode issues one request at a time |
+| Team | 4 agents × 3 rounds; `solo` 1 × 3; `solo_budget` 1 × 12. Temperature 0.8, top_p 0.95, `max_tokens` 1024 throughout |
+| Tiers | `medium` 16 jobs / 5 workers, `hard` 24 / 6, `xhard` 36 / 8. `max_model_len` held at 17,408 across all three so the instrument does not vary along the curve |
+| Cost | 144 episodes in 113 minutes wall clock; 560k output tokens; 55–136 tok/s aggregate depending on tier |
+| Reporting | `python scripts/gate_report.py` produces every gate number; `python scripts/figures.py` every figure |
+
+**Read any gate number from this instrument beside its answer-turn truncation
+count.** That is not a caveat about precision, it is the difference between a
+*d* = 1.09 at *p* < 0.0001 and a gap of +0.024 at *p* = 0.64 (§4.10). The audit
+prints `cut@end` above every mean for this reason.
+
 **Sampling reproducibility is per batch, not per request.** vLLM seeds each
 sequence independently; `model.generate` draws the whole batch from one global
 RNG, so an episode's text depends on which other episodes happened to batch with
@@ -1738,53 +1758,55 @@ Steps 2 and 3 below are what the grid would have produced and are not
 recoverable at this operating point; they need either a task the team is better
 at or a larger model.
 
-**0. The served run, and it is what the card is queued for.** Three tiers on
-Meta-Llama-3.1-8B-Instruct Q4_K_M over llama.cpp — §3.11, registered as
-PREREG-xhard Amendment 2. In order, and stopping at the first one that answers
-the question:
+~~0. The served run.~~ **Done, 2026-08-12** (§4.9–4.11). Three tiers, 144
+episodes, zero errored turns and zero context overflows. `xhard` — the tier
+§3.10 called infeasible — ran clean in 69.6 minutes.
 
-```
-llama-server -m models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf \
-    --host 127.0.0.1 --port 8000 -ngl 99 -c 73728 --parallel 4 \
-    -b 2048 -ub 512 --flash-attn
+~~5. Date the retraction.~~ **Superseded.** `medium` was regenerated whole on
+the served instrument rather than patched, so §4.1's withdrawn point is now a
+measured one on a different instrument. The bf16 corpora were deleted in the
+move, which is what makes the later note on §4.1e permanent rather than fixable.
 
-for tier in medium hard xhard; do
-  python scripts/preflight.py --config configs/llamacpp-$tier.yaml || break
-  collabengine pipeline --config configs/llamacpp-$tier.yaml \
-                        --phases baseline,solo
-done
-```
+**What is actually open, in the order it is worth doing.**
 
-144 episodes, 6 arms, n=24 each. Everything before the pipeline line is
-runnable and tested; the pipeline lines are the only part that needs the GPU.
-Run `medium` first — it is the cheapest tier and its solo arm is H4's anchor,
-so if solo does not degrade across the three tiers on this model, H1 is
-untestable on this run and the remaining card time should not be spent.
-
-3. **Behavioural coding with the local 8B**; κ against the frontier subsample.
-   *In progress.* This is the live thread — behavioural differentiation does
-   not require a performance benefit, so a failed gate does not touch it.
-4. **Convergent validity:** do transcript labels predict causal profiles? Note
-   that with no ablation grid there is no causal profile to correlate against
-   at `hard`. Convergence can only be reported against *score* contribution,
-   which is a weaker target and must be labelled as such.
-5. **Date the retraction.** Re-run `medium`'s team arm on the fixed harness.
-   The solo arm (0.879) is clean and does not need regenerating, so this is
-   twelve episodes of card time and it converts §4.1 from "withdrawn, unknown"
-   into a measured point on the difficulty curve.
+1. **Finish C4 at `xhard`** (running). `medium` and `hard` both show the team
+   ahead of a matched-budget single agent, +0.082 and +0.059 controlled, both
+   *p* < 0.05. A third point decides whether that is a result or two coin flips.
+2. **Build an honest long-form single-agent baseline, and rerun C4 against it.**
+   This is now the highest-value experiment in the project. §4.12's effect is
+   bounded above by a defect: `solo_budget` runs a multi-party turn-taking
+   protocol alone, under the `n=1` brief §4.9 documents, and degenerates into
+   restatement on 25–33% of consecutive turns. A single-agent prompt that does
+   not re-emit the whole answer every turn would very likely close most of the
+   gap. Until that exists, "the team beats one agent at matched budget" cannot
+   be separated from "the team beats one agent handed a protocol built for four".
+3. **Raise the answer-turn budget and re-measure the gate.** Everything in
+   §4.9–4.11 says the cap is the dominant artifact at every operating point.
+   The fix is not a larger `max_tokens` everywhere — that changes the whole
+   instrument — but a final turn allowed to emit the answer without competing
+   with reasoning for the same budget. Then the sensitivity analysis becomes
+   unnecessary rather than load-bearing.
+4. **Behavioural coding with the local 8B**; κ against the frontier subsample.
+   Behavioural differentiation does not require a performance benefit, so a
+   failed gate does not touch it.
+5. **Convergent validity:** do transcript labels predict causal profiles? With
+   no ablation grid there is no causal profile to correlate against, so
+   convergence can only be reported against *score* contribution — a weaker
+   target that must be labelled as such.
 6. Extend N via resume; Phase 4 robustness across model families and team sizes.
-7. Preregister Phases 3–4 before running them.
+7. Preregister Phases 3–4 — and C4 — before running them again. C4 was built
+   and run in a single afternoon in response to §4.9; it is exploratory, and
+   §4.12 says so.
 
-**The honest summary of what Phase 1 cost and bought.** It bought one negative
-result (§4.1b), a difficulty curve with one measured point and one withdrawn,
-and an instrument that has now caught five distinct silent-corruption modes.
-It cost the ablation grid, which was the project's headline deliverable. The
-grid is not abandoned — it is blocked on finding an operating point where the
-team contributes something to ablate.
-
-**A weak correlation at step 5 is not a failed project.** It is the strongest
-version of the original thesis and an independent replication of *Agents that
-Matter*' finding that introspective judgment diverges from ablation.
+**The honest summary of what Phase 1 cost and bought.** It bought a negative
+result that has now survived two instruments, five operating points and six
+distinct corrections; a difficulty curve measured end to end; one genuinely
+surprising positive (§4.12); and an instrument that has caught six silent
+corruption modes, the last of which would have published a *d* = 1.09 at
+*p* < 0.0001 as the project's headline. It cost the ablation grid, which was
+the headline deliverable. The grid is not abandoned — it is blocked on finding
+an operating point where the team contributes something to ablate, and §4.12 is
+the first evidence that such a point might exist.
 
 ---
 
@@ -1810,12 +1832,45 @@ Matter*' finding that introspective judgment diverges from ablation.
    it.
 7. **Measure the shape you will run.** A benchmark at 192 new tokens said the
    configuration was healthy; the same configuration at 1024 was not.
+8. **A limit applied identically to both arms is not a fair limit if the arms
+   use the resource differently.** `max_tokens` was the same everywhere. One arm
+   spent its last turn writing the answer and the other spent its last turn
+   summarising one already written, so an identical cap truncated an answer in
+   one arm and a summary in the other. This produced *d* = 1.09 at *p* < 0.0001
+   (§4.10). Symmetry of a parameter is not symmetry of its effect.
+9. **An artifact that scales with your independent variable is indistinguishable
+   from your hypothesis.** Solo's answer-turn truncation grew 7 → 10 → 15 across
+   the difficulty curve because harder instances need longer answers. H1
+   predicted a team advantage growing with instance size; the instrument
+   delivered exactly that, unaided. Before believing a trend, ask what else in
+   the setup varies along the same axis.
+10. **A guard that cannot perform its check must be louder than one that
+    performs it and passes.** Three failures here failed open while printing
+    text that made the silence sound explained — a CRLF that made a free-VRAM
+    check evaluate to nothing (§3.9), an OOM diagnosis blamed on a busy card
+    (§3.10), and a slot check reporting "no /props (vLLM, or an older
+    llama.cpp)" against a healthy llama-server it was asking at the wrong URL
+    (§3.12). All three were plausible, and being plausible is what made them
+    expensive.
+11. **A test double laxer than the thing it doubles cannot fail on the
+    difference.** The `/props` stub matched `endswith("/props")`, so it answered
+    the wrong URL as readily as the right one, and 337 tests stayed green over a
+    guard that had never run.
+12. **Partial correction applied unevenly across the independent variable is
+    worse than none.** The integrity filter excluded solo's all-turns-truncated
+    episodes at a rate that itself grew with difficulty, so it lifted solo's
+    mean most where the artifact was largest — leaving a residual that is not a
+    constant offset and cannot be reasoned about as one (§4.11).
+13. **Delete a corpus and you delete every future correction to it.** The bf16
+    runs cannot be re-examined for the answer-turn artifact, because the
+    corpora were removed when the instrument changed. Their published gaps are
+    now permanently upper bounds of unknown size (§4.1e).
 
 ---
 
 ## Appendix A — Commit ledger
 
-<!-- 71 commits; `git log --reverse --format='%h %ad %s' --date=short` -->
+<!-- 100 commits; `git log --reverse --format='%h %ad %s' --date=short` -->
 <!-- The table below covers days 1-2; later commits are summarised in the
      sections above, each of which names the change it came from. -->
 
@@ -1908,13 +1963,18 @@ because every test went through that subclass (§3.3).
 
 | Script | Role |
 |---|---|
-| `scripts/figures.py` | Regenerates every README figure from the corpus, through the same integrity filter and scoring module the analysis uses |
+| `scripts/gate_report.py` | **The one path to a gate number.** Prints the integrity audit above the means, then the headline, the answer-turn sensitivity (§4.10) and C4 (§4.12). Reads run directories from the configs, because hardcoding them has been wrong three times |
+| `scripts/figures.py` | Regenerates every README figure from the corpus, through the same integrity filter and scoring module the analysis uses. Refuses to plot a tier still generating |
 | `scripts/rescore.py` | Offline re-scoring of archived corpora under alternative metrics — no GPU, since instances are deterministic in `(seed, difficulty)` |
+| `scripts/serve.sh` | Starts llama-server with the geometry `LLAMACPP-SETUP.md` derives; prints tokens-per-slot and refuses to race a server already on the port |
+| `scripts/served-run.sh` | The whole difficulty curve on the served instrument — three tiers, preflight-gated, resumable (§4.9–4.11) |
+| `scripts/budget-run.sh` | The C4 matched-budget arm across the three tiers (§4.12). Off by default in the pipeline: it costs what the team arm costs |
+| `scripts/repair.py` | Regenerates instrument failures at low concurrency. Refuses to touch conditions the regeneration pass would not rewrite, after a dry run showed it would have deleted a `fixed_order` episode |
 | `scripts/gatecheck.sh` | Evaluates the Phase 1 gate as soon as the episodes exist; refuses a verdict below 5 usable episodes per arm |
 | `scripts/queue-judge.sh` | Waits for ≥18 GiB free, stable across three checks, before starting a second model on the shared card |
 | `scripts/followup.sh` | Chains analyze → code → κ → converge once a pipeline finishes |
-| `scripts/overnight.sh` | The n=24 extensions at `hard` and `medium` |
-| `scripts/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, in a minute, before the night is spent (§3.11) |
+| `scripts/overnight.sh` | The n=24 extensions at `hard` and `medium`, on the superseded bf16 instrument |
+| `scripts/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, in a minute, before the night is spent (§3.11). Its slot check silently did nothing until §3.12 |
 
 ### Appendix D — Configs
 
@@ -1923,7 +1983,7 @@ because every test went through that subclass (§3.3).
 | `configs/local-gpu.yaml` | `hard` — 24 jobs, 6 workers. Measured; fails the gate (§4.1b) |
 | `configs/local-gpu-medium.yaml` | `medium` — 16 jobs, 5 workers. Measured; fails the gate (§4.1d). The largest instance this card evaluates without censoring the team arm (§4.6) |
 | `configs/local-gpu-xhard.yaml` | `xhard` — 36 jobs, 8 workers. **Not runnable on 24 GB at bf16** (§3.10); kept because the preregistration that motivated it is part of the record |
-| `configs/llamacpp-medium.yaml` | `medium` on the served Q4 instrument (§3.11) |
-| `configs/llamacpp-hard.yaml` | `hard`, same. Regenerated because H1 is a trend and H4 a comparison, and neither survives a change of instrument at one point only |
-| `configs/llamacpp-xhard.yaml` | `xhard`, same — the tier bf16 could not reach. Identical to the two above but for `name` and `difficulty` |
+| `configs/llamacpp-medium.yaml` | `medium` on the served Q4 instrument (§3.11). Measured; fails the gate, and its apparent gap reverses under the answer-turn control (§4.9) |
+| `configs/llamacpp-hard.yaml` | `hard`, same. Regenerated because H1 is a trend and H4 a comparison, and neither survives a change of instrument at one point only. Measured; *passes* the gate at *d* = 1.09 and the pass is the token cap (§4.10) |
+| `configs/llamacpp-xhard.yaml` | `xhard`, same — the tier bf16 could not reach, which it reached in 69.6 minutes. Measured; passes at *p* = 0.020, controlled gap −0.056 (§4.11) |
 | `configs/vllm-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |
