@@ -24,6 +24,16 @@ from collabengine.tasks.render import (
 from collabengine.tasks.schema import Instance, Solution
 from collabengine.transcripts.store import EpisodeRecord
 
+#: Templated on the agent count, which reads badly at `n=1`: the solo and
+#: `solo_budget` arms open with "You are one of 1 participants working together"
+#: and a reference to "the others". Left exactly as-is on purpose. The worry --
+#: that an agent told it has absent partners would defer or wait, biasing the
+#: gate toward the team -- was measured on the served `medium` corpus instead of
+#: assumed: across 72 solo agent messages, 0% name an absent agent and 0% defer
+#: or wait (RESEARCH-LOG 4.9). Rewording it now would change the solo brief and
+#: the C4 turn budget in the same run, which is the two-variables-at-once move
+#: that cost the `medium` write-up in 4.1c. Change it in a run where it is the
+#: only thing that changes, and regenerate every arm that uses it.
 TEAM_BRIEF = (
     "You are one of {n} participants working together on the task below. "
     "You share a single answer: whatever the group last submits is what gets "
