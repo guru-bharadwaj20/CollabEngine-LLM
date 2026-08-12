@@ -184,6 +184,27 @@ def _matched_budget(team_path: Path, headline: dict, rng: random.Random) -> None
     print("     Both arms spend the same generation here. What is left is the")
     print("     multi-agent structure, which is the thing under test.")
 
+    # C4 equalises the budget, which is not the same as removing the cap. Both
+    # arms here run twelve turns, so if `solo_budget` still spends its last turn
+    # writing the answer while the team spends its last turn restating one, the
+    # asymmetry of 4.10 survives the fix and has to be reported the same way.
+    cut_b = scores(team_path, "solo_budget", drop_final_truncated=True)
+    cut_t = scores(team_path, "baseline", drop_final_truncated=True)
+    if not (cut_b.get("fraction") and cut_t.get("fraction")):
+        return
+    dropped_b, dropped_t = n_b - len(cut_b["fraction"]), n_t - len(cut_t["fraction"])
+    if not (dropped_b or dropped_t):
+        print("     No answer-turn truncation in either arm: the budget fix")
+        print("     removed the asymmetry rather than merely balancing it.")
+        return
+    print(f"     ...same, answer-turn truncation dropped "
+          f"(1 agent -{dropped_b}, team -{dropped_t}): ", end="")
+    if min(len(cut_b["fraction"]), len(cut_t["fraction"])) < 5:
+        print("too few left to read.")
+        return
+    g = st.mean(cut_t["fraction"]) - st.mean(cut_b["fraction"])
+    print(f"fraction {g:+.3f} (p={perm_p(cut_b['fraction'], cut_t['fraction'], rng):.3f})")
+
 
 def _sensitivity(
     team_path: Path, solo_path: Path, headline: dict, rng: random.Random
