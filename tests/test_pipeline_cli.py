@@ -9,6 +9,7 @@ needs. Those are the failures that cost hours of card time rather than seconds.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 import yaml
@@ -153,6 +154,34 @@ def test_every_plan_id_matches_the_record_it_produces(run) -> None:
     recorded |= {r.episode_id for r in TranscriptReader(run_dir / "ablation.jsonl")}
 
     assert planned == recorded
+
+
+def test_solo_budget_matches_the_team_turn_for_turn(run) -> None:
+    """The C4 arm is worthless unless the budgets it equalises are equal.
+
+    Its only job is to hold total generation fixed while removing the second
+    through fourth agent, so `n_agents x rounds` and the per-turn cap must both
+    match the team arm exactly. If they drift apart, the arm silently becomes a
+    second uncontrolled comparison rather than the control on the first.
+    """
+    config_path, _ = run
+
+    from collabengine.cli import _solo_budget_plans
+    from collabengine.config import ExperimentConfig
+
+    config = ExperimentConfig.load(config_path)
+    backend = config.backend.build()
+    plans = _solo_budget_plans(config, backend)
+
+    team = config.team
+    solo_budget = replace(team, n_agents=1, rounds=team.rounds * team.n_agents)
+
+    assert solo_budget.n_agents == 1, "the point is that it is one agent"
+    assert solo_budget.n_agents * solo_budget.rounds == team.n_agents * team.rounds
+    assert solo_budget.max_tokens == team.max_tokens
+    assert solo_budget.difficulty == team.difficulty
+    assert len(plans) == len(config.seeds)
+    assert all(p.episode_id.startswith("solo_budget:") for p in plans)
 
 
 def test_pipeline_phase_subset_runs_only_what_was_asked(run) -> None:

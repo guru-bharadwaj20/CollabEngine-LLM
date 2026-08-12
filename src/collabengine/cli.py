@@ -120,7 +120,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--phases",
         default="baseline,solo,symmetry,c2,ablate",
-        help="comma-separated subset of: baseline, solo, symmetry, c2, ablate",
+        help=(
+            "comma-separated subset of: baseline, solo, solo_budget, symmetry, "
+            "c2, ablate. solo_budget is off by default: it is one agent given "
+            "the team's whole turn budget, and it costs as much as the team arm"
+        ),
     )
     p.add_argument(
         "--auto-difficulty",
@@ -810,6 +814,8 @@ async def _pipeline(config: ExperimentConfig, backend, phases: set[str]) -> int:
         stage1 += _baseline_plans(config, backend)
     if "solo" in phases:
         stage1 += _solo_plans(config, backend)
+    if "solo_budget" in phases:
+        stage1 += _solo_budget_plans(config, backend)
     if "symmetry" in phases:
         stage1 += _symmetry_plans(config, backend)
     if "c2" in phases:
@@ -937,6 +943,45 @@ def _solo_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
                     config=team,
                     episode_seed=seed,
                     condition="solo",
+                )
+            ),
+        )
+        for seed in config.seeds
+    ]
+
+
+def _solo_budget_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
+    """One agent given the *team's* turn budget: the C4 control.
+
+    `_solo_plans` above calls one agent "a quarter of an episode's cost (one
+    agent, so a third of the turns)" as though that were only a saving. It is
+    also the comparison's largest uncontrolled difference. Measured on the
+    served `medium` corpus, the team arm takes 12 agent turns to solo's 3 and
+    actually emits 4,443 output tokens to solo's 2,055 -- 2.16x the generation,
+    across 4x the forward passes. Any gap the gate reports is a gap between
+    four agents conferring *and* one agent thinking less.
+
+    This arm holds the budget and drops the conferring: `n_agents=1`,
+    `rounds` scaled by the team's agent count, so 1x12 against 4x3 with the
+    same per-turn cap. What is left between this arm and the team arm is the
+    multi-agent structure itself, which is the thing the project is named after.
+
+    It is not a replacement for `solo`. The preregistered gate is team vs solo
+    and stays exactly as written; this is the third arm that says which reading
+    of it survives.
+    """
+    team = replace(
+        config.team, n_agents=1, rounds=config.team.rounds * config.team.n_agents
+    )
+    return [
+        RunPlan(
+            episode_id=_run_id("solo_budget", config.team.difficulty, seed),
+            factory=(
+                lambda seed=seed: run_episode(
+                    backend=backend,
+                    config=team,
+                    episode_seed=seed,
+                    condition="solo_budget",
                 )
             ),
         )
