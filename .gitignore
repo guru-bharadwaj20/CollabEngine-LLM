@@ -20,3 +20,7 @@ models/
 *.gguf
 *.safetensors
 runs/
+
+# Vendored llama.cpp binaries and CUDA runtime (~640 MB, fetched by
+# docs/LLAMACPP-SETUP.md; regenerable, never committed).
+vendor/
