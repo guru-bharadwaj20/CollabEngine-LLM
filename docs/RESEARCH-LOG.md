@@ -1398,6 +1398,36 @@ the team's agent count, so 1×12 against 4×3 at an identical per-turn cap. It i
 not a replacement for the preregistered gate; it decides which reading of the
 gate survives. Queued behind the three tiers.
 
+**A wart in the solo prompt, checked rather than assumed.** `_solo_plans` sets
+`n_agents=1` and the brief is templated on that count, so every solo episode
+ever run in this project — including §4.1e's published table — opened with:
+
+> You are one of **1** participants working together on the task below. You
+> share a single answer: whatever **the group** last submits is what gets
+> scored. You can see everything **the others** write.
+
+That is incoherent, and the obvious worry is that it costs solo something: an
+agent told it has partners might defer, hedge, or wait for input that never
+arrives, which would bias the gate toward the team like everything else here.
+It does not appear to. Across 72 solo agent messages:
+
+| | addresses an absent agent | defers or waits | first-person voice |
+|---|---|---|---|
+| solo | **0%** | **0%** | 29% |
+| team (288 msgs) | 74% | 2% | 16% |
+
+Not one solo message names A2–A4 or waits on anyone. Collective pronouns run at
+79% against the team's 82%, but "we need to assign W3" is ordinary usage for a
+single reasoner and is not evidence of imagined partners. So the prompt is
+untidy rather than load-bearing, and it is recorded here as a wart with a
+measurement attached, not as another artifact.
+
+**It is deliberately not being fixed before C4.** Changing the brief now would
+make `solo_budget` differ from `solo` in the prompt *and* the turn budget, which
+is precisely the two-variables-at-once move that cost this project its `medium`
+write-up (§4.1c). C4 runs on the brief the solo arm already has; the wording is
+a candidate for a later run where it is the only thing that changes.
+
 ---
 
 ## 5. Instrument validity work
