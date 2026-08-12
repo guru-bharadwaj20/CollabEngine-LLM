@@ -518,6 +518,53 @@ size, in about a minute, before any stage starts. Three corpora in this project
 were lost to conditions that were true before the first episode ran and
 detectable in seconds. That is the whole argument for it.
 
+### 3.12 The preflight guard was open, and said so in the server's voice
+
+§3.11 ends by arguing that `scripts/preflight.py` is worth its minute because
+"three corpora in this project were lost to conditions that were true before the
+first episode ran and detectable in seconds". The slot check it names first had
+never run.
+
+`/props` is served at the llama-server **root**. Preflight requested it through
+the `openai_compat` client, whose `base_url` ends in `/v1`, so it asked for
+`/v1/props` — which llama-server answers 404, while serving `/props` 200. The
+404 was read as absence, and absence is deliberately not a failure there (vLLM
+has no `/props` at all), so the check degraded to a note and the run proceeded:
+
+    note: no /props; slot size unverified (vLLM, or an older llama.cpp).
+
+Every clause of that note is wrong about this server. It was neither vLLM nor
+old; it was answering the endpoint at the address nobody asked. Measured on the
+running build: `models` is served at both `/models` and `/v1/models`, `props` at
+the root only. That asymmetry is the entire habitat of the bug — the request
+that verified the model worked under either spelling, so nothing upstream of the
+slot check ever looked wrong.
+
+**Why the suite was green.** The stub matched `request.url.path.endswith("/props")`,
+which answers `/v1/props` as readily as `/props`. A test double laxer than the
+thing it doubles cannot fail on the difference between them, and this one was
+laxer in precisely the dimension the code got wrong. The stub now matches paths
+exactly and mirrors the measured asymmetry, and a regression test asserts the
+URL preflight actually requests.
+
+**What it cost, and what it did not.** Nothing in §4 is affected: the live probe
+runs after the slot check and accepted 17,381 prompt tokens on the real server,
+so the geometry was confirmed — by the slower check, for the whole time the fast
+one was silent. The exposure was the `--skip-probe` path, and the case where the
+probe's estimate happens to fall under a slot that later turns out too small.
+
+With the fix, preflight prints `ctx per slot 18432 (need 18432)`. That is also
+the first time the margin has been legible: **zero**. The requirement is
+`max_model_len + max_tokens` = 17408 + 1024, and the slot is 18432 exactly. It
+fits, and any increase to either cap on any tier fails immediately rather than
+partially — which is the good direction for this failure to run, and was not
+visible while the number was never printed.
+
+*The generalisable form, which this log now has three instances of (§3.9's
+`queue-judge.sh`, §3.10's OOM diagnosis, this): a guard that cannot perform its
+check should be much louder than one that performs it and passes. All three
+failed open while emitting text that made the silence sound explained.*
+
 ---
 
 ## 4. Results
