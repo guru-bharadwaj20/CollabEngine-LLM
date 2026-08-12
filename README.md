@@ -61,24 +61,23 @@ So the gate still fails, and the reason to believe that is the same reason as be
 
 **The honest limit on that last column.** Controlling for answer-turn truncation costs most of the solo arm at the hard end — usable *n* falls 22 → 17 → 9. At `xhard` the controlled comparison rests on nine solo episodes, so −0.056 is a weak estimate and its *p* reflects that. The claim these three rows jointly support is not that the team is *worse*; it is that **no controlled comparison at any operating point shows the team ahead**, and every uncontrolled one that did was tracking a truncation rate that grew with the independent variable. Full accounting in [RESEARCH-LOG §4.9–4.11](docs/RESEARCH-LOG.md).
 
-### The one comparison that survives the control
+### The matched-budget control, and why it does not rescue the team either
 
 The gate compares 4 agents × 3 rounds against 1 agent × 3 rounds — which is not a matched comparison. The team spends roughly **2× the output tokens across 4× the forward passes**, so "four agents beat one" has never been separable from "more tokens beat fewer". The `solo_budget` arm gives one agent the team's whole turn budget (1 × 12 rounds, same per-turn cap) to separate them.
 
-| controlled `fraction` | solo, 3 turns | solo_budget, 12 turns | team, 12 turns |
-|---|---|---|---|
-| **medium** | **0.654** | 0.549 | 0.631 |
-| **hard** | 0.561 | 0.526 | **0.585** |
-| tokens / episode | ~2,100 | **~8,700** | ~4,800 |
-| consecutive turns >80% repeated | 0–4% | **25–33%** | 2–7% |
+| controlled `fraction` | solo, 3 turns | solo_budget, 12 turns | team, 12 turns | team − solo_budget |
+|---|---|---|---|---|
+| **medium** | **0.654** | 0.549 | 0.631 | +0.082 (*p* = 0.039) |
+| **hard** | 0.561 | 0.526 | **0.585** | +0.059 (*p* = 0.045) |
+| **xhard** | **0.586** | 0.527 | 0.530 | **+0.003 (*p* = 0.962)** |
+| tokens / episode | ~2,400 | **~8,900** | ~5,400 | |
+| consecutive turns >80% repeated | 0–4% | **25–33%** | 2–11% | |
 
-Two readings that sound contradictory and are not. **Against the cheap three-turn baseline the team is a coin flip at 2.2× the cost** — one tier each way, neither significant. **Against the matched-budget baseline the team wins at both tiers** (+0.082, *p* = 0.039; +0.059, *p* = 0.045), and these are the only positive results in this project to survive the truncation control.
+**+0.082, +0.059, +0.003.** The effect declines monotonically along the independent variable and is gone at the hardest point — two results barely under 0.05 and one squarely at zero. That is not a replication, and this project has already withdrawn one claim with exactly that profile. It fails for a reason worth noting too: the gap closes because the **team** declines (0.631 → 0.585 → 0.530), not because the lone agent improves.
 
-The last row reconciles them: a lone agent driven through twelve turns spends a third of them restating what it just said, and each restatement is another chance to break a constraint it had already satisfied. Team agents repeat 2–7% of the time, because each is responding to something new. **What the multi-agent structure demonstrably buys is protection against single-agent long-horizon degradation, not better reasoning** — and that requires no role specialisation to explain, which is a far narrower claim than the one this project set out to test.
+**What does survive all three tiers has nothing to do with teams.** The cheap single agent is the best configuration measured — three turns, ~2,400 output tokens, ahead of the team at two of three operating points on less than half the generation. And a lone agent given four times the budget gets *worse* at every tier, because 25–33% of its consecutive turns restate the previous one and each restatement is another chance to break a constraint it had already satisfied.
 
-Also note the direction: the team wins while generating *less*. The budget confound does not merely wash out, it reverses.
-
-> **This is exploratory and bounded above.** `solo_budget` was built and run the same day, in response to the measurement that motivated it — it is not preregistered, and [PREREG-xhard](docs/PREREG-xhard.md) says so. It also drives one agent through a protocol built for four, so a purpose-built long-form single-agent baseline would likely close much of the gap. Treat +0.059–0.082 as an upper bound, not an estimate. `xhard` is still generating.
+> **Exploratory, and bounded above.** `solo_budget` was built and run the same day in response to the measurement that motivated it — not preregistered, and [PREREG-xhard](docs/PREREG-xhard.md) says so. It also drives one agent through a protocol built for four, so part of its degradation is the harness's doing rather than the model's. See [RESEARCH-LOG §4.12](docs/RESEARCH-LOG.md) for the result and §4.12b for the two-tier version of this section, withdrawn the same day it was written.
 
 PLAN.md makes this a stop condition, so the ablation grid was not run: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
 

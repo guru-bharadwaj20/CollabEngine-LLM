@@ -55,9 +55,12 @@ TEAM_LIGHT = "#7ba7cc"
 GREY = "#8a8a8a"
 RULE = "#d0d0d0"
 
+SOLO_LIGHT = "#e08b5a"
+
 ARMS = [
-    ("solo", "solo\n1 agent", SOLO),
-    ("baseline", "baseline\n4 agents", TEAM),
+    ("solo", "solo\n1 agent, 3 turns", SOLO),
+    ("solo_budget", "solo_budget\n1 agent, 12 turns", SOLO_LIGHT),
+    ("baseline", "baseline\n4 agents, 12 turns", TEAM),
     ("symmetry:name_seed_scratch", "symmetry\nname+seed", TEAM_LIGHT),
     ("fixed_order", "fixed order\ncontrol", TEAM_LIGHT),
 ]
@@ -193,7 +196,13 @@ def fig_gate(by, out: Path, cut_flags: dict[str, list[bool]] | None = None) -> N
     ax1.set_xticks(range(len(ARMS)))
     ax1.set_xticklabels([a[1] for a in ARMS])
     ax1.set_ylabel("score  (fraction of constraints satisfied)")
-    ax1.set_title("Phase 1 gate: four agents do not beat one", pad=20)
+    # "four agents do not beat one" was the controlled conclusion printed over
+    # uncontrolled points. On the served `hard` corpus the raw means are 0.342
+    # against 0.591 and the panel plainly shows the team ahead, so the old title
+    # contradicted its own figure. Say what is drawn; the caption carries the
+    # conclusion.
+    ax1.set_title("Phase 1 gate, as scored (hollow = answer turn hit the cap)",
+                  pad=20)
     if marked:
         ax1.scatter([], [], s=44, facecolor="none", edgecolor=GREY, linewidth=1.6,
                     label="answer turn hit the token cap")
@@ -221,7 +230,12 @@ def fig_gate(by, out: Path, cut_flags: dict[str, list[bool]] | None = None) -> N
     ax2.set_yticks(list(ys))
     ax2.set_yticklabels([r[0] for r in rows])
     ax2.set_xlabel("team − solo  (95% bootstrap interval)")
-    ax2.set_title("Every interval spans zero")
+    # Derived, not asserted. This read "Every interval spans zero" for as long
+    # as that happened to be true, and stayed on the figure when `hard` came
+    # back at p < 0.001 with an interval clear of zero.
+    spans = sum(1 for _, _, lo, hi, _ in rows if lo <= 0 <= hi)
+    ax2.set_title("Every interval spans zero" if spans == len(rows)
+                  else f"{spans} of {len(rows)} intervals span zero")
     span = max(abs(v) for r in rows for v in (r[2], r[3])) if rows else 0.5
     ax2.set_xlim(-span - 0.10, span + 0.22)  # room on the right for the p labels
     ax2.invert_yaxis()

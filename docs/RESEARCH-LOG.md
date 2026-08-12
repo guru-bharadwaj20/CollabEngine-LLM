@@ -1569,7 +1569,9 @@ and the other having twelve to discuss one.
 
 ### 4.12 C4: the budget confound reverses, and what the team is actually buying
 
-*`medium` and `hard` complete and replicating; `xhard` still generating.*
+*All three tiers complete. The headline of the first two does not survive the
+third; this section was rewritten rather than extended, and §4.12b records what
+it originally said.*
 
 The matched-budget arm — one agent, 1×12 rounds against the team's 4×3, identical
 per-turn cap, same seeds, same server — is the estimator §4.9 said was needed
@@ -1613,49 +1615,91 @@ and far less repetitive, because each agent is responding to something new.
 
 **What this does and does not license.**
 
-**It replicates at `hard`.** +0.190 raw (*p* < 0.001), **+0.059 controlled
-(*p* = 0.045)**, against `medium`'s +0.082 (*p* = 0.039). Two tiers, same
-direction, similar magnitude, both surviving the truncation control that killed
-every other positive result in this project.
+**It does not survive `xhard`.** The controlled C4 gap across the three tiers:
 
-**The three arms, controlled, at both tiers:**
+| controlled `fraction` | solo (3t) | solo_budget (12t) | team (12t) | **C4 gap** | *p* |
+|---|---|---|---|---|---|
+| `medium` | **0.654** | 0.549 | 0.631 | +0.082 | 0.039 |
+| `hard` | 0.561 | 0.526 | **0.585** | +0.059 | 0.045 |
+| `xhard` | **0.586** | 0.527 | 0.530 | **+0.003** | **0.962** |
+| tokens/episode | ~2,100–2,700 | **~8,500–9,300** | ~4,400–6,800 | | |
+| consecutive turns >80% repeated | 0–4% | **25–33%** | 2–11% | | |
 
-| controlled `fraction` | solo (3 turns) | solo_budget (12 turns) | team (12 turns) |
-|---|---|---|---|
-| `medium` | **0.654** | 0.549 | 0.631 |
-| `hard` | 0.561 | 0.526 | **0.585** |
-| tokens/episode | ~2,100 | ~8,700 | ~4,800 |
-| consecutive turns >80% repeated | 0–4% | **25–33%** | 2–7% |
+**+0.082, +0.059, +0.003 at *p* = 0.039, 0.045, 0.962.** Two operating points
+just under the threshold and one squarely at zero, with the effect declining
+monotonically along the independent variable. **That is not a robust finding, and
+this log has already retracted one claim with exactly this profile** — the
+variance effect of §4.1b, present in one arm at *p* = 0.019 and absent in the
+other two. The standard applied there applies here.
 
-**This is the shape of the result, and it is not "four agents beat one".**
+**And it fails for a reason that matters more than the failure.** The C4 gap
+closes at `xhard` because the *team* declines — 0.631 → 0.585 → 0.530 — not
+because the lone agent improves. `solo_budget` is flat across the curve (0.549,
+0.526, 0.527) and so, roughly, is three-turn `solo` (0.654, 0.561, 0.586). Only
+the team has a trend, and it points down. The team's own repetition rate rises to
+11% at `xhard` against 2% at `hard`, and its token spend rises 4,443 → 6,779.
+**Whatever protects four agents from talking in circles weakens as the instance
+grows**, which is the opposite of the scaling H1 assumed.
 
-*Against the cheap baseline, the team is a coin flip at 2.2× the cost.* Solo at
-three turns scores 0.654 against the team's 0.631 at `medium`, and 0.561 against
-0.585 at `hard` — one each way, both small, neither significant. The team spends
-roughly 2.2× the output tokens to draw with the simplest configuration tested.
+**What survives all three tiers.** One thing does, and it is not about teams:
 
-*Against the matched-budget baseline, the team wins consistently.* And the reason
-is visible in the last row: a lone agent forced through twelve turns spends
-33% of its consecutive turns restating what it just said, and each restatement is
-another chance to break a constraint it had already satisfied. Team agents,
-responding to something new each turn, repeat 2–7% of the time.
+*The cheap single agent is the best configuration measured.* Controlled,
+three-turn `solo` scores 0.654 / 0.561 / 0.586 against the team's 0.631 / 0.585 /
+0.530 — ahead at two of three points, behind at one, and doing it on **~2,400
+output tokens against the team's ~5,400**. Nothing here beats one agent given
+three turns and a token budget it can actually spend on an answer.
 
-*So what the multi-agent structure demonstrably buys is not better reasoning but
-protection against single-agent long-horizon degradation.* Turn count, per-turn
-cap, model, instances and seeds are identical between `solo_budget` and the team;
-the only difference is whether twelve turns come from one voice or four, and one
-voice talks itself in circles. That is a real and reproducible effect. It is also
-a much narrower claim than the hypothesis this project set out to test, and it
-does not require any specialization to explain — four agents need not divide
-labour to avoid repeating each other, they need only be responding to different
-things.
+*And more turns make a lone agent worse, consistently.* `solo_budget` is below
+three-turn `solo` at every tier — 0.549 vs 0.654, 0.526 vs 0.561, 0.527 vs
+0.586 — on four times the budget. The measured mechanism is restatement: 25–33%
+of its consecutive turns repeat the previous by more than 80% of their words,
+against 0–4% for `solo`. Each restatement is another chance to break a constraint
+it had already satisfied.
 
-*The comparison arm has a known defect, and it inflates the team.* `solo_budget`
-runs a protocol built for multi-party turn-taking, with the `n=1` brief §4.9
-documents. A purpose-built long-form single-agent baseline — one that does not
-re-emit the whole answer every turn — would very likely close most of this gap.
-**+0.059 to +0.082 is an upper bound on the structural effect**, not an estimate
-of it. The gate is not cleared, and this section does not claim it is.
+**So the honest reading of C4 is a null with a caveat, not a positive.** The
+multi-agent structure does not reliably beat a matched-budget single agent; where
+it appears to, the margin is small, barely significant, and gone at the hardest
+point. The one durable asymmetry is that a lone agent handles a long turn budget
+badly — and `solo_budget` runs a protocol built for four, under the `n=1` brief
+§4.9 documents, so even that is partly the harness's doing rather than the
+model's. **The gate is not cleared. Nothing in this project clears it.**
+
+---
+
+### 4.12b What §4.12 said after two tiers — **withdrawn the same day**
+
+Preserved verbatim in substance, because this log's rule is that a claim which
+was written down gets retracted in public rather than edited away, and because
+the shape of the mistake is the same one §4.1b made.
+
+After `medium` and `hard`, §4.12 read:
+
+> **The team beats one agent at matched budget: +0.253, *p* < 0.001; +0.082,
+> *p* = 0.039 with answer-turn truncation controlled.** It is the first
+> comparison in this project to survive that control. … **It replicates at
+> `hard`.** +0.190 raw, **+0.059 controlled (*p* = 0.045)**. Two tiers, same
+> direction, similar magnitude, both surviving the truncation control that
+> killed every other positive result in this project. … *So what the multi-agent
+> structure demonstrably buys is not better reasoning but protection against
+> single-agent long-horizon degradation.* … That is a real and reproducible
+> effect.
+
+`xhard` returned +0.003 at *p* = 0.962. The word that did the damage is
+**"reproducible"**, written on two points that agreed, about a quantity that was
+already declining between them: 0.082 then 0.059. The decline was visible in the
+data I had, and I read two barely-significant results in the same direction as
+replication instead of as a trend toward zero.
+
+**Two points are not a replication when the effect is shrinking between them.**
+That is the generalisable form, and it is a sharper version of the lesson §4.1b
+already taught: *p* = 0.039 and *p* = 0.045 are not two independent confirmations
+at *p* < 0.05, they are one weak signal measured twice on a curve that had one
+more point coming.
+
+I also called `solo_budget`'s degradation "protection against single-agent
+long-horizon degradation" *bought by the team*. The third tier shows the team
+degrading too, just more slowly and from a higher start — so the effect was never
+protection, only a difference in rate that closes as instances grow.
 
 ---
 
