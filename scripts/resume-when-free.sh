@@ -28,8 +28,20 @@ set -uo pipefail
 
 NEED_MIB=${NEED_MIB:-16000}     # weights 4.6 + KV 9.0 + buffers, with margin
 LOG=runs/resume-when-free.log
+LOCK=runs/resume-when-free.lock
 mkdir -p runs
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
+
+# One instance only. Two watchers would each start a server and a pipeline the
+# moment the card frees, and the second would race the first into the same run
+# directory -- which is how 3.13's corpus got written twice over. mkdir is the
+# atomic primitive available in every shell here; a pid file read-then-write is
+# not, and this script exists precisely because processes here are hard to see.
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "another watcher holds $LOCK; not starting a second" >&2
+  exit 3
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
 
 say "waiting for ${NEED_MIB} MiB free; the foreign Ollama process must be stopped first"
 
