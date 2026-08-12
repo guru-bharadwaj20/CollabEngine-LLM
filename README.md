@@ -61,7 +61,24 @@ So the gate still fails, and the reason to believe that is the same reason as be
 
 **The honest limit on that last column.** Controlling for answer-turn truncation costs most of the solo arm at the hard end — usable *n* falls 22 → 17 → 9. At `xhard` the controlled comparison rests on nine solo episodes, so −0.056 is a weak estimate and its *p* reflects that. The claim these three rows jointly support is not that the team is *worse*; it is that **no controlled comparison at any operating point shows the team ahead**, and every uncontrolled one that did was tracking a truncation rate that grew with the independent variable. Full accounting in [RESEARCH-LOG §4.9–4.11](docs/RESEARCH-LOG.md).
 
-> **A confound the design does not name.** The gate compares 4 agents × 3 rounds against 1 agent × 3 rounds: the team spends **4,443 output tokens to solo's 2,055** across 4× the forward passes. "Team beats solo" has never been separable from "more tokens beat fewer". A matched-budget arm — one agent, 1 × 12 rounds, same per-turn cap — is implemented and running; it is the estimator that needs no post-hoc correction, because the cap is not doing different work in the two arms to begin with.
+### The one comparison that survives the control
+
+The gate compares 4 agents × 3 rounds against 1 agent × 3 rounds — which is not a matched comparison. The team spends roughly **2× the output tokens across 4× the forward passes**, so "four agents beat one" has never been separable from "more tokens beat fewer". The `solo_budget` arm gives one agent the team's whole turn budget (1 × 12 rounds, same per-turn cap) to separate them.
+
+| controlled `fraction` | solo, 3 turns | solo_budget, 12 turns | team, 12 turns |
+|---|---|---|---|
+| **medium** | **0.654** | 0.549 | 0.631 |
+| **hard** | 0.561 | 0.526 | **0.585** |
+| tokens / episode | ~2,100 | **~8,700** | ~4,800 |
+| consecutive turns >80% repeated | 0–4% | **25–33%** | 2–7% |
+
+Two readings that sound contradictory and are not. **Against the cheap three-turn baseline the team is a coin flip at 2.2× the cost** — one tier each way, neither significant. **Against the matched-budget baseline the team wins at both tiers** (+0.082, *p* = 0.039; +0.059, *p* = 0.045), and these are the only positive results in this project to survive the truncation control.
+
+The last row reconciles them: a lone agent driven through twelve turns spends a third of them restating what it just said, and each restatement is another chance to break a constraint it had already satisfied. Team agents repeat 2–7% of the time, because each is responding to something new. **What the multi-agent structure demonstrably buys is protection against single-agent long-horizon degradation, not better reasoning** — and that requires no role specialisation to explain, which is a far narrower claim than the one this project set out to test.
+
+Also note the direction: the team wins while generating *less*. The budget confound does not merely wash out, it reverses.
+
+> **This is exploratory and bounded above.** `solo_budget` was built and run the same day, in response to the measurement that motivated it — it is not preregistered, and [PREREG-xhard](docs/PREREG-xhard.md) says so. It also drives one agent through a protocol built for four, so a purpose-built long-form single-agent baseline would likely close much of the gap. Treat +0.059–0.082 as an upper bound, not an estimate. `xhard` is still generating.
 
 PLAN.md makes this a stop condition, so the ablation grid was not run: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
 
@@ -112,9 +129,14 @@ The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving one mod
 **The in-process path cannot run the largest tier, and the reason is not a tuning knob.** A bf16 prefill materialises a logits distribution for every prompt position over a 151,936-entry vocabulary, at 1–1.5 MB per prompt token on top of 15.3 GiB of resident weights; `xhard` prompts start near 5,200 tokens. The tier runs instead against a llama.cpp server holding a 4-bit GGUF, where prefill is chunked into `-ub`-sized micro-batches and logits are materialised only for the sampled position — the vocabulary size stops mattering, which is the actual fix. Weights drop to ~4.6 GiB and the whole difficulty curve moves onto that instrument together, because a curve with one point measured elsewhere measures the instrument. See [`docs/LLAMACPP-SETUP.md`](docs/LLAMACPP-SETUP.md) for the memory arithmetic and [PREREG Amendment 2](docs/PREREG-xhard.md) for what the change costs.
 
 ```bash
+scripts/serve.sh --detach                                          # llama-server
 python scripts/preflight.py --config configs/llamacpp-xhard.yaml   # a minute
-collabengine pipeline --config configs/llamacpp-xhard.yaml --phases baseline,solo
+scripts/served-run.sh          # all three tiers, preflight-gated, resumable
+scripts/budget-run.sh          # the C4 matched-budget arm (costs a team arm each)
+python scripts/gate_report.py  # every gate number in this README
 ```
+
+`preflight` is not a formality. Three corpora in this project were lost to conditions that were true before the first episode ran and detectable in seconds — an undersized slot, a server holding different weights, a card already full. It checks all three in about a minute. It is also where §3.12 lives: its slot check silently did nothing for every served run until the day it was found asking `/v1/props` of a server that serves `/props`.
 
 Preflight is not ceremony. Three corpora here were lost to conditions true before the first episode ran: a context ceiling nothing checked, and — new to a served backend — a server quietly holding weights other than the ones the config names, which breaks the identical-weights control while leaving every score plausible.
 

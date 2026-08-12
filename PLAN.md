@@ -185,6 +185,30 @@ Avoid SWE-bench-style tasks at this model scale; the failure floor swamps the ef
 > that an 8B model has no band in this task where collaboration pays, which is a
 > Phase 1 result and a publishable one — not a licence to run Phase 3 anyway.
 
+> **Resolved, 2026-08-12 — three tiers on a served 4-bit instrument.** `medium`,
+> `hard` and `xhard`, 24 episodes per arm, zero errored turns and zero context
+> overflows. Two of the three *pass* the gate as scored — `hard` at *d* = 1.09,
+> *p* < 0.001 — and none survives the answer-turn control: the controlled gaps
+> are −0.023, +0.024, −0.056. The pass is an artifact of the token cap, which
+> falls on solo's answer-bearing turn and the team's summary turn, and therefore
+> grows with instance size in the same shape H1 predicts. RESEARCH-LOG §4.9–4.11.
+>
+> **The gate stays failed, and the stop condition stays in force.** But the
+> comparison it rests on has a confound this document never named: 4 agents ×
+> 3 rounds against 1 agent × 3 rounds is not a matched comparison, because the
+> team spends ~2× the output tokens across 4× the forward passes. The
+> `solo_budget` arm (1 agent × 12 rounds, same per-turn cap) was added to
+> separate them. It is exploratory, not preregistered, and it is the one place
+> so far where something survives the control — RESEARCH-LOG §4.12.
+
+**Stop condition, restated after the served run.** The gate is *team beats one
+agent*, and it is still not cleared. Two clauses now qualify how it must be read:
+
+1. **Read the answer-turn truncation column beside any gate verdict.** A gate
+   evaluated without it passed at two of three operating points on an artifact.
+2. **A matched-budget arm is part of the comparison, not an extra.** Without it,
+   "four agents beat one" and "more tokens beat fewer" are the same measurement.
+
 ### Phase 2 — Emergence measurement (local GPU, ~1 week)
 - Local 24 GB + 7–8B (Qwen3-8B or Llama-3.1-8B-Instruct). Batch aggressively — this is the difference between hours and days, whether the batching happens in vLLM or in `hf_local`.
 - Run the symmetry-breaking sweep (C3) × baseline episodes.
