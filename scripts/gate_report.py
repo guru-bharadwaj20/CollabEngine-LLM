@@ -153,7 +153,36 @@ def report(label: str, team_path: Path, solo_path: Path, rng: random.Random) -> 
           f"{', '.join(sig) if sig else 'none'}")
 
     _sensitivity(team_path, solo_path, out, rng)
+    _matched_budget(team_path, out, rng)
     return out
+
+
+def _matched_budget(team_path: Path, headline: dict, rng: random.Random) -> None:
+    """C4: team vs one agent holding the team's whole turn budget.
+
+    Silent when the arm has not been generated, because it is off by default in
+    the pipeline -- absence here means "not run", never "no difference".
+    """
+    budget = scores(team_path, "solo_budget")
+    if not budget.get("fraction"):
+        return
+    team = scores(team_path, "baseline")
+    n_b, n_t = len(budget["fraction"]), len(team["fraction"])
+
+    print(f"\n  -- C4: matched turn budget (solo_budget n={n_b}, team n={n_t}) --")
+    if min(n_b, n_t) < 5:
+        print("     too few usable episodes to read.")
+        return
+    print(f"     {'metric':<11}{'1 agent':>9}{'team':>8}{'gap':>9}{'perm p':>9}"
+          f"{'  vs vs-solo':>13}")
+    for metric in METRICS:
+        a, b = budget[metric], team[metric]
+        gap = st.mean(b) - st.mean(a)
+        p = perm_p(a, b, rng)
+        print(f"     {metric:<11}{st.mean(a):>9.3f}{st.mean(b):>8.3f}{gap:>+9.3f}"
+              f"{p:>9.3f}{gap - headline[metric][2]:>+13.3f}")
+    print("     Both arms spend the same generation here. What is left is the")
+    print("     multi-agent structure, which is the thing under test.")
 
 
 def _sensitivity(
