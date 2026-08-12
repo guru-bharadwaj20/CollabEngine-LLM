@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 import random
 import statistics as st
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import matplotlib
@@ -298,31 +298,60 @@ def fig_selftest(out: Path) -> None:
     plt.close(fig)
 
 
-def fig_curve(hard, out: Path) -> None:
-    """Both operating points, and what the OOM dropouts did to one of them.
+TIER_LABELS = {
+    "medium": "medium\n16 jobs, 5 workers",
+    "hard": "hard\n24 jobs, 6 workers",
+    "xhard": "xhard\n36 jobs, 8 workers",
+}
 
-    The right panel is the methodological point: the same three episodes are
-    present or absent, and that alone moves `feasible` from a project-reviving
-    effect to nothing.
+
+def fig_curve(_unused, out: Path) -> bool:
+    """The difficulty curve, and the reason it cannot be read on its own.
+
+    Every tier comes from its own config-derived run directory. The previous
+    version took one tier from `--run-dir` and plotted it as `hard` against
+    `medium` read from a config -- so running the script against the medium
+    directory silently plotted medium as both points. The right panel was worse:
+    three transcribed bf16 constants that no longer described any corpus on
+    disk. Both are the same mistake as the stale solo path, and a figure gets
+    that mistake past review more easily than a table does.
+
+    The right panel is now the methodological point, computed rather than
+    transcribed: the headline gap against the gap with answer-turn truncation
+    dropped. The headline trends upward across difficulty and the sensitivity
+    does not, because the cap falls on solo's answer turn and not the team's
+    (RESEARCH-LOG 4.10).
     """
-    med_dir = _run_dir("configs/llamacpp-medium.yaml")
-    if not (med_dir / "baseline.jsonl").exists():
-        print(f"no corpus at {med_dir}; skipping curve.png")
+    tiers = []
+    for tier in ("medium", "hard", "xhard"):
+        cfg = f"configs/llamacpp-{tier}.yaml"
+        if not Path(cfg).exists():
+            continue
+        run_dir = _run_dir(cfg)
+        if not (run_dir / "baseline.jsonl").exists():
+            continue
+        # A tier still generating has both arms present and neither finished,
+        # and its means move for as long as it runs. Plotted anyway it is a
+        # point on a published curve that nothing on disk will reproduce an
+        # hour later -- caught here after a mid-run regeneration drew `xhard`
+        # from 25 of its 48 episodes.
+        if not _tier_complete(cfg, run_dir):
+            print(f"{tier}: incomplete, excluded from curve.png")
+            continue
+        by = load(run_dir)
+        if not (by["fraction"].get("solo") and by["fraction"].get("baseline")):
+            continue
+        tiers.append((tier, run_dir, by))
+
+    if len(tiers) < 2:
+        print("need at least two tiers with both arms; skipping curve.png")
         return False
-    med = load(med_dir)
-    # Both medium arms live in the same run directory. Reading solo from
-    # runs/medium-corpus was correct until 24 fresh solo episodes were
-    # generated beside the team arm; after that it silently plotted the stale
-    # 12-episode mean (0.879) against the new team mean, overstating the gap by
-    # 0.031. The same bug was fixed in gate_report.py and missed here, because
-    # a figure that looks plausible is not checked the way a table is.
-    solo_med = med
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.6, 4.0))
+    xs = list(range(len(tiers)))
+    solo = [st.mean(by["fraction"]["solo"]) for _, _, by in tiers]
+    team = [st.mean(by["fraction"]["baseline"]) for _, _, by in tiers]
 
-    xs = [0, 1]
-    solo = [st.mean(solo_med["fraction"]["solo"]), st.mean(hard["fraction"]["solo"])]
-    team = [st.mean(med["fraction"]["baseline"]), st.mean(hard["fraction"]["baseline"])]
     ax1.plot(xs, solo, "o-", color=SOLO, lw=2.4, ms=9, label="solo (1 agent)")
     ax1.plot(xs, team, "s-", color=TEAM, lw=2.4, ms=9, label="team (4 agents)")
     for x, (a, b) in enumerate(zip(solo, team)):
@@ -332,30 +361,42 @@ def fig_curve(hard, out: Path) -> None:
         ax1.annotate(f"{b:.3f}", (x, b), textcoords="offset points",
                      xytext=(side, 8), ha="center", fontsize=9, color=TEAM)
     ax1.set_xticks(xs)
-    ax1.set_xticklabels(["medium\n16 jobs, 5 workers", "hard\n24 jobs, 6 workers"])
+    ax1.set_xticklabels([TIER_LABELS.get(t, t) for t, _, _ in tiers])
     ax1.set_ylabel("score (fraction)")
-    ax1.set_ylim(0.80, 0.94)
-    ax1.set_title("Neither operating point rewards collaboration")
+    lo, hi = min(solo + team), max(solo + team)
+    pad = max(0.03, 0.15 * (hi - lo))
+    ax1.set_ylim(max(0.0, lo - pad), min(1.0, hi + pad))
+    ax1.set_title("The apparent gap widens with instance size")
     ax1.legend(frameon=False, fontsize=9, loc="lower left")
     ax1.grid(axis="y", color=RULE, lw=0.7)
     ax1.set_axisbelow(True)
 
-    # Right: what censoring did to the `hard` team mean. Every time OOM-dropped
-    # episodes were recovered, the team's apparent advantage shrank -- the gap
-    # was tracking what the instrument discarded, not an effect.
-    labels = ["team n=19\n21% censored", "team n=23\n4% censored", "solo n=24"]
-    vals = [0.892, 0.883, 0.851]
-    bars = ax2.bar(labels, vals, color=["#b8860b", TEAM, SOLO], width=0.6, zorder=3)
-    for bar, v in zip(bars, vals):
-        ax2.text(bar.get_x() + bar.get_width() / 2, v + 0.004, f"{v:.3f}",
-                 ha="center", fontsize=10, fontweight="bold")
-    ax2.annotate("recovering censored episodes\nshrinks the gap: p 0.093 → 0.185",
-                 xy=(0.85, 0.888), xytext=(0.15, 0.925), fontsize=8.5,
-                 color="#b8860b", ha="left",
-                 arrowprops=dict(arrowstyle="->", color="#b8860b", lw=1.3))
-    ax2.set_ylabel("score (fraction), `hard`")
-    ax2.set_ylim(0.80, 0.95)
-    ax2.set_title("The gap tracked the censoring")
+    head = [t - s for s, t in zip(solo, team)]
+    sens = []
+    for _, run_dir, _ in tiers:
+        kept = _drop_cut(run_dir)
+        sens.append(
+            st.mean(kept["baseline"]) - st.mean(kept["solo"])
+            if kept["solo"] and kept["baseline"] else float("nan")
+        )
+
+    width = 0.36
+    ax2.bar([x - width / 2 for x in xs], head, width, color=TEAM, zorder=3,
+            label="as scored")
+    ax2.bar([x + width / 2 for x in xs], sens, width, color=GREY, zorder=3,
+            label="answer-turn truncation dropped")
+    for x, (h, s) in enumerate(zip(head, sens)):
+        ax2.text(x - width / 2, h + 0.006, f"{h:+.3f}", ha="center", fontsize=8.5,
+                 color=TEAM, fontweight="bold")
+        if s == s:  # not NaN
+            ax2.text(x + width / 2, s + 0.006, f"{s:+.3f}", ha="center",
+                     fontsize=8.5, color="#5f5f5f")
+    ax2.axhline(0, color="#333333", lw=1.1)
+    ax2.set_xticks(xs)
+    ax2.set_xticklabels([t for t, _, _ in tiers])
+    ax2.set_ylabel("team − solo (fraction)")
+    ax2.set_title("The widening is the token cap")
+    ax2.legend(frameon=False, fontsize=8.5, loc="upper left")
     ax2.grid(axis="y", color=RULE, lw=0.7)
     ax2.set_axisbelow(True)
 
@@ -363,6 +404,32 @@ def fig_curve(hard, out: Path) -> None:
     fig.savefig(out, bbox_inches="tight")
     plt.close(fig)
     return True
+
+
+def _tier_complete(config_path: str, run_dir: Path, name: str = "baseline.jsonl") -> bool:
+    """Both arms present at the episode count the config asks for.
+
+    Counted before the integrity filter: a genuine instrument failure should not
+    make a finished tier look unfinished, and it is already accounted for in the
+    `unusable` column of every report.
+    """
+    from collabengine.config import ExperimentConfig
+
+    want = ExperimentConfig.load(config_path).n_episodes
+    seen: Counter[str] = Counter()
+    for rec in TranscriptReader(str(run_dir / name)):
+        seen[rec.condition] += 1
+    return seen["solo"] >= want and seen["baseline"] >= want
+
+
+def _drop_cut(run_dir: Path, name: str = "baseline.jsonl") -> dict[str, list[float]]:
+    """`fraction` per condition with answer-turn-truncated episodes removed."""
+    out: dict[str, list[float]] = defaultdict(list)
+    for rec in TranscriptReader(str(run_dir / name)):
+        if is_instrument_failure(rec) or final_turn_truncated(rec):
+            continue
+        out[rec.condition].append(rescore(rec).overall["fraction"])
+    return out
 
 
 def main() -> None:
