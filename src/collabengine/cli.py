@@ -1287,6 +1287,24 @@ def cmd_kappa(args: argparse.Namespace) -> int:
         print("the two files share no coded messages", file=sys.stderr)
         return 2
 
+    # Labels are only comparable within one codebook. v1 defined `organize` as
+    # "divides up the work", which on an allocation task collides with the
+    # puzzle itself and cost 17 of 40 messages a wrong label (RESEARCH-LOG
+    # 4.13); v2 restricts it to coordination between participants. Agreement
+    # computed across the two would mix a real disagreement with a definitional
+    # one and report the sum as reliability.
+    versions = {c.codebook for c in first.values()} | {
+        c.codebook for c in second.values()
+    }
+    if len(versions) > 1:
+        print(
+            f"these files were coded under different codebooks {sorted(versions)}; "
+            "kappa across them is not a reliability figure. Re-code the older "
+            "file under the current codebook and compare again.",
+            file=sys.stderr,
+        )
+        return 2
+
     left = [first[k].action for k in shared]
     right = [second[k].action for k in shared]
     kappa = cohens_kappa(left, right)

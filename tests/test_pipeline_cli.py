@@ -346,3 +346,54 @@ def test_the_solo_long_brief_does_not_invent_teammates() -> None:
     assert "the others" in team, "TEAM_BRIEF is unchanged and still the C4 arm's brief"
     assert "12 turns" in solo, "the agent is told the budget it actually has"
     assert "final" in solo.lower()
+
+
+def test_kappa_refuses_to_compare_across_codebooks(tmp_path, capsys) -> None:
+    """v1's `organize` meant something else, so agreement across the two mixes a
+    definitional disagreement into a reliability figure (RESEARCH-LOG 4.13)."""
+    import json
+
+    from collabengine.analysis.coding import CODEBOOK_VERSION
+
+    def write(path, codebook, action):
+        path.write_text(
+            "\n".join(
+                json.dumps({
+                    "episode_id": "e1", "turn": t, "agent_id": "A1",
+                    "action": action, "judge": "j", "codebook": codebook,
+                })
+                for t in range(3)
+            ),
+            encoding="utf-8",
+        )
+
+    old, new = tmp_path / "old.jsonl", tmp_path / "new.jsonl"
+    write(old, 1, "organize")
+    write(new, CODEBOOK_VERSION, "propose")
+
+    assert main(["kappa", str(old), str(new)]) == 2
+    assert "different codebooks" in capsys.readouterr().err
+
+
+def test_kappa_compares_within_one_codebook(tmp_path) -> None:
+    import json
+
+    from collabengine.analysis.coding import CODEBOOK_VERSION
+
+    def write(path, action):
+        path.write_text(
+            "\n".join(
+                json.dumps({
+                    "episode_id": "e1", "turn": t, "agent_id": "A1",
+                    "action": action, "judge": "j",
+                    "codebook": CODEBOOK_VERSION,
+                })
+                for t in range(3)
+            ),
+            encoding="utf-8",
+        )
+
+    a, b = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    write(a, "propose")
+    write(b, "propose")
+    assert main(["kappa", str(a), str(b)]) == 0
