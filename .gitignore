@@ -24,3 +24,6 @@ runs/
 # Vendored llama.cpp binaries and CUDA runtime (~640 MB, fetched by
 # docs/LLAMACPP-SETUP.md; regenerable, never committed).
 vendor/
+
+# A polluted corpus backup, kept out of git but not deleted (LOG 3.13).
+*.polluted.bak
