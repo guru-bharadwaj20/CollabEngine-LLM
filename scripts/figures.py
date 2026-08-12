@@ -26,7 +26,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from collabengine.analysis.integrity import is_instrument_failure
+from collabengine.analysis.integrity import (
+    final_turn_truncated,
+    is_instrument_failure,
+)
 from collabengine.analysis.scoring import METRICS, rescore
 from collabengine.transcripts.store import TranscriptReader
 
@@ -92,6 +95,21 @@ def load(run_dir: Path, name: str = "baseline.jsonl") -> dict[str, dict[str, lis
     return by
 
 
+def load_cut_flags(run_dir: Path, name: str = "baseline.jsonl") -> dict[str, list[bool]]:
+    """condition -> per-episode "answer turn hit the cap", in `load` order.
+
+    Kept in step with `load` by applying the same filter in the same pass order;
+    the two are zipped in the figure, so a divergence would mislabel points
+    rather than fail.
+    """
+    flags: dict[str, list[bool]] = defaultdict(list)
+    for rec in TranscriptReader(str(run_dir / name)):
+        if is_instrument_failure(rec):
+            continue
+        flags[rec.condition].append(final_turn_truncated(rec))
+    return flags
+
+
 def boot_ci(a: list[float], b: list[float], n: int = 10000, seed: int = 20260809):
     """Percentile bootstrap on mean(b) - mean(a)."""
     rng = random.Random(seed)
@@ -117,7 +135,7 @@ def perm_p(a: list[float], b: list[float], n: int = 10000, seed: int = 20260809)
     return (hits + 1) / (n + 1)
 
 
-def fig_gate(by, out: Path) -> None:
+def fig_gate(by, out: Path, cut_flags: dict[str, list[bool]] | None = None) -> None:
     """The headline: every episode, every arm, and the gap with its interval.
 
     Plotted as individual points rather than bars because the whole finding is
@@ -128,26 +146,58 @@ def fig_gate(by, out: Path) -> None:
         1, 2, figsize=(11, 4.4), gridspec_kw={"width_ratios": [1.35, 1]}
     )
     rng = random.Random(7)
+    means: list[tuple[int, float, str]] = []
 
+    drawn: list[float] = []
+    marked = False
     for i, (cond, label, colour) in enumerate(ARMS):
         vals = by["fraction"].get(cond, [])
         if not vals:
             continue
+        drawn += vals
+        cut = cut_flags.get(cond, []) if cut_flags else []
         xs = [i + rng.uniform(-0.13, 0.13) for _ in vals]
-        ax1.scatter(xs, vals, s=34, color=colour, alpha=0.75, zorder=3,
-                    edgecolor="white", linewidth=0.6)
+        # Episodes whose answer-bearing turn hit the cap are drawn hollow. They
+        # are not a separate population to be read past: they are ordinary
+        # episodes the instrument cut off, and on the served corpus they are
+        # every zero in the solo arm (RESEARCH-LOG 4.9).
+        for x, v, is_cut in zip(xs, vals, cut or [False] * len(vals)):
+            if is_cut:
+                marked = True
+                ax1.scatter([x], [v], s=44, facecolor="none", edgecolor=colour,
+                            linewidth=1.6, zorder=3)
+            else:
+                ax1.scatter([x], [v], s=34, color=colour, alpha=0.75, zorder=3,
+                            edgecolor="white", linewidth=0.6)
         mean = st.mean(vals)
         ax1.plot([i - 0.30, i + 0.30], [mean, mean], color=colour, lw=2.6, zorder=4)
-        # Above the rule, not beside it -- at 0.28 offset the label ran into the
-        # neighbouring arm's points.
-        ax1.text(i, 1.005, f"{mean:.3f}", ha="center", fontsize=9.5,
-                 color=colour, fontweight="bold")
+        means.append((i, mean, colour))
+
+    # Limits from the data, not from the instrument that produced an earlier
+    # corpus. The hardcoded 0.62 floor here predated the served run and would
+    # have clipped all four of its zero-scoring solo episodes off the axis --
+    # a figure that hides precisely the episodes the result turns on.
+    lo_v, hi_v = (min(drawn), max(drawn)) if drawn else (0.0, 1.0)
+    pad = max(0.04, 0.08 * (hi_v - lo_v))
+    top = min(1.03, hi_v + pad)
+    ax1.set_ylim(max(-0.03, lo_v - pad), top)
+    # In points above the axis rather than in data units: the offset used to be
+    # a data-space constant, which lands in a different place on every corpus
+    # and ran the arm means into the title once the y-limits became data-driven.
+    for i, mean, colour in means:
+        ax1.annotate(f"{mean:.3f}", xy=(i, top), xytext=(0, 4),
+                     textcoords="offset points", ha="center", va="bottom",
+                     fontsize=9.5, color=colour, fontweight="bold",
+                     annotation_clip=False)
 
     ax1.set_xticks(range(len(ARMS)))
     ax1.set_xticklabels([a[1] for a in ARMS])
     ax1.set_ylabel("score  (fraction of constraints satisfied)")
-    ax1.set_title("Phase 1 gate: four agents do not beat one")
-    ax1.set_ylim(0.62, 1.03)
+    ax1.set_title("Phase 1 gate: four agents do not beat one", pad=20)
+    if marked:
+        ax1.scatter([], [], s=44, facecolor="none", edgecolor=GREY, linewidth=1.6,
+                    label="answer turn hit the token cap")
+        ax1.legend(loc="lower right", fontsize=8.5, frameon=False)
     ax1.grid(axis="y", color=RULE, lw=0.7)
     ax1.set_axisbelow(True)
 
@@ -172,7 +222,8 @@ def fig_gate(by, out: Path) -> None:
     ax2.set_yticklabels([r[0] for r in rows])
     ax2.set_xlabel("team − solo  (95% bootstrap interval)")
     ax2.set_title("Every interval spans zero")
-    ax2.set_xlim(-0.42, 0.55)
+    span = max(abs(v) for r in rows for v in (r[2], r[3])) if rows else 0.5
+    ax2.set_xlim(-span - 0.10, span + 0.22)  # room on the right for the p labels
     ax2.invert_yaxis()
     ax2.grid(axis="x", color=RULE, lw=0.7)
     ax2.set_axisbelow(True)
@@ -340,7 +391,7 @@ def main() -> None:
         return
 
     by = load(Path(args.run_dir))
-    fig_gate(by, out / "gate.png")
+    fig_gate(by, out / "gate.png", load_cut_flags(Path(args.run_dir)))
     written += 1
     if fig_curve(by, out / "curve.png"):
         written += 1
