@@ -565,6 +565,61 @@ visible while the number was never printed.
 check should be much louder than one that performs it and passes. All three
 failed open while emitting text that made the silence sound explained.*
 
+### 3.13 Killing the server without stopping the client wrote 137 errored turns
+
+Self-inflicted, on 2026-08-12 at 22:20, and it belongs here because the recovery
+depended on machinery §3.6 and §4.1 already paid for.
+
+The answer-budget run was thrashing against a foreign process holding most of the
+card (§3.4's failure mode, diagnosed in the commit that armed
+`scripts/resume-when-free.sh`). I stopped our `llama-server` to resize it — and
+believed I had stopped the pipeline first. I had not. `pkill -f` matched nothing,
+because under MSYS `ps -W` prints the **MSYS pid first and the Windows pid
+fourth**, and every signal I sent went to a pid that Windows does not know. The
+pipeline kept running for four more minutes against a server that no longer
+existed.
+
+It behaved exactly as designed, which is the problem. Each turn's request failed,
+the backend recorded `finish_reason: "error"`, the orchestrator wrote the episode,
+and the runner counted it *done, 0 failed* — because from the runner's side
+nothing failed: every episode it planned came back. **137 errored turns across 22
+episodes were written to the corpus as data.**
+
+Three things caught it, in the order they fire:
+
+1. `finish_reasons` showed `error: 137` beside `stop: 141` — the accounting §3.2
+   added after the token cap wrote zeros nobody could see.
+2. `is_instrument_failure` marked all 22 unusable, because a single errored turn
+   condemns an episode (§4.1's rule).
+3. The audit printed `unusable` above the means, so no number could be read
+   without the damage attached.
+
+**What made it dangerous rather than merely ugly.** Resume skips any episode id
+already on disk. The 22 broken episodes would have been skipped forever — present,
+excluded from every mean, and never regenerated. The corpus would have silently
+capped at 74 usable episodes out of 96 with nothing on screen to say why. That is
+the precise hazard `scripts/repair.py` exists for and the reason its dry run was
+worth building: **an instrument failure left on disk is not a gap, it is a
+permanent hole.**
+
+Recovery: back the file up, drop every record `is_instrument_failure` rejects, and
+let resume replan the ids that vanished. Filtering re-reads the raw JSONL lines
+rather than rewriting from parsed records — a corpus should only ever be truncated
+in place, never round-tripped through the serialiser, or the surviving episodes
+quietly become a different encoding of themselves. 11 episodes survived, all
+`baseline`, all clean.
+
+*The generalisable form: stop the client before the server, and check the pid the
+operating system uses rather than the one your shell prints.* The second half cost
+four minutes of corpus, and would have cost the run.
+
+*A useful accident.* The 11 survivors are the first episodes generated under
+`answer_max_tokens`, and they confirm it works end to end: 121 agent turns
+recorded a cap of 1,024, the 11 final turns recorded 3,072, `answer_turn` is true
+on exactly one turn per episode, and **none of the 11 was truncated on its answer
+turn** — against 0/24 for the team arm and 7/24 for solo on the shared-cap
+instrument. Too few episodes to be a result; enough to show the fix is live.
+
 ---
 
 ## 4. Results
