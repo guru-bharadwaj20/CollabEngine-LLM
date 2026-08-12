@@ -1703,6 +1703,83 @@ protection, only a difference in rate that closes as instances grow.
 
 ---
 
+### 4.13 The behavioural judge against a human: κ = 0.07
+
+§4.8 reports Phase 2's differentiation null and defends it with κ = 0.68 against
+a stronger blind rater, while flagging that both raters were Google models and
+that their agreement is therefore an upper bound. This is the check that flag
+was asking for: a human rater instead of a second model.
+
+**Design.** 40 agent messages from `runs/llama31-8b-q4-hard`, stratified equally
+across `baseline` / `solo` / `solo_budget` and spread over rounds within each —
+uniform sampling would have given 60% of the sample to `solo_budget`, which has
+twelve turns an episode to `solo`'s three. I coded all 40 by reading them,
+**before any judge label existed for this corpus**, applying one rule
+consistently: `propose` when the bulk of the message is a new or revised concrete
+assignment, `verify` when arithmetic serves auditing the current draft, `compute`
+when arithmetic is exploratory, `search` when alternatives are weighed without
+committing. The local 8B then coded the same 40 through `_code_one` — the
+pipeline's own path, prompt, identity-stripping and per-turn seed, so the number
+below describes the judge the pipeline actually runs. 0 unparseable, 0 errors.
+
+**Result.**
+
+| | |
+|---|---|
+| Cohen's κ | **0.072**, 95% CI [−0.03, 0.19] |
+| raw agreement | **8 / 40 (20%)** |
+| my labels | propose 22, verify 12, compute 3, search 1, other 1, organize 1 |
+| judge labels | **organize 17**, verify 9, search 4, propose 4, agree 4, compute 1, synthesize 1 |
+
+**The judge does not agree with a careful human reading at better than chance.**
+
+**A large part of it is a collision between the taxonomy and the task.** The judge
+assigned `organize` to 17 of 40 messages, including 7 of my 22 `propose`. The
+label is defined as *"divides up the work or sets procedure, without doing the
+task"* — and the task here **is** dividing work among workers. A message reading
+"J5 → W4, J9 → W5, J18 → W4…" is literally dividing up work, so the judge applies
+the label to the task's content rather than to the discourse act, which is what
+the taxonomy means. That is a defect in the instrument, not only in the judge.
+
+**But the collision is not the whole failure.** Drop every message the judge
+called `organize` and κ on the remaining 23 is **0.111**. Charitably remap the
+judge's `organize` to `propose` and κ goes *negative*, −0.017, at 14/40 agreement.
+The disagreement is broad, and fixing one label would not rescue it.
+
+**What this does and does not impugn.** The judge measured here is
+Llama-3.1-8B-Q4, on the served corpus. Phase 2's labels came from Qwen3-8B on the
+bf16 corpus, and that judge did **not** have this failure: in the §4.8 validation
+sample it used `organize` 0 times in 40, and the third rater once. So this does
+not retroactively overturn §4.8's null.
+
+It does two other things, and both are worse than a single overturned result:
+
+1. **It shows what model-vs-model κ cannot see.** Two models sharing a literal
+   reading of `organize` would agree with each other at high κ while both being
+   wrong. κ = 0.68 between two Google models was never evidence against that, and
+   §4.8 said as much — this is the concrete mechanism it was hedging about.
+2. **Phase 2's judge can now never be validated against a human**, because the
+   corpus it coded was deleted in the move to the served instrument. §4.8's null
+   is not refuted and is no longer falsifiable either. That is lesson 13 of §8
+   collecting a second debt.
+
+**Limits of this measurement, stated plainly.** One rater, n = 40, and that rater
+is me — not naive to the study's hypotheses, which is exactly the exposure a
+proper validation would remove by using someone who has never seen the project.
+The protection that does hold is order: I coded before any judge label for this
+corpus existed. And the disagreement is not a matter of a defensible alternative
+rule — 55% `propose` against 42% `organize` is not two readings of the same
+messages, it is two different tasks.
+
+**Consequence for the project.** Any behavioural coding on the served instrument
+is currently uninterpretable, so Phase 2 must not be re-run on it until the
+taxonomy's `organize` definition is disambiguated against a job-assignment task
+and the judge re-validated against a naive human rater. The sample, both label
+sets and the confusion matrix are committed at `docs/handcode-sample.json` so the
+next attempt starts from data rather than from this paragraph.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
@@ -1830,9 +1907,12 @@ move, which is what makes the later note on §4.1e permanent rather than fixable
    instrument — but a final turn allowed to emit the answer without competing
    with reasoning for the same budget. Then the sensitivity analysis becomes
    unnecessary rather than load-bearing.
-4. **Behavioural coding with the local 8B**; κ against the frontier subsample.
-   Behavioural differentiation does not require a performance benefit, so a
-   failed gate does not touch it.
+4. ~~**Behavioural coding with the local 8B**; κ against the frontier
+   subsample.~~ **Blocked by §4.13.** The served judge agrees with a human at
+   κ = 0.07, so coding on this instrument is uninterpretable. Two things have to
+   happen before Phase 2 is re-run: `organize` must be disambiguated against a
+   task whose content *is* dividing up work, and the judge must be re-validated
+   against a rater who has not seen this project.
 5. **Convergent validity:** do transcript labels predict causal profiles? With
    no ablation grid there is no causal profile to correlate against, so
    convergence can only be reported against *score* contribution — a weaker

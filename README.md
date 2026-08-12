@@ -83,7 +83,11 @@ PLAN.md makes this a stop condition, so the ablation grid was not run: an agent 
 
 **Phase 2 finds no role differentiation either.** 468 messages coded against an eight-action taxonomy: agents within an episode differ no more in what they do than shuffling the labels among them produces (*p* = 0.45), and no agent identity carries a stable tendency across episodes (*p* = 1.00). The one robust behavioural result is between conditions rather than within teams — **teams generate and lone agents audit**: propose as a share of propose+verify is 0.674 for teams against 0.403 for solo, *p* < 0.0001.
 
-That null survives its own instrument check. The local 8B coder agrees with a much stronger blind rater at **κ = 0.68 [0.50, 0.85]** on a sample deliberately loaded with the rare labels, so the taxonomy collapsing to `propose`/`verify` is a property of these transcripts, not of a cheap judge.
+That null was defended with an instrument check: the local 8B coder agreed with a stronger blind rater at **κ = 0.68 [0.50, 0.85]**. Both raters were Google models, and the log always flagged their agreement as an upper bound.
+
+**A human rater puts the current judge at κ = 0.072 [−0.03, 0.19], 8/40 agreement.** I coded 40 messages by reading them, before any judge label for that corpus existed; the judge then coded the same 40 through the pipeline's own path. It assigned `organize` to 17 of 40 — a label defined as *"divides up the work"*, on a task that **is** dividing work among workers, so it reads the content rather than the discourse act. That is a defect in the taxonomy, not only in the judge. Dropping those 17 leaves κ = 0.111; remapping them charitably makes it negative.
+
+This does not overturn the Phase 2 null, which was coded by a different judge (Qwen3-8B) that did not show this failure. It does mean two things: model-vs-model κ is structurally blind to two models sharing a misreading, and Phase 2's judge can now **never** be validated against a human, because the corpus it coded was deleted. See [RESEARCH-LOG §4.13](docs/RESEARCH-LOG.md).
 
 **Three claims were withdrawn along the way** and are documented rather than quietly dropped — a `medium` comparison whose team arm had two thirds of its turns empty, a variance effect present in one team arm but not the other two, and a *d* = 0.92 feasibility result that evaporated when three OOM-dropped episodes were regenerated (the episodes the card could not finish were longer and scored 0/3, so losing them flattered the team). See [RESEARCH-LOG §4.1](docs/RESEARCH-LOG.md).
 
