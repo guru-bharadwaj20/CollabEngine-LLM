@@ -28,12 +28,13 @@ Either direction of that result is publishable, which is the mark of a well-pose
 
 Llama-3.1-8B-Instruct (Q4_K_M, served by llama.cpp) on constraint-satisfaction instances, **24 episodes per arm**, identical instances across arms, both arms from the same run:
 
-| | metric | solo | team | gap | *d* | perm *p* |
-|---|---|---|---|---|---|---|
-| **medium** | `fraction` | 0.564 | 0.631 | +0.067 | +0.31 | 0.305 |
-| **hard** | `fraction` | 0.342 | 0.591 | **+0.249** | **+1.09** | **0.000** |
+| | metric | solo | team | gap | *d* | perm *p* | **gap, cap controlled** |
+|---|---|---|---|---|---|---|---|
+| **medium** | `fraction` | 0.564 | 0.631 | +0.067 | +0.31 | 0.305 | **−0.023** |
+| **hard** | `fraction` | 0.342 | 0.591 | **+0.249** | **+1.09** | **0.000** | **+0.024** |
+| **xhard** | `fraction` | 0.310 | 0.499 | **+0.188** | +0.75 | **0.020** | **−0.056** |
 
-At `hard` that is a large, highly significant effect — and it is an artifact of the token cap. It is the clearest thing this project has measured, so it is worth being precise about.
+**Two of three operating points clear the gate. None survives the control, and two of the three controlled gaps are negative.** That last column is the finding, and it is worth being precise about.
 
 **The two arms do not use `max_tokens` the same way.** A solo episode is three turns and the last one carries the entire answer. A team episode is twelve and the last one commits an answer the transcript already contains. The same per-turn cap therefore lands on solo's answer and on the team's *summary* of one. At `hard`, solo's answer-bearing turn was truncated in 10 of 24 episodes and the team's in 1.
 
@@ -48,15 +49,19 @@ Those 10 episodes are the entire effect:
 
 ![Difficulty curve](docs/figures/curve.png)
 
-**The artifact grows with instance size, which is the shape the hypothesis predicts.** Harder instances need longer answers, so solo's one answer turn hits the cap more often while the team's summary turn does not. The headline gap grows +0.067 → +0.249; the same gap with truncation controlled sits either side of zero, −0.023 → +0.024. A difficulty curve read without that control is indistinguishable from the effect it was built to detect.
+**The artifact grows with instance size, which is the shape the hypothesis predicts.** Harder instances need longer answers, so solo's one answer turn hits the cap more often while the team's summary turn does not. Answer-turn cuts run **7 / 10 / 15** across the three tiers for solo against **0 / 1 / 2** for the team; solo's per-turn truncation reaches 58% at `xhard` against the team's 22%. The controlled gaps show no trend at all: −0.023, +0.024, −0.056.
 
-The preregistered integrity filter caught **1 of the 10** — it excludes a malformed episode only when *every* turn was truncated, and solo's last turn is the only one that matters. The predicate that catches this was written the morning these corpora landed, after a column looked asymmetric at `medium`.
+The preregistered hypothesis was a team advantage growing with instance size. The uncontrolled data show exactly that, significantly, twice. **A difficulty curve read without this control is indistinguishable from the effect it was built to detect.**
+
+The integrity filter that was supposed to catch this caught **1 of the 10** at `hard` — it excludes a malformed episode only when *every* turn was truncated, and solo's last turn is the only one that matters. Worse, at `xhard` it finally engages on 7 solo episodes, which is why the headline gap *falls* from +0.249 to +0.188 while the underlying artifact is at its largest. A partial correction applied unevenly across the independent variable is worse than none: the residual stops being a constant offset.
 
 The generalisable form: **an instrument limit applied identically to both arms is not a fair limit if the arms use the resource differently.**
 
-So the gate still fails, and the reason to believe that is the same reason as before: **every artifact removed has made the gap smaller** — +0.029 → +0.040 → +0.032 → +0.067 → −0.023, across five corrections, never once the other way. Full accounting in [RESEARCH-LOG §4.9–4.10](docs/RESEARCH-LOG.md).
+So the gate still fails, and the reason to believe that is the same reason as before: **every artifact removed has made the gap smaller, never once the other way.** On the bf16 instrument, recovering censored episodes at `hard` moved it +0.040 → +0.032. On the served instrument, controlling the answer-turn cap moved it by −0.090, −0.225 and −0.244 at the three tiers respectively. Six corrections, one direction.
 
-> **A confound the design does not name.** The gate compares 4 agents × 3 rounds against 1 agent × 3 rounds: the team spends **4,443 output tokens to solo's 2,055**. "Team beats solo" has never been separable from "more tokens beat fewer". A matched-budget arm (1 agent × 12 rounds, same per-turn cap) is implemented and queued.
+**The honest limit on that last column.** Controlling for answer-turn truncation costs most of the solo arm at the hard end — usable *n* falls 22 → 17 → 9. At `xhard` the controlled comparison rests on nine solo episodes, so −0.056 is a weak estimate and its *p* reflects that. The claim these three rows jointly support is not that the team is *worse*; it is that **no controlled comparison at any operating point shows the team ahead**, and every uncontrolled one that did was tracking a truncation rate that grew with the independent variable. Full accounting in [RESEARCH-LOG §4.9–4.11](docs/RESEARCH-LOG.md).
+
+> **A confound the design does not name.** The gate compares 4 agents × 3 rounds against 1 agent × 3 rounds: the team spends **4,443 output tokens to solo's 2,055** across 4× the forward passes. "Team beats solo" has never been separable from "more tokens beat fewer". A matched-budget arm — one agent, 1 × 12 rounds, same per-turn cap — is implemented and running; it is the estimator that needs no post-hoc correction, because the cap is not doing different work in the two arms to begin with.
 
 PLAN.md makes this a stop condition, so the ablation grid was not run: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
 
