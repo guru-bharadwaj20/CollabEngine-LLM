@@ -1567,9 +1567,9 @@ and the other having twelve to discuss one.
 
 ---
 
-### 4.12 C4 at `medium`: the budget confound reverses, and one agent gets worse with more turns
+### 4.12 C4: the budget confound reverses, and what the team is actually buying
 
-*`hard` and `xhard` still generating; this is one tier and is written as such.*
+*`medium` and `hard` complete and replicating; `xhard` still generating.*
 
 The matched-budget arm — one agent, 1×12 rounds against the team's 4×3, identical
 per-turn cap, same seeds, same server — is the estimator §4.9 said was needed
@@ -1587,44 +1587,75 @@ in this project to survive that control.
 
 **And the budget confound runs backwards.** §4.9 worried that "team beats solo"
 was inseparable from "more tokens beat fewer". At matched turns the single agent
-spends **1.92× the team's output tokens** — 8,541 against 4,443, because team
-agents write 1,117 characters per turn and the lone agent writes 2,114 — and
-scores 0.25 lower. The team wins while generating less. Whatever it is doing, it
-is not winning on compute.
+spends **1.9× the team's output tokens** — 8,541 against 4,443 at `medium`, 8,829
+against 5,135 at `hard`, because team agents write ~1,100 characters per turn and
+the lone agent writes ~2,100 — and scores lower at both. The team wins while
+generating less. Whatever it is doing, it is not winning on compute.
 
-**One agent gets *worse* when given more turns.** 0.564 at three turns, 0.378 at
-twelve, on the same instances. This is the most surprising number of the run and
-it is not a truncation effect: `solo_budget` truncates 34% of turns against
-`solo`'s 24%, but the controlled `solo` mean is 0.654 and the controlled
-`solo_budget` mean is 0.549. More thinking time, worse answers, both before and
-after the correction.
+**One agent gets *worse* when given more turns — read this one controlled.**
+Uncontrolled, the two solo arms swap order between tiers: 0.564 against 0.378 at
+`medium` but 0.342 against 0.401 at `hard`, because three-turn `solo` is the arm
+the answer-turn cap hits hardest and its raw mean collapses at `hard`. Controlled,
+the ordering is stable and points the same way at both points — **0.654 vs 0.549
+at `medium`, 0.561 vs 0.526 at `hard`.** Four times the turns, four times the
+budget, consistently worse answers.
+
+That is the cleanest illustration in this log of why §4.10's control is not
+optional bookkeeping. The uncontrolled numbers do not merely exaggerate this
+comparison, they *invert* it at one of the two operating points.
 
 **Why, measured rather than guessed.** 25% of `solo_budget`'s consecutive turns
-overlap the previous turn by more than 80% of their words, against 4% for `solo`
-and 7% for the team. The lone agent spends its extra budget restating its own
-answer, and each restatement is another chance to corrupt a constraint it had
-already satisfied. The team's turns are half as long and far less repetitive,
-because each agent is responding to something new.
+at `medium` and 33% at `hard` overlap the previous turn by more than 80% of their
+words, against 0–4% for `solo` and 2–7% for the team. The lone agent spends its
+extra budget restating its own answer, and each restatement is another chance to
+corrupt a constraint it had already satisfied. The team's turns are half as long
+and far less repetitive, because each agent is responding to something new.
 
 **What this does and does not license.**
 
-*It does not say four agents beat one.* The best single-agent configuration here
-is the cheap one — three turns, 2,055 tokens, 0.654 controlled — and that is
-**above** the team's 0.631. The team's advantage is over a lone agent forced
-through a twelve-turn protocol, not over a lone agent.
+**It replicates at `hard`.** +0.190 raw (*p* < 0.001), **+0.059 controlled
+(*p* = 0.045)**, against `medium`'s +0.082 (*p* = 0.039). Two tiers, same
+direction, similar magnitude, both surviving the truncation control that killed
+every other positive result in this project.
 
-*It does say the multi-agent structure is doing something.* Turn count, per-turn
-cap, model, instances and seeds are identical between `solo_budget` and the team.
-The only remaining difference is whether the twelve turns come from one voice or
-four, and that difference is worth 0.25 raw and 0.08 controlled.
+**The three arms, controlled, at both tiers:**
+
+| controlled `fraction` | solo (3 turns) | solo_budget (12 turns) | team (12 turns) |
+|---|---|---|---|
+| `medium` | **0.654** | 0.549 | 0.631 |
+| `hard` | 0.561 | 0.526 | **0.585** |
+| tokens/episode | ~2,100 | ~8,700 | ~4,800 |
+| consecutive turns >80% repeated | 0–4% | **25–33%** | 2–7% |
+
+**This is the shape of the result, and it is not "four agents beat one".**
+
+*Against the cheap baseline, the team is a coin flip at 2.2× the cost.* Solo at
+three turns scores 0.654 against the team's 0.631 at `medium`, and 0.561 against
+0.585 at `hard` — one each way, both small, neither significant. The team spends
+roughly 2.2× the output tokens to draw with the simplest configuration tested.
+
+*Against the matched-budget baseline, the team wins consistently.* And the reason
+is visible in the last row: a lone agent forced through twelve turns spends
+33% of its consecutive turns restating what it just said, and each restatement is
+another chance to break a constraint it had already satisfied. Team agents,
+responding to something new each turn, repeat 2–7% of the time.
+
+*So what the multi-agent structure demonstrably buys is not better reasoning but
+protection against single-agent long-horizon degradation.* Turn count, per-turn
+cap, model, instances and seeds are identical between `solo_budget` and the team;
+the only difference is whether twelve turns come from one voice or four, and one
+voice talks itself in circles. That is a real and reproducible effect. It is also
+a much narrower claim than the hypothesis this project set out to test, and it
+does not require any specialization to explain — four agents need not divide
+labour to avoid repeating each other, they need only be responding to different
+things.
 
 *The comparison arm has a known defect, and it inflates the team.* `solo_budget`
 runs a protocol built for multi-party turn-taking, with the `n=1` brief §4.9
-documents, and degenerates into restatement a quarter of the time. A
-purpose-built long-form single-agent baseline would very likely score higher.
-So **+0.082 is an upper bound on the structural effect**, not an estimate of it.
-That is the honest reading and it is the reason this section does not claim the
-gate has been cleared.
+documents. A purpose-built long-form single-agent baseline — one that does not
+re-emit the whole answer every turn — would very likely close most of this gap.
+**+0.059 to +0.082 is an upper bound on the structural effect**, not an estimate
+of it. The gate is not cleared, and this section does not claim it is.
 
 ---
 
