@@ -1274,6 +1274,80 @@ than 0.68 — but neither undermines the direction of the conclusion, since the
 rare-label oversampling was designed to expose exactly the disagreement that
 would matter.
 
+### 4.9 Served instrument, `medium`: the gap flips sign when the cap is controlled
+
+First corpus on the served instrument (Meta-Llama-3.1-8B-Instruct Q4_K_M via
+llama.cpp, build `b10369-6e62ba538`, 18,432 tokens/slot). 48 episodes, 24 per
+arm, 19.2 minutes, 136 tok/s aggregate.
+
+**The instrument itself is fixed.** Zero errored turns in either arm, and zero
+context overflows. The failure that dominated §4.6 — 28.9% of team turns at
+`hard` exceeding the prefill ceiling against 0% of solo — does not occur here at
+all. §3.11 predicted that and it held.
+
+**The preregistered gate fails, as at every previous operating point.**
+
+| metric | solo | team | gap | d | perm p |
+|---|---|---|---|---|---|
+| fraction | 0.564 | 0.631 | +0.067 | +0.31 | 0.305 |
+| strict | 0.192 | 0.221 | +0.029 | +0.20 | 0.519 |
+| feasible | 0.000 | 0.000 | +0.000 | 0.00 | 1.000 |
+
+`feasible` is 0.000 in both arms — on this model no episode solves a whole
+instance at `medium`, so that metric carries no information here and should not
+be read as agreement between the arms.
+
+**What replaced the old artifact is quieter and runs the same direction.** Solo:
+6 malformed answers, 24% of agent turns truncated. Team: 0 malformed, 9%. Those
+are one fact, and the association is not subtle:
+
+| solo | malformed | well-formed |
+|---|---|---|
+| final turn truncated | **5** | 2 |
+| final turn intact | 1 | 16 |
+
+In the team arm the final turn was truncated **0 times in 24**. The cause is
+structural rather than stochastic: solo's last of three turns must carry the
+entire answer, while the team's last of twelve commits an answer the transcript
+already contains. The same `max_tokens` therefore lands on solo's answer and on
+the team's summary of one.
+
+`is_instrument_failure` cannot see this. Its truncation rule requires *every*
+turn to be cut off — at the measured per-turn rates a 1-in-70 event over three
+solo turns and a 1-in-10¹³ event over twelve team turns, so it is an exclusion
+the team arm can essentially never qualify for. It removed 2 of the 6 and left
+four 0.000 scores in solo's mean.
+
+**Dropping the episodes whose answer-bearing turn was truncated (5 solo, 0 team)
+reverses the ordering:**
+
+| metric | solo | team | gap | perm p | vs headline |
+|---|---|---|---|---|---|
+| fraction | 0.654 | 0.631 | **−0.023** | 0.655 | −0.090 |
+| strict | 0.234 | 0.221 | −0.013 | 0.777 | −0.043 |
+
+Both readings are non-significant, so this is not a team result overturned into
+a solo one. It is a gap that was never there, and whose *entire* apparent
+magnitude was the output cap. That is now the fifth measurement artifact in this
+project removed, and the fifth to have flattered the team: +0.029 → +0.040 →
++0.032 → +0.067 → −0.023. The sequence has never once gone the other way, which
+is itself the most robust quantitative result the project has.
+
+**The confound underneath it, which the design never listed.** §1.3 names three
+confounds. None is this one: the team arm takes 12 agent turns to solo's 3 and
+emits **4,443 output tokens to solo's 2,055**, across 4× the forward passes. The
+gate has always been "four agents conferring" versus "one agent thinking 2.16×
+less", and reads collaboration into a difference that includes compute. Note
+which way that cuts here — the team spends 2.16× the tokens to score 0.023
+*lower*.
+
+`solo_budget` (C4) is the arm that separates them: one agent, `rounds` scaled by
+the team's agent count, so 1×12 against 4×3 at an identical per-turn cap. It is
+not a replacement for the preregistered gate; it decides which reading of the
+gate survives. Queued behind the three tiers.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
