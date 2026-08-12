@@ -1505,6 +1505,68 @@ spends its last turn summarising one it has already written.
 
 ---
 
+### 4.11 Served `xhard`, and the complete curve
+
+48 episodes, 69.6 min, 55 tok/s, **zero errored turns and zero context
+overflows** — the tier §3.10 declared infeasible ran clean, which retires that
+failure for good.
+
+| metric | solo (n=17) | team (n=24) | gap | *d* | perm *p* |
+|---|---|---|---|---|---|
+| `fraction` | 0.310 | 0.499 | **+0.188** | +0.75 | **0.020** |
+| `strict` | 0.060 | 0.089 | +0.028 | +0.25 | 0.445 |
+| `feasible` | 0.000 | 0.000 | +0.000 | 0.00 | 1.000 |
+
+Significant again. And again it is the cap: solo truncated **58%** of its turns
+against the team's 22%, with 15 answer-turn cuts to the team's 2. Controlled,
+the gap is **−0.056** (*p* = 0.345) — negative for the second time in three
+tiers.
+
+**The three tiers together.** This is the result of the run:
+
+| | solo | team | headline gap | *p* | answer cut s/t | turn trunc s/t | **controlled gap** | *p* |
+|---|---|---|---|---|---|---|---|---|
+| `medium` | 0.564 | 0.631 | +0.067 | 0.305 | 7 / 0 | 24% / 9% | **−0.023** | 0.655 |
+| `hard` | 0.342 | 0.591 | **+0.249** | **0.000** | 10 / 1 | 29% / 9% | **+0.024** | 0.647 |
+| `xhard` | 0.310 | 0.499 | **+0.188** | **0.020** | 15 / 2 | 58% / 22% | **−0.056** | 0.345 |
+
+**Two of three operating points clear the Phase 1 gate. None survives the
+control, and two of the three controlled gaps are negative.** The answer-cut
+count rises monotonically in both arms — 7/10/15 solo against 0/1/2 team — which
+is the mechanism doing exactly what §4.10 predicted before `xhard` existed.
+
+**The headline curve is not even monotonic, and the reason is instructive.** It
+goes +0.067 → +0.249 → +0.188: the artifact is *largest* at `xhard` but the
+apparent gap *falls*. That is the preregistered filter finally engaging. Its rule
+excludes a malformed episode only when every turn was truncated, which at 58%
+per-turn truncation finally happens — 7 solo episodes are dropped as unusable at
+`xhard`, against 1 at `hard` and 2 at `medium`. Those dropped episodes are zeros,
+so removing them lifts solo's mean and shrinks the gap. The filter is not
+correcting the bias; it is removing a biased subset of a biased sample, at a rate
+that itself varies with difficulty. **A partial correction applied unevenly
+across the independent variable is worse than none, because the residual is no
+longer a constant offset and can no longer be reasoned about as one.**
+
+**Honest limits on the controlled column.** Dropping answer-turn truncation
+costs most of the solo arm at the hard end: usable *n* goes 22/24 → 17/24 → 9/22
+for solo. At `xhard` the controlled comparison rests on **nine** solo episodes,
+so its −0.056 is a weak estimate and its *p* = 0.345 is as much about *n* as
+about the effect. The claim the three rows jointly support is not "the team is
+worse"; it is that **no controlled comparison at any operating point shows the
+team ahead**, and that every uncontrolled one that did was tracking a truncation
+rate that grew with the independent variable.
+
+**H1 is not supported, and the reason is stronger than a null.** The
+preregistered hypothesis was a team advantage growing with instance size. The
+uncontrolled data show precisely that, at *p* < 0.05 twice. The controlled data
+show −0.023, +0.024, −0.056: no trend, straddling zero. Had `cut@end` not
+existed, this run would have produced the project's headline result — the gate
+cleared at two of three points with the predicted difficulty interaction — and
+it would have been an artifact of one arm having three turns to write an answer
+and the other having twelve to discuss one.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of

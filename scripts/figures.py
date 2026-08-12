@@ -366,7 +366,12 @@ def fig_curve(_unused, out: Path) -> bool:
     lo, hi = min(solo + team), max(solo + team)
     pad = max(0.03, 0.15 * (hi - lo))
     ax1.set_ylim(max(0.0, lo - pad), min(1.0, hi + pad))
-    ax1.set_title("The apparent gap widens with instance size")
+    # "Widens" was wrong once xhard landed: the headline gap runs +0.067,
+    # +0.249, +0.188. It is not monotonic, because the preregistered filter
+    # starts excluding solo's all-turns-truncated episodes at the hard end and
+    # lifts solo's mean back up (RESEARCH-LOG 4.11). Describe the panel, not the
+    # story the first two points suggested.
+    ax1.set_title("As scored, solo falls away faster")
     ax1.legend(frameon=False, fontsize=9, loc="lower left")
     ax1.grid(axis="y", color=RULE, lw=0.7)
     ax1.set_axisbelow(True)
@@ -395,7 +400,7 @@ def fig_curve(_unused, out: Path) -> bool:
     ax2.set_xticks(xs)
     ax2.set_xticklabels([t for t, _, _ in tiers])
     ax2.set_ylabel("team − solo (fraction)")
-    ax2.set_title("The widening is the token cap")
+    ax2.set_title("Control the answer-turn cap and it goes")
     ax2.legend(frameon=False, fontsize=8.5, loc="upper left")
     ax2.grid(axis="y", color=RULE, lw=0.7)
     ax2.set_axisbelow(True)
