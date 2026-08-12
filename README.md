@@ -26,22 +26,37 @@ Either direction of that result is publishable, which is the mark of a well-pose
 
 ![Phase 1 gate](docs/figures/gate.png)
 
-Qwen3-8B on constraint-satisfaction instances, **24 episodes per arm**, identical instances across arms, both arms from the same run:
+Llama-3.1-8B-Instruct (Q4_K_M, served by llama.cpp) on constraint-satisfaction instances, **24 episodes per arm**, identical instances across arms, both arms from the same run:
 
-| | metric | solo (n=24) | team (n=23) | gap | *d* | perm *p* |
+| | metric | solo | team | gap | *d* | perm *p* |
 |---|---|---|---|---|---|---|
-| **medium** | `fraction` | 0.848 | 0.885 | +0.037 | +0.24 | 0.511 |
-| **hard** | `fraction` | 0.851 | 0.883 | +0.032 | +0.40 | 0.185 |
+| **medium** | `fraction` | 0.564 | 0.631 | +0.067 | +0.31 | 0.305 |
+| **hard** | `fraction` | 0.342 | 0.591 | **+0.249** | **+1.09** | **0.000** |
 
-**Four agents over three rounds are not measurably better than one agent** on any of the three scoring metrics at either operating point. Every bootstrap interval spans zero.
+At `hard` that is a large, highly significant effect — and it is an artifact of the token cap. It is the clearest thing this project has measured, so it is worth being precise about.
 
-The result is trustworthy mainly because of what happened while measuring it: **every artifact removed made the gap smaller.** At `hard` the gap read +0.040 (*p* = 0.093) when 21% of team episodes had been lost to out-of-memory failures, and +0.032 (*p* = 0.185) once four of them were recovered. The one moment this looked like it might clear the gate was the moment its team arm was most censored — the gap was tracking what the instrument discarded, not an effect.
+**The two arms do not use `max_tokens` the same way.** A solo episode is three turns and the last one carries the entire answer. A team episode is twelve and the last one commits an answer the transcript already contains. The same per-turn cap therefore lands on solo's answer and on the team's *summary* of one. At `hard`, solo's answer-bearing turn was truncated in 10 of 24 episodes and the team's in 1.
 
-It is not a badly chosen difficulty. Both operating points were measured:
+Those 10 episodes are the entire effect:
+
+| `hard` | zeros | malformed | answer turn cut | **non-zero mean** |
+|---|---|---|---|---|
+| solo | 10 / 23 | 10 | 9 | **0.605** |
+| team | 0 / 24 | 0 | 1 | **0.591** |
+
+**When one agent manages to emit a parseable answer, it matches four agents.** Drop answer-turn truncation from both arms and *d* = 1.09 becomes a gap of +0.024 at *p* = 0.64, with `strict` changing sign.
 
 ![Difficulty curve](docs/figures/curve.png)
 
-At n=24 both curves are flat — solo 0.848 → 0.851, team 0.885 → 0.883 across a 50% increase in instance size. **Neither `medium` nor `hard` rewards collaboration**, which makes this a property of the task and the model scale rather than of the operating point.
+**The artifact grows with instance size, which is the shape the hypothesis predicts.** Harder instances need longer answers, so solo's one answer turn hits the cap more often while the team's summary turn does not. The headline gap grows +0.067 → +0.249; the same gap with truncation controlled sits either side of zero, −0.023 → +0.024. A difficulty curve read without that control is indistinguishable from the effect it was built to detect.
+
+The preregistered integrity filter caught **1 of the 10** — it excludes a malformed episode only when *every* turn was truncated, and solo's last turn is the only one that matters. The predicate that catches this was written the morning these corpora landed, after a column looked asymmetric at `medium`.
+
+The generalisable form: **an instrument limit applied identically to both arms is not a fair limit if the arms use the resource differently.**
+
+So the gate still fails, and the reason to believe that is the same reason as before: **every artifact removed has made the gap smaller** — +0.029 → +0.040 → +0.032 → +0.067 → −0.023, across five corrections, never once the other way. Full accounting in [RESEARCH-LOG §4.9–4.10](docs/RESEARCH-LOG.md).
+
+> **A confound the design does not name.** The gate compares 4 agents × 3 rounds against 1 agent × 3 rounds: the team spends **4,443 output tokens to solo's 2,055**. "Team beats solo" has never been separable from "more tokens beat fewer". A matched-budget arm (1 agent × 12 rounds, same per-turn cap) is implemented and queued.
 
 PLAN.md makes this a stop condition, so the ablation grid was not run: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
 
@@ -49,7 +64,9 @@ PLAN.md makes this a stop condition, so the ablation grid was not run: an agent 
 
 That null survives its own instrument check. The local 8B coder agrees with a much stronger blind rater at **κ = 0.68 [0.50, 0.85]** on a sample deliberately loaded with the rare labels, so the taxonomy collapsing to `propose`/`verify` is a property of these transcripts, not of a cheap judge.
 
-**Three claims were withdrawn along the way** and are documented rather than quietly dropped — a `medium` comparison whose team arm had two thirds of its turns empty, a variance effect present in one team arm but not the other two, and a *d* = 0.92 feasibility result that evaporated when three OOM-dropped episodes were regenerated. The right panel above is that last one: the episodes the card could not finish were longer and scored 0/3, so losing them flattered the team. See [RESEARCH-LOG §4.1](docs/RESEARCH-LOG.md).
+**Three claims were withdrawn along the way** and are documented rather than quietly dropped — a `medium` comparison whose team arm had two thirds of its turns empty, a variance effect present in one team arm but not the other two, and a *d* = 0.92 feasibility result that evaporated when three OOM-dropped episodes were regenerated (the episodes the card could not finish were longer and scored 0/3, so losing them flattered the team). See [RESEARCH-LOG §4.1](docs/RESEARCH-LOG.md).
+
+The variance claim is worth one more line, because it came back. On the served `medium` corpus solo's spread is 0.281 against the team's 0.107 at *p* = 0.040 — the retracted finding, apparently replicated on a new model, a new instrument and equal arms. Controlling for answer-turn truncation returns *p* = 0.430. Solo's excess variance was its four zeros, and its four zeros were the cap.
 
 ---
 
@@ -57,7 +74,7 @@ That null survives its own instrument check. The local 8B coder agrees with a mu
 
 ```bash
 pip install -e ".[dev,analysis]"
-pytest -q          # 330 tests, seconds, no GPU
+pytest -q          # 344 tests, seconds, no GPU
 ```
 
 Python 3.10+. `dev` brings the test suite, `analysis` brings pandas and statsmodels for the mixed-effects test; the module that needs them imports lazily and says so if they are missing.
@@ -85,9 +102,9 @@ collabengine analyze  --config configs/local-gpu.yaml
 
 `pipeline` calibrates, picks the operating point, then runs baseline, the symmetry sweep, the fixed-order control and the ablation grid in one process — weights load once, the phases share a work queue so the batcher never drains, and no phase waits on a human to read a table. The individual steps (`calibrate`, `baseline`, `ablate`) still exist on their own. Runs resume, and resume is covered by a test asserting planned and recorded episode ids match, because they once did not and every restart silently re-ran the entire grid.
 
-The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving one model at bf16 to every agent. vLLM has no supported Windows build, so the default path generates in-process through `transformers` and supplies its own token-budget batching. To serve with vLLM instead (WSL2 or a rented Linux box) point at `configs/vllm-8b.yaml`; only `backend.kind` differs.
+The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving one model to every agent. Two backends exist: an in-process `transformers` path that supplies its own token-budget batching (vLLM has no supported Windows build), and an OpenAI-compatible client pointed at a local server. **The results above come from the served path**; `configs/vllm-8b.yaml` reaches vLLM on WSL2 or a rented Linux box with only `backend.kind` changed.
 
-**The largest tier does not fit that path, and the reason is not a tuning knob.** A bf16 prefill materialises a logits distribution for every prompt position over a 151,936-entry vocabulary, at 1–1.5 MB per prompt token on top of 15.3 GiB of resident weights; `xhard` prompts start near 5,200 tokens. The tier runs instead against a llama.cpp server holding a 4-bit GGUF, where prefill is chunked into `-ub`-sized micro-batches and logits are materialised only for the sampled position — the vocabulary size stops mattering, which is the actual fix. Weights drop to ~4.6 GiB and the whole difficulty curve moves onto that instrument together, because a curve with one point measured elsewhere measures the instrument. See [`docs/LLAMACPP-SETUP.md`](docs/LLAMACPP-SETUP.md) for the memory arithmetic and [PREREG Amendment 2](docs/PREREG-xhard.md) for what the change costs.
+**The in-process path cannot run the largest tier, and the reason is not a tuning knob.** A bf16 prefill materialises a logits distribution for every prompt position over a 151,936-entry vocabulary, at 1–1.5 MB per prompt token on top of 15.3 GiB of resident weights; `xhard` prompts start near 5,200 tokens. The tier runs instead against a llama.cpp server holding a 4-bit GGUF, where prefill is chunked into `-ub`-sized micro-batches and logits are materialised only for the sampled position — the vocabulary size stops mattering, which is the actual fix. Weights drop to ~4.6 GiB and the whole difficulty curve moves onto that instrument together, because a curve with one point measured elsewhere measures the instrument. See [`docs/LLAMACPP-SETUP.md`](docs/LLAMACPP-SETUP.md) for the memory arithmetic and [PREREG Amendment 2](docs/PREREG-xhard.md) for what the change costs.
 
 ```bash
 python scripts/preflight.py --config configs/llamacpp-xhard.yaml   # a minute
