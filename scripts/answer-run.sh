@@ -28,6 +28,11 @@ set -uo pipefail
 
 LOG=runs/answer-run.log
 TIERS=${TIERS:-"medium hard xhard"}
+# Episodes per arm. Raising it resumes: the pipeline compares plan ids
+# against the ids already in the transcript, so EPISODES=48 adds seeds
+# 24..47 and re-runs nothing. That is how n is extended without paying for
+# what is already measured.
+EPISODES=${EPISODES:-24}
 PHASES=${PHASES:-"baseline,solo,solo_budget,solo_long"}
 mkdir -p runs
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
@@ -53,9 +58,9 @@ for tier in $TIERS; do
     exit 1
   fi
 
-  say "=== $i  $tier -> $PHASES, 24 episodes per arm ==="
+  say "=== $i  $tier -> $PHASES, $EPISODES episodes per arm ==="
   python -u -m collabengine.cli pipeline --config "$CONFIG" \
-    --phases "$PHASES" --episodes 24 2>&1 | tee -a "$LOG"
+    --phases "$PHASES" --episodes "$EPISODES" 2>&1 | tee -a "$LOG"
 
   say "=== $i  $tier done -- gate below ==="
   python -u scripts/gate_report.py --run-dir "runs/llama31-8b-q4-$tier-ans" \

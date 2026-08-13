@@ -2007,6 +2007,99 @@ settle that on its own.
 
 ---
 
+### 4.16 The complete curve on the answer-budget instrument: H1 fails at all three
+
+`xhard` closes the re-measurement. 288 episodes across three tiers and four
+arms, one instrument, zero errored turns.
+
+| tier | old gap | old *p* | **answer budget** | ***p*** | solo `cut@end` |
+|---|---|---|---|---|---|
+| `medium` | +0.067 | 0.305 | +0.059 | 0.269 | 7 → **0** |
+| `hard` | **+0.249** | **0.000** | **−0.026** | 0.500 | 10 → **1** |
+| `xhard` | **+0.188** | **0.020** | **+0.069** | 0.263 | 15 → **1** |
+
+**Both significant results are gone.** The preregistered gate is now
+non-significant at every operating point measured, and the largest |*d*| across
+the three tiers is 0.35. Answer-turn truncation in the solo arm fell 7/10/15 to
+0/1/1 — the artifact §4.9–4.11 identified is removed at the source rather than
+conditioned away, and with it the entire apparent effect.
+
+The curve H1 predicted was a team advantage growing with instance size. What
+grew with instance size was the number of solo answers the cap cut off.
+
+#### Matched budget: the brief carries most of what looked like structure
+
+| tier | C4 `TEAM_BRIEF` | *p* | **C5 `SOLO_BRIEF`** | ***p*** | brief alone | *p* |
+|---|---|---|---|---|---|---|
+| `medium` | +0.161 | **0.009** | **+0.142** | **0.002** | +0.019 | 0.762 |
+| `hard` | +0.102 | **0.038** | +0.016 | 0.719 | +0.085 | 0.094 |
+| `xhard` | +0.150 | **0.022** | +0.080 | 0.161 | +0.070 | 0.319 |
+
+**Under the brief written for a group, the team beats one agent at matched
+budget at three tiers out of three. Under a brief written for one agent, at one
+out of three.** That is the same corpus, the same instrument, the same budget
+and the same model; the arms differ only in wording.
+
+**No single brief contrast is significant** — +0.019, +0.085, +0.070 at
+*p* = 0.762, 0.094, 0.319 — so this is a consistent pattern at *n* = 24 rather
+than three results. Two things keep it from being dismissed: the direction is
+the same at the two tiers where it is large, and the mechanism was predicted in
+advance (§4.12 identified the restatement loop before C5 existed) rather than
+found by inspection afterwards. Two things keep it from being asserted: `medium`
+shows nothing at all, and *n* = 24 cannot separate +0.07 from zero. The n = 48
+extension at `medium` and `hard` is running for exactly this reason.
+
+**What survives all three tiers.** The team's advantage over a *properly
+briefed* single agent on matched budget is significant at `medium` only
+(+0.142, *p* = 0.002). Everything else that looked like a multi-agent effect
+has now been attributed to something else: the token cap at the headline gate,
+and the single-agent brief at matched budget.
+
+---
+
+### 4.17 Can the judge be fixed? Four codebooks, and no
+
+Phase 2 has 468 coded messages on disk and is blocked on a judge that agrees
+with a human at κ = 0.24 (§4.13b). Before spending anything on new episodes, the
+cheap question: is that the codebook or the model? Four books, same 40 messages,
+same human column, same `_code_one` path, same seeds, temperature 0.
+
+| codebook | labels | κ | 95% CI | raw |
+|---|---|---|---|---|
+| v2 control | 7 | 0.219 | [+0.03, +0.42] | 19/40 |
+| v4 boundaries — say which way the ambiguous cases resolve | 7 | 0.230 | [+0.01, +0.45] | 22/40 |
+| **v5 boundaries + worked examples** | 7 | **0.288** | [+0.09, +0.50] | **25/40** |
+| v3 coarse — three labels, the generate/audit split | 3 | 0.056 | [−0.07, +0.19] | 12/40 |
+
+**The answer is no, and it is not close.** Phase 2 needs ~0.6; §4.8's convergent
+validity claim needs ~0.78. The best available book reaches 0.288.
+
+**A resolution limit worth recording.** v2 re-coded here returns κ = 0.219 where
+the same prompt on the same 40 messages returned **0.241** yesterday (§4.13b) —
+identical seeds, temperature 0, and the labels still moved. llama.cpp is not
+bit-deterministic across differing batch composition, which is the same class of
+effect §6 records for vLLM. So run-to-run noise on this measurement is roughly
+±0.02, and v4's +0.011 over v2 is inside it. Only v5's +0.069 is larger than the
+instrument's own wobble, and even that rests on 6 extra agreements out of 40.
+
+**v3 failed, and the way it failed is the interesting part.** Collapsing eight
+labels to three should raise agreement mechanically — an easier question. It
+returned the *worst* κ in the sweep because the judge put **22 of 40 messages
+into `meta`**, the label whose gloss ends "or none of the above". That is v1's
+`organize` collision exactly: give the judge a catch-all and it will use the
+catch-all. The coarsening is not disproven; that particular third label is. A
+book with no escape hatch — force `solve` or `check` — is the version worth
+trying, and it costs another five minutes.
+
+**Where this leaves Phase 2.** Not blocked on wording any more. Three successive
+codebooks, one of which fixed a real defect and one of which added worked
+examples, moved κ from 0.07 to 0.29 and stopped. The remaining options are a
+larger judge — testable on these same 40 messages the moment a 14B is on disk —
+or reporting Phase 2's differentiation null with κ = 0.29 attached, which means
+reporting that it cannot be interpreted.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
