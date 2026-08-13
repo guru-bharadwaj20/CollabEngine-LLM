@@ -26,58 +26,66 @@ Either direction of that result is publishable, which is the mark of a well-pose
 
 ![Phase 1 gate](docs/figures/gate.png)
 
-Llama-3.1-8B-Instruct (Q4_K_M, served by llama.cpp) on constraint-satisfaction instances, **24 episodes per arm**, identical instances across arms, both arms from the same run:
+Llama-3.1-8B-Instruct (Q4_K_M, served by llama.cpp) on constraint-satisfaction instances, **24 episodes per arm**, identical instances across arms, both arms from the same run.
 
-| | metric | solo | team | gap | *d* | perm *p* | **gap, cap controlled** |
-|---|---|---|---|---|---|---|---|
-| **medium** | `fraction` | 0.564 | 0.631 | +0.067 | +0.31 | 0.305 | **−0.023** |
-| **hard** | `fraction` | 0.342 | 0.591 | **+0.249** | **+1.09** | **0.000** | **+0.024** |
-| **xhard** | `fraction` | 0.310 | 0.499 | **+0.188** | +0.75 | **0.020** | **−0.056** |
+**The gate has been measured twice: once on an instrument that truncated one arm's answer, and once on an instrument that does not.**
 
-**Two of three operating points clear the gate. None survives the control, and two of the three controlled gaps are negative.** That last column is the finding, and it is worth being precise about.
+| | as scored, old instrument | *d* | **answer budget** | perm *p* | solo `cut@end` |
+|---|---|---|---|---|---|
+| **medium** | +0.067 | +0.31 | **+0.059** | 0.269 | 7 → **0** |
+| **hard** | **+0.249** | **+1.09** | **−0.026** | **0.500** | 10 → **1** |
+| **xhard** | +0.188 | +0.75 | *running* | | 15 → *tbd* |
 
-**The two arms do not use `max_tokens` the same way.** A solo episode is three turns and the last one carries the entire answer. A team episode is twelve and the last one commits an answer the transcript already contains. The same per-turn cap therefore lands on solo's answer and on the team's *summary* of one. At `hard`, solo's answer-bearing turn was truncated in 10 of 24 episodes and the team's in 1.
+**The project's only significant Phase 1 result was the token cap.** At `hard` the gap is now negative and nowhere near significance.
 
-Those 10 episodes are the entire effect:
+**The two arms did not use `max_tokens` the same way.** A solo episode is three turns and the last one carries the entire answer. A team episode is twelve and the last one commits an answer the transcript already contains. The same per-turn cap therefore landed on solo's answer and on the team's *summary* of one — identical, and not symmetric.
 
-| `hard` | zeros | malformed | answer turn cut | **non-zero mean** |
+The fix is not a larger cap everywhere, which would change the whole instrument. It is a separate budget for the one turn that gets parsed: `answer_max_tokens = 3072` on the final agent turn, `max_tokens` unchanged at 1024 elsewhere, and `max_model_len` cut so the slot geometry does not move. Then:
+
+| `hard` | solo mean | team mean | answer turn cut | malformed |
 |---|---|---|---|---|
-| solo | 10 / 23 | 10 | 9 | **0.605** |
-| team | 0 / 24 | 0 | 1 | **0.591** |
+| old instrument | 0.342 | 0.591 | 10 / 1 | 11 / 0 |
+| **answer budget** | **0.581** | 0.555 | **1 / 1** | **1 / 1** |
 
-**When one agent manages to emit a parseable answer, it matches four agents.** Drop answer-turn truncation from both arms and *d* = 1.09 becomes a gap of +0.024 at *p* = 0.64, with `strict` changing sign.
+**The team's mean barely moved. Solo's rose by +0.239 — the whole of the original gap.** Nothing about the models or the task changed; the measurement had been reading its own cap.
+
+**The preregistered sensitivity analysis got this right from biased data.** It said the `hard` gap was +0.024 at *p* = 0.64 while the headline said +0.249 at *p* < 0.0001 — and the purpose-built instrument now says −0.026 at *p* = 0.500, on all 24 episodes rather than the 14 that survived filtering. A post-hoc filter is still post-hoc; this one was right.
 
 ![Difficulty curve](docs/figures/curve.png)
 
 **The artifact grows with instance size, which is the shape the hypothesis predicts.** Harder instances need longer answers, so solo's one answer turn hits the cap more often while the team's summary turn does not. Answer-turn cuts run **7 / 10 / 15** across the three tiers for solo against **0 / 1 / 2** for the team; solo's per-turn truncation reaches 58% at `xhard` against the team's 22%. The controlled gaps show no trend at all: −0.023, +0.024, −0.056.
 
-The preregistered hypothesis was a team advantage growing with instance size. The uncontrolled data show exactly that, significantly, twice. **A difficulty curve read without this control is indistinguishable from the effect it was built to detect.**
+The preregistered hypothesis was a team advantage growing with instance size. The uncontrolled data showed exactly that, significantly, twice. **A difficulty curve read without this control is indistinguishable from the effect it was built to detect** — the artifact and the hypothesis have the same shape, because both scale with how much answer the instance needs.
 
-The integrity filter that was supposed to catch this caught **1 of the 10** at `hard` — it excludes a malformed episode only when *every* turn was truncated, and solo's last turn is the only one that matters. Worse, at `xhard` it finally engages on 7 solo episodes, which is why the headline gap *falls* from +0.249 to +0.188 while the underlying artifact is at its largest. A partial correction applied unevenly across the independent variable is worse than none: the residual stops being a constant offset.
+The integrity filter that was supposed to catch this caught **1 of the 10** at `hard` — it excludes a malformed episode only when *every* turn was truncated, and solo's last turn is the only one that matters. Worse, at `xhard` it finally engaged on 7 solo episodes, which is why the old headline gap *falls* from +0.249 to +0.188 while the underlying artifact is at its largest. A partial correction applied unevenly across the independent variable is worse than none: the residual stops being a constant offset.
 
 The generalisable form: **an instrument limit applied identically to both arms is not a fair limit if the arms use the resource differently.**
 
-So the gate still fails, and the reason to believe that is the same reason as before: **every artifact removed has made the gap smaller, never once the other way.** On the bf16 instrument, recovering censored episodes at `hard` moved it +0.040 → +0.032. On the served instrument, controlling the answer-turn cap moved it by −0.090, −0.225 and −0.244 at the three tiers respectively. Six corrections, one direction.
+So the gate fails, and the reason to believe it is stronger than before: **every artifact removed has made the gap smaller, never once the other way.** On the bf16 instrument, recovering censored episodes at `hard` moved it +0.040 → +0.032. Controlling the answer-turn cap moved it −0.090, −0.225 and −0.244 at the three tiers. Rebuilding the instrument so the truncation does not happen moved `hard` from +0.249 to −0.026. Seven corrections, one direction.
 
-**The honest limit on that last column.** Controlling for answer-turn truncation costs most of the solo arm at the hard end — usable *n* falls 22 → 17 → 9. At `xhard` the controlled comparison rests on nine solo episodes, so −0.056 is a weak estimate and its *p* reflects that. The claim these three rows jointly support is not that the team is *worse*; it is that **no controlled comparison at any operating point shows the team ahead**, and every uncontrolled one that did was tracking a truncation rate that grew with the independent variable. Full accounting in [RESEARCH-LOG §4.9–4.11](docs/RESEARCH-LOG.md).
+**What changed on 2026-08-13 is the kind of claim this rests on.** The rows above were a complete-case analysis: drop the truncated episodes and see what survives. That brackets rather than settles, because truncation is post-treatment — and it cost most of the solo arm at the hard end, with usable *n* falling 22 → 17 → 9. The answer-budget instrument does not drop anything. At `medium` the gate report now prints *"sensitivity: nothing to drop"*, because `cut@end` is 0 in both arms. Full accounting in [RESEARCH-LOG §4.9–4.11](docs/RESEARCH-LOG.md) for the artifact and [§4.14–4.15](docs/RESEARCH-LOG.md) for the re-measurement.
 
 ### The matched-budget control, and why it does not rescue the team either
 
 The gate compares 4 agents × 3 rounds against 1 agent × 3 rounds — which is not a matched comparison. The team spends roughly **2× the output tokens across 4× the forward passes**, so "four agents beat one" has never been separable from "more tokens beat fewer". The `solo_budget` arm gives one agent the team's whole turn budget (1 × 12 rounds, same per-turn cap) to separate them.
 
-| controlled `fraction` | solo, 3 turns | solo_budget, 12 turns | team, 12 turns | team − solo_budget |
+Two matched-budget arms now exist, differing only in the brief the single agent receives:
+
+- **C4 `solo_budget`** — `TEAM_BRIEF`, the prompt written for a group. Told it has co-workers and that the group's last message is what gets scored, it restated its whole answer on 25–33% of consecutive turns.
+- **C5 `solo_long`** — `SOLO_BRIEF`, written for one agent. No phantom co-workers, no last-message-is-the-answer instruction, explicit licence not to restate.
+
+| `fraction`, answer-budget instrument | C4 `TEAM_BRIEF` | **C5 `SOLO_BRIEF`** | team | team − C5 |
 |---|---|---|---|---|
-| **medium** | **0.654** | 0.549 | 0.631 | +0.082 (*p* = 0.039) |
-| **hard** | 0.561 | 0.526 | **0.585** | +0.059 (*p* = 0.045) |
-| **xhard** | **0.586** | 0.527 | 0.530 | **+0.003 (*p* = 0.962)** |
-| tokens / episode | ~2,400 | **~8,900** | ~5,400 | |
-| consecutive turns >80% repeated | 0–4% | **25–33%** | 2–11% | |
+| **medium** | 0.502 (*p* = 0.009) | 0.521 | 0.663 | **+0.142 (*p* = 0.002)** |
+| **hard** | 0.454 (*p* = 0.038) | **0.539** | 0.555 | **+0.016 (*p* = 0.719)** |
 
-**+0.082, +0.059, +0.003.** The effect declines monotonically along the independent variable and is gone at the hardest point — two results barely under 0.05 and one squarely at zero. That is not a replication, and this project has already withdrawn one claim with exactly that profile. It fails for a reason worth noting too: the gap closes because the **team** declines (0.631 → 0.585 → 0.530), not because the lone agent improves.
+**The brief matters, and the two tiers disagree about how much.** At `hard`, one agent given a brief written for one agent is statistically indistinguishable from four agents on the same total budget — while the same agent under the group brief still trails significantly. At `medium` the brief buys nothing (+0.019, *p* = 0.762) and the team leads either way.
 
-**What does survive all three tiers has nothing to do with teams.** The cheap single agent is the best configuration measured — three turns, ~2,400 output tokens, ahead of the team at two of three operating points on less than half the generation. And a lone agent given four times the budget gets *worse* at every tier, because 25–33% of its consecutive turns restate the previous one and each restatement is another chance to break a constraint it had already satisfied.
+**This inverts the earlier reading in one direction and confirms it in the other.** [§4.12](docs/RESEARCH-LOG.md) called the C4 margin an upper bound because the harness was degrading the baseline. At `hard` that was right: fix the brief and the margin goes. At `medium` it was wrong: the brief was fixed, the transcripts got measurably cleaner — truncation 40% → 22%, answer cuts 6 → 2, malformed 5 → 2 — and the score did not move.
 
-> **Exploratory, and bounded above.** `solo_budget` was built and run the same day in response to the measurement that motivated it — not preregistered, and [PREREG-xhard](docs/PREREG-xhard.md) says so. It also drives one agent through a protocol built for four, so part of its degradation is the harness's doing rather than the model's. See [RESEARCH-LOG §4.12](docs/RESEARCH-LOG.md) for the result and §4.12b for the two-tier version of this section, withdrawn the same day it was written.
+> **Underpowered, and exploratory.** The direct C4 → C5 contrast at `hard` is +0.085 at *p* = 0.094 (*n* = 24), so "the brief explains the matched-budget gap" is a reading of the data, not a result. Neither arm was preregistered — [PREREG-xhard](docs/PREREG-xhard.md) says so. What is solid is narrower: *at `hard`, one properly-briefed agent matches four on the same budget.*
+
+**The design rule this produces is worth more than the effect size.** A single-agent baseline needs a single-agent brief. Running `n=1` through a prompt that says "you are one of 1 participants" and "the others" measures the harness, not the model — and it does so in the direction that flatters the team.
 
 PLAN.md makes this a stop condition, so the ablation grid was not run: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
 
