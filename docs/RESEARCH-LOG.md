@@ -2076,6 +2076,32 @@ count.** That is not a caveat about precision, it is the difference between a
 *d* = 1.09 at *p* < 0.0001 and a gap of +0.024 at *p* = 0.64 (§4.10). The audit
 prints `cut@end` above every mean for this reason.
 
+### The answer-budget instrument (2026-08-13, §4.14–4.15)
+
+The instrument above is superseded for gate numbers. Both corpora are kept —
+`runs/llama31-8b-q4-{tier}` and `runs/llama31-8b-q4-{tier}-ans` — because the
+difference between them is a result.
+
+| | |
+|---|---|
+| Changed | `answer_max_tokens: 3072` on the final agent turn only; `max_tokens` stays 1024 for every other turn |
+| Held | `max_model_len` cut 17,408 → 15,360 so the required slot stays **18,432** and the geometry does not move with the budget |
+| Server | same binary and flags except `-c 129024 --parallel 7` (was `-c 73728 --parallel 4`); still 18,432 tokens per slot, confirmed from `n_ctx_slot` and `/props` |
+| Client | `max_concurrency` 7, matched to `--parallel` |
+| Arms | 4 per tier: `baseline` 4×3, `solo` 1×3, `solo_budget` 1×12 under `TEAM_BRIEF`, `solo_long` 1×12 under `SOLO_BRIEF` |
+| Cost | 96 episodes per tier; `medium` 63 min, `hard` 176 min |
+| Config | `configs/llamacpp-{tier}-ans.yaml`; runner `scripts/answer-run.sh` |
+
+**Why the per-turn cap is recorded per turn.** It is no longer constant within an
+episode, so a `length` finish reason means nothing without the number it ran
+into. Every agent turn now stores `max_tokens` and `answer_turn` in its meta.
+
+**Why 7 slots and not 8.** 7 × 18,432 fits in 21.4 GiB and leaves ~2.8 GiB free
+on a 24 GiB card. 8 leaves ~0.8 GiB, and Windows WDDM answers that by paging the
+working set over PCIe while `nvidia-smi` still reads 100% utilisation — the
+failure of §3.4, which costs ~4× throughput and reports nothing. Power draw is
+the tell: ~186 W of 210 W computing, ~60 W paging.
+
 **Sampling reproducibility is per batch, not per request.** vLLM seeds each
 sequence independently; `model.generate` draws the whole batch from one global
 RNG, so an episode's text depends on which other episodes happened to batch with
@@ -2117,23 +2143,38 @@ move, which is what makes the later note on §4.1e permanent rather than fixable
 
 **What is actually open, in the order it is worth doing.**
 
-1. **Finish C4 at `xhard`** (running). `medium` and `hard` both show the team
-   ahead of a matched-budget single agent, +0.082 and +0.059 controlled, both
-   *p* < 0.05. A third point decides whether that is a result or two coin flips.
-2. **Build an honest long-form single-agent baseline, and rerun C4 against it.**
-   This is now the highest-value experiment in the project. §4.12's effect is
-   bounded above by a defect: `solo_budget` runs a multi-party turn-taking
-   protocol alone, under the `n=1` brief §4.9 documents, and degenerates into
-   restatement on 25–33% of consecutive turns. A single-agent prompt that does
-   not re-emit the whole answer every turn would very likely close most of the
-   gap. Until that exists, "the team beats one agent at matched budget" cannot
-   be separated from "the team beats one agent handed a protocol built for four".
-3. **Raise the answer-turn budget and re-measure the gate.** Everything in
-   §4.9–4.11 says the cap is the dominant artifact at every operating point.
-   The fix is not a larger `max_tokens` everywhere — that changes the whole
-   instrument — but a final turn allowed to emit the answer without competing
-   with reasoning for the same budget. Then the sensitivity analysis becomes
-   unnecessary rather than load-bearing.
+~~1. Finish C4 at `xhard`.~~ ~~2. Build an honest long-form single-agent
+baseline.~~ ~~3. Raise the answer-turn budget and re-measure the gate.~~
+**All three done, 2026-08-13** (§4.14–4.15), and item 3 changed the headline:
+the answer budget removes the truncation rather than controlling for it, and on
+that instrument `hard` goes from +0.249 at *d* = 1.09 to **−0.026 at *p* =
+0.500**. The sensitivity analysis is no longer load-bearing — at `medium` there
+is nothing left for it to drop. Item 2 produced `solo_long` (C5), which changed
+the reading of §4.12 in opposite directions at the two tiers analysed so far.
+
+**What is actually open, in the order it is worth doing.**
+
+1. **Decide what the two-tier disagreement about the brief means.** At `hard`,
+   one agent under `SOLO_BRIEF` matches the team on the same budget (+0.016,
+   *p* = 0.719) while the same agent under `TEAM_BRIEF` trails (+0.102,
+   *p* = 0.038); at `medium` the brief buys nothing (+0.019, *p* = 0.762) and
+   the team leads both. The direct contrast is *p* = 0.094 at *n* = 24, so the
+   honest options are more episodes at these two tiers or dropping the claim.
+   Extending *n* is cheap now that the instrument is fixed and every run
+   resumes — this is the highest value per GPU-hour left in Phase 1.
+2. **A single-agent baseline needs a single-agent brief, and that is now a
+   design rule rather than a finding.** Whatever the effect size turns out to
+   be, `TEAM_BRIEF` at *n* = 1 tells one agent it has co-workers and that the
+   group's last message is scored. Every future matched-budget comparison uses
+   `SOLO_BRIEF`, and `solo_budget` is kept only as the arm that shows what the
+   defect cost.
+3. **`working_notes` is built and unmeasured.** The protocol half of the
+   regurgitation fix — an agent's own `<notes>` block carried across its turns —
+   is implemented, symmetric across conditions, and deliberately off in the
+   answer-budget run, because changing the protocol and the answer budget in one
+   run is §4.1c's mistake. It needs a run where it is the only thing that
+   changes. Note that C5 already removed most of the restatement through wording
+   alone, so the remaining headroom may be small.
 4. ~~**Behavioural coding with the local 8B**; κ against the frontier
    subsample.~~ **Blocked by §4.13.** The served judge agrees with a human at
    κ = 0.07, so coding on this instrument is uninterpretable. Two things have to
@@ -2150,14 +2191,20 @@ move, which is what makes the later note on §4.1e permanent rather than fixable
    §4.12 says so.
 
 **The honest summary of what Phase 1 cost and bought.** It bought a negative
-result that has now survived two instruments, five operating points and six
-distinct corrections; a difficulty curve measured end to end; one genuinely
-surprising positive (§4.12); and an instrument that has caught six silent
-corruption modes, the last of which would have published a *d* = 1.09 at
-*p* < 0.0001 as the project's headline. It cost the ablation grid, which was
-the headline deliverable. The grid is not abandoned — it is blocked on finding
-an operating point where the team contributes something to ablate, and §4.12 is
-the first evidence that such a point might exist.
+result that has now survived three instruments, five operating points and seven
+distinct corrections; a difficulty curve measured end to end; and an instrument
+that has caught seven silent corruption modes, the largest of which would have
+published a *d* = 1.09 at *p* < 0.0001 as the project's headline. That last one
+is no longer a near miss to be described carefully — the artifact was removed at
+the source and the number it produced is now measured at −0.026, *p* = 0.500.
+
+It cost the ablation grid, which was the headline deliverable. The grid stays
+blocked, and the case for it is weaker than it was on 2026-08-12: §4.12 was the
+first evidence that an operating point might exist where the team contributes
+something to ablate, and §4.15 shows that at `hard` most of that evidence was
+the single-agent baseline's brief rather than the team's contribution. What
+remains is `medium`, where the team leads a properly-briefed single agent by
++0.142 at *p* = 0.002 on matched budget. One tier is not an operating point.
 
 ---
 
