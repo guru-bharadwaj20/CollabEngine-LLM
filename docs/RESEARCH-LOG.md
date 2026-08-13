@@ -2085,10 +2085,18 @@ null.** The gate does not pass at either sample size. The team beats a
 `strict` as well (+0.074, *p* = 0.036) rather than `fraction` alone.
 
 **The brief still explains nothing at `medium`.** +0.041 at *p* = 0.377, having
-moved from +0.019 with twice the data. Compare `hard` and `xhard`, where the
-same contrast was +0.085 and +0.070. Doubling n did not turn `medium`'s null
-into the effect the other two tiers show, which makes the two-tier disagreement
-of §4.16 more likely to be real than to be noise at n = 24.
+moved from +0.019 with twice the data.
+
+> **Withdrawn ninety minutes later.** This section originally continued: *"Compare
+> `hard` and `xhard`, where the same contrast was +0.085 and +0.070. Doubling n
+> did not turn `medium`'s null into the effect the other two tiers show, which
+> makes the two-tier disagreement of §4.16 more likely to be real than to be
+> noise at n = 24."* `hard` at n = 48 landed at 21:01 and says the opposite: the
+> contrast there fell from +0.085 to **+0.036**. The disagreement was n = 24
+> noise, and I called it real from one tier's doubling while the other tier's
+> was still running. §4.16c has the resolved picture. This is the same error as
+> §4.12b — a claim about replication made before the replication finished — and
+> it is the second time, which is what makes it worth leaving in place.
 
 **So `medium` is the one operating point where the team genuinely contributes
 something.** Against the best single-agent baseline this project can build, on
@@ -2101,6 +2109,68 @@ because no operating point showed the team contributing anything to ablate.
 `medium` at n = 48 is a candidate. One agent's share of a +0.126 gap is roughly
 0.03, which is probably still under what n = 48 can resolve — but the grid is no
 longer blocked on principle, only on power.*
+
+---
+
+### 4.16c `hard` at n = 48, and the resolved picture
+
+The tier the extension was built for. At n = 24 the brief contrast here was
++0.085 at *p* = 0.094 — the largest of the three and the reason for doubling.
+
+| `hard` | n = 24 | **n = 48** |
+|---|---|---|
+| headline gate | −0.026, *p* = 0.500 | **−0.018, *p* = 0.578** |
+| C4 `TEAM_BRIEF` | +0.102, *p* = 0.038 | +0.083, *p* = 0.027 |
+| C5 `SOLO_BRIEF` | +0.016, *p* = 0.719 | +0.046, *p* = 0.214 |
+| the brief alone | +0.085, *p* = 0.094 | **+0.036, *p* = 0.368** |
+
+**The brief effect halved.** It did not firm up with more data; it regressed
+toward the value `medium` was already showing. That settles §4.16's open
+question in the direction of "no disagreement": at n = 48 both tiers put the
+brief at about +0.04 with *p* ≈ 0.37.
+
+#### The whole thing, in one table
+
+| | gate | C4 vs team | **C5 vs team** | brief alone |
+|---|---|---|---|---|
+| `medium` (n=48) | +0.045 (0.246) | +0.168 (**<0.001**) | **+0.126 (<0.001)** | +0.041 (0.377) |
+| `hard` (n=48) | −0.018 (0.578) | +0.083 (**0.027**) | +0.046 (0.214) | +0.036 (0.368) |
+| `xhard` (n=24) | +0.069 (0.263) | +0.150 (**0.022**) | +0.080 (0.161) | +0.070 (0.319) |
+
+Three statements survive all of it:
+
+1. **The Phase 1 gate fails at every operating point.** Three tiers, none
+   significant, one negative. The two passes it once had were the token cap.
+2. **The single-agent brief costs about 0.04, consistently and everywhere**, and
+   *n* = 48 cannot distinguish that from zero at any single tier. It is the same
+   sign and roughly the same size three times, which is worth more than any one
+   of the three *p* values. It is not the whole of the C4 gap, and it is not
+   nothing.
+3. **The team beats the best single-agent baseline this project can build at
+   exactly one operating point out of three** — `medium`, +0.126 at *p* < 0.001,
+   on `strict` as well as `fraction`. At `hard` and `xhard` the same comparison
+   is +0.046 and +0.080, neither significant.
+
+**What that means for the project's headline.** "Four agents do not beat one" is
+too strong; the honest claim is *"four agents beat one at one of three operating
+points, on a matched budget, once the instrument and the baseline's brief are
+both fixed — and the preregistered gate, which compares unmatched budgets, fails
+at all three."* The interesting question is no longer whether collaboration pays
+but why it pays at `medium` and not on either side of it, and the arm means say
+where to look:
+
+| | `medium` | `hard` | `xhard` |
+|---|---|---|---|
+| team | **0.631** | 0.536 | 0.575 |
+| C5, one agent, same budget | 0.504 | 0.489 | 0.495 |
+
+**C5 is flat.** A properly-briefed single agent scores about 0.49–0.50 at every
+instance size in this range. The team is what moves — 0.631 at `medium`, then
+down to 0.536 and 0.575 — so the `medium` advantage comes from the team doing
+unusually *well* there, not from the lone agent doing unusually badly. Whatever
+four agents buy, they buy it at one point and then stop buying it, while the
+task keeps getting harder for both. That is a different question from the one
+Phase 1 was built to ask, and a better one.
 
 ---
 
