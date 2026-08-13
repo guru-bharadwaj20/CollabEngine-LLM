@@ -201,13 +201,44 @@ Avoid SWE-bench-style tasks at this model scale; the failure floor swamps the ef
 > separate them. It is exploratory, not preregistered, and it is the one place
 > so far where something survives the control — RESEARCH-LOG §4.12.
 
-**Stop condition, restated after the served run.** The gate is *team beats one
-agent*, and it is still not cleared. Two clauses now qualify how it must be read:
+> **Re-measured, 2026-08-13 — the artifact removed rather than controlled for.**
+> The entry above reached its conclusion by dropping episodes whose answer turn
+> was truncated, which is a post-treatment filter and brackets rather than
+> settles. The instrument was then rebuilt so the truncation does not occur:
+> `answer_max_tokens = 3072` on the answer-bearing turn alone, `max_model_len`
+> cut to 15,360 so the slot geometry is unchanged. Same seeds, same model, four
+> arms, 24 episodes each.
+>
+> | tier | as scored before | answer budget | solo `cut@end` |
+> |---|---|---|---|
+> | `medium` | +0.067 | +0.059, *p* = 0.269 | 7 → **0** |
+> | `hard` | **+0.249, *d* = 1.09, *p* < 0.001** | **−0.026, *p* = 0.500** | 10 → **1** |
+>
+> **`hard` was the project's only significant Phase 1 result and it does not
+> survive.** The team's mean barely moved (0.591 → 0.555); solo's rose +0.239,
+> the whole of the original gap. RESEARCH-LOG §4.14–4.15.
+>
+> Two things this vindicates. The complete-case bracket was *right* — it said
+> +0.024 at *p* = 0.641 for `hard` where the headline said *p* < 0.001, and the
+> purpose-built instrument says −0.026. And the confound named above is now
+> measured with a purpose-built baseline rather than a borrowed one: `solo_long`
+> (C5) gives one agent the team's budget under a brief written for one agent.
+
+**Stop condition, restated after the answer-budget run.** The gate is *team beats
+one agent*, and it is still not cleared — now on an instrument where nothing has
+to be dropped to say so. Three clauses qualify how it must be read:
 
 1. **Read the answer-turn truncation column beside any gate verdict.** A gate
    evaluated without it passed at two of three operating points on an artifact.
 2. **A matched-budget arm is part of the comparison, not an extra.** Without it,
    "four agents beat one" and "more tokens beat fewer" are the same measurement.
+3. **A single-agent baseline needs a single-agent brief.** At `hard`, one agent
+   under `SOLO_BRIEF` is indistinguishable from the team on the same budget
+   (+0.016, *p* = 0.719) while the same agent under `TEAM_BRIEF` trails
+   significantly (+0.102, *p* = 0.038). At `medium` the brief changes nothing
+   (+0.019, *p* = 0.762). The tiers disagree and the direct contrast is
+   underpowered at *n* = 24, so this clause is a warning about how to build the
+   baseline, not a result about teams.
 
 ### Phase 2 — Emergence measurement (local GPU, ~1 week)
 - Local 24 GB + 7–8B (Qwen3-8B or Llama-3.1-8B-Instruct). Batch aggressively — this is the difference between hours and days, whether the batching happens in vLLM or in `hf_local`.
