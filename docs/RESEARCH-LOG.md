@@ -2189,6 +2189,18 @@ difference between them is a result.
 episode, so a `length` finish reason means nothing without the number it ran
 into. Every agent turn now stores `max_tokens` and `answer_turn` in its meta.
 
+**One within-corpus instrument variation, recorded because it is one.** The
+`medium` extension to n = 48 ran for about twenty minutes on 2026-08-13 at
+`--parallel 2` and `max_concurrency: 2` rather than 7, because another account's
+job held 11.5 GiB of the card and our 7-slot geometry needs 21.4. Roughly 18
+`medium` episodes were generated under it before the card came free and the run
+was restarted at 7. Concurrency changes neither the prompt, the sampling
+parameters nor the seed, so it cannot bias an arm — arms interleave, so any
+effect lands on both. It is not nothing, though: §4.17 measured that llama.cpp
+is not bit-deterministic across differing batch composition, which is exactly
+what concurrency changes. The right description is that a handful of episodes
+carry a slightly different numerical realisation, not a different treatment.
+
 **Why 7 slots and not 8.** 7 × 18,432 fits in 21.4 GiB and leaves ~2.8 GiB free
 on a 24 GiB card. 8 leaves ~0.8 GiB, and Windows WDDM answers that by paging the
 working set over PCIe while `nvidia-smi` still reads 100% utilisation — the
