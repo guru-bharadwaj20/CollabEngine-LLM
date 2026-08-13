@@ -2457,6 +2457,100 @@ pilot-derived effect sizes instead of guesses.
 
 ---
 
+### 4.20 The frozen_replay pass and the controls: no compensation, and a control that does not control
+
+Run overnight by `scripts/overnight-watch.sh`, which took the card at 00:04
+after three consecutive checks showed it free, and handed it back at 01:26.
+`frozen_replay` 192 episodes in 64 min at 3.0/min; `capacity` 48 and
+`random_message` 192 in 17 min. **0 failed, 0 skipped, across all 432.**
+
+| mode | n | mean drop | per-agent |
+|---|---|---|---|
+| `live` | 192 | **+0.055** | A1 +0.049, A2 +0.037, A3 +0.064, A4 +0.071 |
+| `frozen_replay` | 192 | **+0.051** | A1 +0.030, A2 +0.078, A3 +0.078, A4 +0.017 |
+| `capacity` | 48 | +0.019 | — |
+| `random_message` | 192 | +0.012 | A1 +0.025, A2 −0.001, A3 +0.010, A4 +0.013 |
+
+#### Fungibility is zero, which is not the expected shape
+
+**Δ(frozen_replay) − Δ(live) = −0.005.** Blocking compensation does not increase
+the damage. PLAN §C1 built the whole three-mode design around the expectation
+that it would: survivors reorganize, live drops are cushioned, and the gap
+measures redundancy. There is no gap.
+
+Combined with the flat interaction (§4.19), the picture is a team that is
+**additive and non-substitutable at the same time**: each agent contributes a
+roughly equal increment, nobody's increment is specialised, and nobody picks up
+a missing agent's share. That is a volume machine, not an organisation. It is
+also, note, a *coherent* result rather than a null on both axes — the two
+findings constrain each other.
+
+#### The capacity control does not control what it is read as controlling
+
+`live_ablation` keeps `n_agents=4` and passes `exclude=(agent_id,)`.
+`capacity_control` builds a genuine `n_agents=3` team. **For A4 these leave the
+identical roster** — A1, A2, A3 — on the same 48 seeds and the same instrument,
+so anything between them is not A4's contribution:
+
+| arm | roster | turns | chars | `fraction` |
+|---|---|---|---|---|
+| baseline | A1 A2 A3 A4 | 12.0 | 13,873 | 0.631 |
+| `live:A4` | A1 A2 A3 | 9.0 | 12,443 | **0.560** |
+| `capacity:3` | A1 A2 A3 | 9.0 | 10,087 | **0.612** |
+
+| | |
+|---|---|
+| drop attributed to removing A4 | +0.071 |
+| drop from one fewer worker | +0.019 |
+| **unexplained by either** | **+0.052 — 74% of the attributed drop** |
+
+**And it is not significant: perm *p* = 0.123, 95% CI [−0.014, +0.119] at n=48.**
+So this is a *design* finding, not a result. The direction and the magnitude both
+say the live-ablation number may be substantially a property of the measurement —
+three agents running in a setup built for four, generating 23% more text than the
+same three running as a three — and n=48 cannot say whether it is.
+
+**Two things follow, and the second is a defect.**
+
+1. Every live drop in §4.19 and above should be read as *"the cost of removing
+   this agent from a four-agent configuration"*, not *"this agent's
+   contribution"*. Those are the same number only if the configuration is
+   neutral, and the check that would establish that is underpowered.
+2. **`capacity_control` only ever produces the roster that matches `live:A4`.**
+   It drops `n_agents` by one, which always removes the last agent, so `live:A1`,
+   `live:A2` and `live:A3` have no matched capacity arm at all. The control
+   exists for one of the four cells it is quoted against. PREREG-phase3
+   Amendment 1 fixes this.
+
+#### The answer that gets scored is not the best one available
+
+Incidental, complete-sample, and it bears on §4.18. `extract_solution` takes the
+last parseable proposal. Scoring every proposal in each of the 48 baseline
+transcripts instead:
+
+| | |
+|---|---|
+| scored (last proposal) | 0.631 |
+| best available in the transcript | **0.657** |
+| left on the table | +0.027 |
+| episodes where the last is not the best | 9/48 (19%) |
+| mean position of the best proposal (0=first, 1=last) | **0.12** |
+
+The best answer a team produces tends to appear near the *start*. Later rounds
+do not, on average, improve what gets scored. That is the same shape §4.18 found
+for a single agent given more turns, now visible inside the team, and it is a
+candidate mechanism for why `medium` is the only tier where four agents help.
+
+> **A partial read, recorded because it nearly went in the log.** At 32 of 192
+> `random_message` records I measured its drop at **−0.116** — the control
+> apparently *improving* the score by more than any proposal-selection rule
+> could — and started diagnosing an extraction artifact. Complete, it is
+> **+0.012**. Nothing was wrong except that the run had not finished. This is
+> the third time in this project (§4.12b, §4.16b) and the first where the fix
+> was simply to wait twenty minutes.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of

@@ -134,6 +134,41 @@ What it still owes is the other half of the convergent-validity comparison —
 transcript-derived role labels — and §4.17 has that blocked at κ = 0.29. **This
 run does not unblock Phase 4 and does not claim to.**
 
+## Amendment 1 — 2026-08-14 01:4x, before any confirmatory episode exists
+
+**`capacity` becomes four arms, one per excluded agent, not one arm.**
+
+`capacity_control` lowers `n_agents` by one, which always removes the *last*
+agent, so it only ever produces the roster A1–A3. That roster matches `live:A4`
+and nothing else: H3 as originally written quotes a single capacity number
+against all four live cells, and for three of them there is no matched control
+at all (§4.20).
+
+The overnight controls also showed why this matters rather than being tidiness.
+`live:A4` and `capacity:3` leave the *identical* roster on the identical seeds
+and differ by **+0.052 — 74% of the drop attributed to removing A4** — at
+*p* = 0.123, which is the wrong side of both significance and negligible. If
+that gap is real, live-ablation drops measure the configuration as much as the
+agent, and H2/H3 as written cannot tell the two apart.
+
+**What changes.** `capacity:without-Ai` for each of the four agents, 150 episodes
+each. That is 600 additional episodes, ~5 GPU h at the measured rate, taking the
+grid from 1,500 to 2,100 episodes and ~12 to ~17 GPU h.
+
+**H3 is restated** as: for each agent *i*, `live:Ai` drop > `capacity:without-Ai`
+drop, tested per agent and pooled. The pooled test is primary; the per-agent
+tests are secondary and will be underpowered by construction.
+
+**H3b is added (procedural neutrality, primary for interpretation).** With the
+same roster and seeds, `capacity:without-Ai` = `live:Ai`. This is the assumption
+every ablation number in this project already rests on and it has never been
+tested at adequate n. If it fails, the correct headline is that **the ablation
+instrument is not neutral**, and every drop reported here needs restating
+against the capacity arm rather than against the four-agent baseline.
+
+Nothing else changes. No hypothesis direction is edited, and this amendment is
+written from a control result, not from any test of H1–H5.
+
 ## What would make me amend this
 
 Stated in advance, since amendments after a glimpse are how a preregistration is
