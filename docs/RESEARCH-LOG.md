@@ -1927,6 +1927,16 @@ instrument and either will replicate this or will not. The claim on the table is
 *"at `medium`, the brief explains none of the matched-budget gap"* and nothing
 wider.
 
+> **Corrected at n = 48 (2026-08-13 evening).** The paragraph above says
+> `cut@end` is 0 in both arms and the sensitivity analysis has nothing to
+> condition on. That was true of these 24 episodes and is not true of the tier:
+> seeds 24–47 turned up **three** solo episodes whose answer turn hit even the
+> 3072-token cap, so at n = 48 the count is 3 solo / 0 team and the filter is
+> live again. The claim that survives is weaker and still worth having — answer
+> truncation in the solo arm falls from 7 of 24 to 3 of 48, about five-fold —
+> but "the artifact is gone at `medium`" was a statement about a sample I had
+> not finished collecting. See §4.16b for the n = 48 numbers.
+
 *One asymmetry the budget fix does not touch: `extract_solution` takes the last
 parseable proposal by any agent, so a four-agent episode gets four chances per
 round to leave a well-formed answer in the transcript and a solo episode gets
@@ -2054,6 +2064,43 @@ briefed* single agent on matched budget is significant at `medium` only
 (+0.142, *p* = 0.002). Everything else that looked like a multi-agent effect
 has now been attributed to something else: the token cap at the headline gate,
 and the single-agent brief at matched budget.
+
+---
+
+### 4.16b `medium` at n = 48: the gate holds, the brief does not explain the gap
+
+The n = 24 result rested on a *p* = 0.094 brief contrast, so the tier was
+doubled. 192 episodes, four arms, 48 each, same instrument.
+
+| | n = 24 | **n = 48** |
+|---|---|---|
+| headline gate | +0.059, *p* = 0.269 | **+0.045, *p* = 0.246** |
+| C4 `TEAM_BRIEF` | +0.161, *p* = 0.009 | **+0.168, *p* < 0.001** |
+| C5 `SOLO_BRIEF` | +0.142, *p* = 0.002 | **+0.126, *p* < 0.001** |
+| the brief alone | +0.019, *p* = 0.762 | +0.041, *p* = 0.377 |
+
+**Everything that was significant is more so, and everything that was null stays
+null.** The gate does not pass at either sample size. The team beats a
+*properly briefed* single agent on matched budget at *p* < 0.001, and now on
+`strict` as well (+0.074, *p* = 0.036) rather than `fraction` alone.
+
+**The brief still explains nothing at `medium`.** +0.041 at *p* = 0.377, having
+moved from +0.019 with twice the data. Compare `hard` and `xhard`, where the
+same contrast was +0.085 and +0.070. Doubling n did not turn `medium`'s null
+into the effect the other two tiers show, which makes the two-tier disagreement
+of §4.16 more likely to be real than to be noise at n = 24.
+
+**So `medium` is the one operating point where the team genuinely contributes
+something.** Against the best single-agent baseline this project can build, on
+identical generation budget, four agents score 0.631 against 0.504 — and that
+gap is not the token cap, not the brief, and not the turn budget, because all
+three are now controlled. It is also the only such point out of three.
+
+*What this changes about the ablation grid: PLAN's stop condition blocked Phase 3
+because no operating point showed the team contributing anything to ablate.
+`medium` at n = 48 is a candidate. One agent's share of a +0.126 gap is roughly
+0.03, which is probably still under what n = 48 can resolve — but the grid is no
+longer blocked on principle, only on power.*
 
 ---
 
@@ -2520,7 +2567,7 @@ because every test went through that subclass (§3.3).
 | `configs/llamacpp-medium.yaml` | `medium` on the served Q4 instrument (§3.11). Measured; fails the gate, and its apparent gap reverses under the answer-turn control (§4.9) |
 | `configs/llamacpp-hard.yaml` | `hard`, same. Regenerated because H1 is a trend and H4 a comparison, and neither survives a change of instrument at one point only. Measured; *passes* the gate at *d* = 1.09 and the pass is the token cap (§4.10) |
 | `configs/llamacpp-xhard.yaml` | `xhard`, same — the tier bf16 could not reach, which it reached in 69.6 minutes. Measured; passes at *p* = 0.020, controlled gap −0.056 (§4.11) |
-| `configs/llamacpp-medium-ans.yaml` | `medium` on the answer-budget instrument — `answer_max_tokens` 3072, `max_model_len` 15,360 so the slot stays 18,432, `max_concurrency` 7. Measured; gate not significant and `cut@end` is 0 in both arms (§4.14) |
+| `configs/llamacpp-medium-ans.yaml` | `medium` on the answer-budget instrument — `answer_max_tokens` 3072, `max_model_len` 15,360 so the slot stays 18,432, `max_concurrency` 7. Measured at n=24 and n=48; gate not significant at either (§4.14, §4.16b) |
 | `configs/llamacpp-hard-ans.yaml` | `hard`, same. **The tier that decides §4.10.** Measured; the *d* = 1.09 pass becomes −0.026 at *p* = 0.500 (§4.15) |
 | `configs/llamacpp-xhard-ans.yaml` | `xhard`, same |
 | `configs/vllm-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |
