@@ -91,6 +91,30 @@ def scores(
     return out
 
 
+def generation(path: Path, condition: str) -> tuple[float, float] | None:
+    """(agent turns, characters generated) per episode, averaged over usable ones.
+
+    Exists because this report asserted for three sections that the matched-budget
+    arms "spend the same generation", which is false and was never measured. They
+    are matched on turn count and on the per-turn cap. They are not matched on
+    what gets written: one agent restates the whole working solution every round,
+    four agents each add to a shared transcript, so the single agent emits ~1.7x
+    the team's text on the same nominal budget (RESEARCH-LOG 4.18).
+
+    Characters, not tokens, and deliberately: it is reported as a ratio between
+    two arms of one instrument, and tokenising the corpus to confirm a 1.7x would
+    not change how the gap reads.
+    """
+    turns, chars = [], []
+    for rec in TranscriptReader(str(path)):
+        if rec.condition != condition or is_instrument_failure(rec):
+            continue
+        body = [m for m in rec.messages if m.is_ablatable()]
+        turns.append(len(body))
+        chars.append(sum(len(m.content) for m in body))
+    return (st.mean(turns), st.mean(chars)) if turns else None
+
+
 def perm_p(a: list[float], b: list[float], rng: random.Random) -> float:
     """Two-sided permutation test on the difference in means."""
     obs = abs(st.mean(b) - st.mean(a))
@@ -230,8 +254,15 @@ def _matched_budget(
         p = perm_p(a, b, rng)
         print(f"     {metric:<11}{st.mean(a):>9.3f}{st.mean(b):>8.3f}{gap:>+9.3f}"
               f"{p:>9.3f}{gap - headline[metric][2]:>+13.3f}")
-    print("     Both arms spend the same generation here. What is left is the")
-    print("     multi-agent structure, which is the thing under test.")
+    gen_b, gen_t = generation(team_path, condition), generation(team_path, "baseline")
+    if gen_b and gen_t and gen_t[1]:
+        print(f"     Turns are matched: {gen_b[0]:.0f} agent turns against "
+              f"{gen_t[0]:.0f}. Generation is")
+        print(f"     not: {gen_b[1]:,.0f} chars against {gen_t[1]:,.0f}, a factor of "
+              f"{gen_b[1] / gen_t[1]:.2f}x. One agent")
+        print("     restates the working solution every round; four agents each add")
+        print("     to a shared transcript. So read this as team against one agent")
+        print("     at equal TURNS -- not at equal tokens, which it is not (4.18).")
 
     # C4 equalises the budget, which is not the same as removing the cap. Both
     # arms here run twelve turns, so if `solo_budget` still spends its last turn
