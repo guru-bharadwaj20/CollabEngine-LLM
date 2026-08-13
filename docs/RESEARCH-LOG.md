@@ -2151,6 +2151,16 @@ Three statements survive all of it:
    on `strict` as well as `fraction`. At `hard` and `xhard` the same comparison
    is +0.046 and +0.080, neither significant.
 
+> **Qualified the same evening — statement 3 says "best" and C5 is not.** The
+> contrast that would have caught this has no team arm in it, so nothing printed
+> it: the same agent under the same brief scores **0.585 over three rounds
+> against C5's 0.504 over twelve**, −0.063 on `strict` at *p* = 0.028. Budget
+> matching *degraded* the baseline it was built to make fair. The claim that
+> survives is "the team beats one agent spending the same turns"; against the
+> best single agent actually recorded it is +0.045 at *p* = 0.243, which is the
+> gate row and is null. §4.18 has the numbers and `gate_report` now prints the
+> contrast.
+
 **What that means for the project's headline.** "Four agents do not beat one" is
 too strong; the honest claim is *"four agents beat one at one of three operating
 points, on a matched budget, once the instrument and the baseline's brief are
