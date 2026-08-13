@@ -1833,6 +1833,45 @@ and the judge re-validated against a naive human rater. The sample, both label
 sets and the confusion matrix are committed at `docs/handcode-sample.json` so the
 next attempt starts from data rather than from this paragraph.
 
+### 4.13b Codebook v2 fixes the collision and does not fix the judge
+
+The codebook now tells the judge the transcript is an allocation puzzle, defines
+`organize` as coordination *between participants* with an example, and states the
+ambiguous case explicitly: dividing work among workers is `propose`, dividing work
+among participants is `organize`. Same 40 messages, same human labels, same
+`_code_one` path, re-coded.
+
+| | κ | 95% CI | raw agreement | judge's `organize` |
+|---|---|---|---|---|
+| v1 | 0.072 | [−0.03, 0.19] | 8/40 (20%) | **17/40** |
+| **v2** | **0.241** | **[0.05, 0.43]** | **19/40 (48%)** | **0/40** |
+
+**The diagnosis was right.** `organize` fell from 17 to 0, `propose` rose from 4
+to 16, κ more than tripled and the interval now excludes zero. The label was
+colliding with the task's content exactly as §4.13 argued, and naming the
+distinction removed it.
+
+**The judge is still not usable.** κ = 0.24 is "fair" on any conventional reading
+and nowhere near the 0.78 that Phase 4's convergent-validity claim would need.
+What remains is ordinary confusion among the three labels that carry the work:
+of the 22 messages I called `propose` the judge now agrees on 12 and splits the
+rest across `search` (4), `verify` (3) and `compute` (2); of my 12 `verify` it
+agrees on 5 and calls 3 `propose` and 3 `search`. Those are genuinely hard
+boundaries — a message that revises an assignment *because* it found a violation
+is both — and no wording change will fix them. Either the boundaries get
+operational definitions with worked examples, or the taxonomy collapses to the
+distinctions a judge can actually hold.
+
+**So Phase 2 stays blocked, for a different reason than yesterday.** It was a
+definitional defect; now it is judge capability at 8B. The honest options are a
+stronger judge, a coarser taxonomy, or reporting Phase 2's differentiation result
+with κ = 0.24 attached and letting the reader discount it accordingly — which on
+this evidence means discounting it to nothing.
+
+*Both label sets are kept: `docs/handcode-sample.v1.json` is the v1 coding and
+`docs/handcode-sample.json` the v2. The human column is identical in both, which
+is what makes the comparison a measurement of the codebook rather than of me.*
+
 ---
 
 ## 5. Instrument validity work
