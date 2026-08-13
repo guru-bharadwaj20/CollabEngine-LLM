@@ -2354,6 +2354,109 @@ the 174-hour run would have measured its own noise floor.
 
 ---
 
+### 4.19 The live-ablation pilot: participation is real, specialization is not
+
+192 episodes, `medium`, `live` only, against the 48 recorded team episodes.
+0 failed, 0 skipped, 91.6 minutes at 2.1 episodes/min. Every number below is
+paired on instance seed through the same integrity filter and scoring module
+`gate_report` uses.
+
+| ablated | n | drop | 95% CI | 3-agent mean |
+|---|---|---|---|---|
+| A1 | 48 | +0.049 | [−0.019, +0.117] | 0.582 |
+| A2 | 48 | +0.037 | [−0.017, +0.092] | 0.593 |
+| A3 | 48 | +0.064 | [−0.001, +0.129] | 0.567 |
+| A4 | 48 | +0.071 | [+0.004, +0.138] | 0.560 |
+| **pooled** | **192** | **+0.055** | **[+0.023, +0.087]** | — |
+
+**Removing one of four agents measurably costs the team.** +0.055 with an
+interval clear of zero. The stop condition that has blocked Phase 3 since §4.1b
+is now cleared on a measurement rather than on the principle §4.16b argued from.
+
+**And that is participation, which PLAN §0 says proves nothing.** The claim needs
+the agent × component interaction. It is not there:
+
+| | arithmetic | search | synthesis | verification |
+|---|---|---|---|---|
+| A1 | +0.013 | −0.001 | +0.006 | −0.018 |
+| A2 | −0.006 | −0.017 | −0.003 | +0.026 |
+| A3 | +0.002 | +0.006 | +0.019 | −0.027 |
+| A4 | −0.009 | +0.012 | −0.023 | +0.019 |
+
+Mixed-effects joint Wald: **chi2 = 3.73, *p* = 0.928** over 768 observations from
+48 episodes.
+
+#### The way it failed is the part worth keeping
+
+The pilot was checked at three points, and the effect walked *away* from
+significance as n grew:
+
+| checked at | episodes/agent | pooled drop | agent spread | largest residual | interaction *p* |
+|---|---|---|---|---|---|
+| 75 done | ~19 | +0.063 | 0.095 | — | 0.591 |
+| 148 done | ~37 | +0.050 | 0.050 | 0.052 | 0.820 |
+| **192 done** | **48** | **+0.055** | **0.034** | **0.027** | **0.928** |
+
+The pooled drop held steady. Everything that would constitute specialization —
+the spread between agents, the largest interaction residual — **halved as the
+sample doubled**, which is the signature of noise being averaged out, not of a
+real effect being resolved.
+
+**The residuals are smaller than chance would produce.** Per-component drop sd is
+0.311, so a cell mean at n = 48 carries se ≈ 0.045, and a double-centred residual
+≈ 0.034. The largest of nine effectively-independent residuals under a true null
+would be expected around 0.06. The observed maximum is **0.027**. There is less
+agent × component structure in this matrix than random noise typically generates.
+
+> **A crossover I nearly reported at the 148-episode check.** A3 sat at −0.052 on
+> `verification` against +0.032 on `synthesis`, with A4 the mirror image — the
+> exact shape PLAN §0 names as the causal signature of specialization. At 192 it
+> is −0.027 against +0.019. It was the largest of sixteen cells at a sample size
+> where the largest of sixteen cells is about that big by construction. Recorded
+> because the temptation to stop the run there and write it up was real, and the
+> only thing that prevented it was having said in advance what the sample size
+> would be.
+
+#### What this costs to confirm, and the correction to §4.18
+
+§4.18 priced the interaction at ~174 GPU h on a guessed effect of 0.015, nine
+arms, and 0.85 min/episode. Two of those three were wrong: the card does 2.1
+episodes/min on this workload, and `live`-only is four arms. Sized on what the
+pilot actually measured:
+
+| to detect | n/agent | live episodes | GPU h |
+|---|---|---|---|
+| the agent-to-agent spread (0.034) | 699 | 2,797 | 23 |
+| the largest interaction residual (0.027) | 2,084 | 8,335 | 69 |
+
+**Both figures are optimistic and should not be used to justify the run.** They
+size on the maximum of a set of estimates that the checkpoint table shows
+shrinking toward zero. If the true interaction is zero — which is what three
+successive checks and a sub-chance residual matrix indicate — no n resolves it.
+
+#### Where this leaves the project
+
+Phase 3 is worth running for the **main effect plus its two controls**: capacity
+(a 3-agent team that never had A_i) and random-message (volume-matched
+excision). Those separate "this agent mattered" from "one fewer worker" and from
+"less text in context", cost roughly 20–25 GPU h at the measured rate, and give
+a result in either direction. The interaction should be reported as a **bounded
+null** — with n = 48 we exclude an agent × component interaction larger than
+about 0.06 — rather than pursued.
+
+**That is not a failed project, and PLAN §7 said so before the data arrived.**
+The convergent-validity claim is that transcript-derived role labels predict
+causal contribution only weakly; a flat ablation matrix under transcripts that
+read as differentiated is the strongest form of it. What Phase 2 still owes is
+the other half of the comparison, and §4.17 has that blocked at κ = 0.29.
+
+**These 48 episodes are now hypothesis-generating and cannot be pooled into a
+test of the hypotheses they generated.** Any confirmatory run takes fresh seeds,
+and PLAN §5's preregistration should be written before it — now possible with
+pilot-derived effect sizes instead of guesses.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
