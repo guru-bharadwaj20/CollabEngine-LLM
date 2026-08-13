@@ -2264,6 +2264,34 @@ remains is `medium`, where the team leads a properly-briefed single agent by
     corpora were removed when the instrument changed. Their published gaps are
     now permanently upper bounds of unknown size (§4.1e).
 
+14. **Where you can rebuild the instrument, rebuild it; a filter brackets, an
+    instrument settles.** Dropping truncated episodes is post-treatment
+    conditioning: it answers "what happens among episodes that were not cut",
+    which is not the question, and it cost 60% of the solo arm at `xhard`.
+    Giving the answer turn its own budget answers the question directly on all
+    24 episodes. The filter and the instrument agreed at `hard` — +0.024 versus
+    −0.026, both null — but that agreement is only visible in hindsight, and
+    the reason to trust it now is the instrument, not the filter (§4.15).
+
+15. **A baseline needs a brief written for the baseline.** The single-agent arm
+    ran for months under a prompt reading "you are one of 1 participants" and
+    "whatever the group last submits is what gets scored", because it was the
+    team's prompt with `n` substituted. Written for one agent instead, the same
+    model on the same budget went from trailing the team by +0.102 (*p* = 0.038)
+    to matching it (+0.016, *p* = 0.719) at `hard`. A control condition
+    assembled by parameterising the treatment inherits the treatment's
+    assumptions, and does so in the direction that flatters the treatment
+    (§4.15).
+
+16. **Anything that can kill a process gets a dry-run mode, and you use it
+    before arming.** `guard.sh`'s process selector was written to match our
+    runner and, on first inspection via `--list-clients`, matched three of the
+    editor's own shells and the probe doing the matching — while missing the
+    actual runner, which is launched by a relative path that never names the
+    repo. It would have killed bystanders and left the target running. The bug
+    was free to find and would have been expensive to discover by observing its
+    effects, which is the whole argument for the mode.
+
 ---
 
 ## Appendix A — Commit ledger
