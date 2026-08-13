@@ -180,6 +180,7 @@ def report(label: str, team_path: Path, solo_path: Path, rng: random.Random) -> 
     for condition, tag, brief in _MATCHED_ARMS:
         _matched_budget(team_path, out, rng, condition, tag, brief)
     _brief_effect(team_path, rng)
+    _budget_within_agent(team_path, solo_path, rng)
     return out
 
 
@@ -209,6 +210,46 @@ def _brief_effect(team_path: Path, rng: random.Random) -> None:
         a, b = old[metric], new[metric]
         print(f"     {metric:<11}{st.mean(a):>9.3f}{st.mean(b):>8.3f}"
               f"{st.mean(b) - st.mean(a):>+9.3f}{perm_p(a, b, rng):>9.3f}")
+
+
+def _budget_within_agent(
+    team_path: Path, solo_path: Path, rng: random.Random
+) -> None:
+    """C5 minus solo: one agent, one brief, twelve turns against three.
+
+    Whether C5 is a fair baseline at all -- and it is the only contrast here
+    with no team arm in it, which is why it went unprinted for so long.
+
+    C5 is described everywhere in this project as the best single-agent
+    baseline it can build: correctly briefed, holding the team's whole turn
+    budget. That is true by construction and false by measurement. At `medium`
+    the same agent under the same brief scores 0.585 over three rounds and
+    0.504 over twelve -- so quadrupling its budget costs it 0.081 on `fraction`
+    and 0.063 on `strict` (p = 0.027). The arm the team is measured against was
+    made worse by the budget matching that was meant to make it fair.
+
+    Print it beside C5, never instead of it. Both readings are real and they do
+    not cancel: the team beats one agent spending the same turns, and the team
+    does not significantly beat the best single agent this project has
+    recorded, which is the three-round one (RESEARCH-LOG 4.18).
+    """
+    long, short = scores(team_path, "solo_long"), scores(solo_path, "solo")
+    if not (long.get("fraction") and short.get("fraction")):
+        return
+    n_l, n_s = len(long["fraction"]), len(short["fraction"])
+    print("\n  -- the budget alone, within one agent: C5 - solo")
+    print(f"     (solo n={n_s} at 3 rounds, solo_long n={n_l} at 12) --")
+    if min(n_l, n_s) < 5:
+        print("     too few usable episodes to read.")
+        return
+    print(f"     {'metric':<11}{'3 rnd':>9}{'12 rnd':>8}{'gap':>9}{'perm p':>9}")
+    for metric in METRICS:
+        a, b = short[metric], long[metric]
+        print(f"     {metric:<11}{st.mean(a):>9.3f}{st.mean(b):>8.3f}"
+              f"{st.mean(b) - st.mean(a):>+9.3f}{perm_p(a, b, rng):>9.3f}")
+    print("     A negative gap here means more turns make a single agent worse,")
+    print("     and that C5 understates what one agent can do. The gate row at")
+    print("     the top is the comparison against one agent's best showing.")
 
 
 #: The two matched-budget arms, both one agent spending the team's whole turn
