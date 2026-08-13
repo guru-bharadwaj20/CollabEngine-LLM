@@ -250,3 +250,33 @@ degenerates into restatement on 25–33% of consecutive turns.
 Nothing in §4.12 should be read at preregistered strength. If that comparison is
 worth making, it is worth preregistering and running again against a purpose-built
 long-form single-agent baseline.
+
+## Postscript 2 — 2026-08-13, the cap explanation tested directly
+
+The section above argued from a complete-case analysis that the cap, not
+collaboration, produced H1's support. That argument has now been tested on an
+instrument where the answer-bearing turn has its own 3072-token budget and the
+truncation it describes does not occur. Same seeds, same model, same slot
+geometry, all 24 episodes per arm rather than the subset that survived filtering.
+
+| tier | preregistered analysis | complete-case bracket | answer budget |
+|---|---|---|---|
+| `medium` | +0.067 | −0.023 | +0.059, *p* = 0.269 |
+| `hard` | **+0.249, *d* = 1.09, *p* < 0.001** | +0.024 | **−0.026, *p* = 0.500** |
+| `xhard` | +0.188, *p* = 0.020 | −0.056 | *running* |
+
+**H1's one unambiguous success does not survive.** At `hard` the gap is negative
+and non-significant; answer-turn truncation fell from 10 solo / 1 team to 1 / 1,
+and the solo arm's mean rose by +0.239 — the whole of the original gap — while
+the team's moved by −0.036. RESEARCH-LOG §4.15.
+
+Two things follow that this document should own. First, the falsification clause
+now engages on two of three tiers where it previously did not engage at all.
+Second, and more usefully for anyone reading this as a template: **the
+complete-case bracket reached the right answer from biased data.** It said +0.024
+at *p* = 0.641 for `hard` where the preregistered analysis said *p* < 0.001, and
+the purpose-built instrument says −0.026 at *p* = 0.500. A post-hoc filter is
+still post-hoc, and this one was right.
+
+*`xhard` is not yet analysed on this instrument. It is the third point, not a
+tiebreaker.*
