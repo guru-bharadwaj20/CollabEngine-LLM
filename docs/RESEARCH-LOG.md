@@ -1874,6 +1874,68 @@ is what makes the comparison a measurement of the codebook rather than of me.*
 
 ---
 
+### 4.14 Answer-budget instrument, `medium`: the artifact is gone and the brief was not the problem
+
+First tier on the instrument where the answer-bearing turn gets its own cap
+(`answer_max_tokens = 3072`, everything else at 1024, `max_model_len` cut to
+15,360 so the slot is unchanged). Four arms, 24 episodes each, one server, one
+sitting.
+
+**The artifact is gone.** `cut@end` is **0 for both gate arms** — solo and team
+alike — against 7 solo vs 0 team on the old `medium` corpus. The gate report now
+prints *"sensitivity: nothing to drop"*, which is the sentence worth having: the
+complete-case analysis that §4.9–4.11 leaned on has stopped being load-bearing
+here, because there is nothing for it to condition on.
+
+| comparison | 1 agent | team | gap | *p* |
+|---|---|---|---|---|
+| headline gate (3 turns vs 3 rounds) | 0.604 | 0.663 | +0.059 | 0.269 |
+| C4, matched budget, `TEAM_BRIEF` | 0.502 | 0.663 | **+0.161** | **0.009** |
+| C5, matched budget, `SOLO_BRIEF` | 0.521 | 0.663 | **+0.142** | **0.002** |
+| C4 → C5, the brief alone | 0.502 | 0.521 | +0.019 | 0.762 |
+
+**The headline gate is not significant at `medium`, and never was** (+0.067 on
+the old instrument, +0.059 here). So this tier cannot adjudicate §4.10's claim
+that the `hard` pass was manufactured by the cap. `hard` is the test, and it has
+not finished. Nothing here confirms or refutes 4.10.
+
+**The rewritten brief did not do what §4.12 predicted.** It was supposed to be
+the fix for a degraded baseline: no phantom co-workers, no instruction that the
+group's last message is the answer of record, explicit licence not to restate
+the assignment. On the transcripts it worked exactly as intended —
+
+| arm | truncated | `cut@end` | malformed | unusable |
+|---|---|---|---|---|
+| C4 `solo_budget` | 40% | 6 | 5 | 1 |
+| C5 `solo_long` | **22%** | **2** | **2** | **0** |
+
+— and on the score it did nothing: **+0.019, *p* = 0.762**. Cleaner transcripts,
+the same result.
+
+**That inverts what §4.12 concluded about its own margin.** §4.12 called the C4
+gap an upper bound, on the reasoning that the harness was degrading the lone
+agent through forced regurgitation and a real baseline would close some of it.
+At `medium` it does not: removing the regurgitation pressure removes the
+regurgitation and leaves the score where it was. The lone agent is worse at
+matched budget because it is worse at matched budget, not because the prompt was
+holding it down. That makes C4's margin roughly an estimate rather than a
+ceiling — at this tier.
+
+**At this tier.** §4.12b was withdrawn for generalising from two declining
+points, and this is one point. `hard` and `xhard` are running on the same
+instrument and either will replicate this or will not. The claim on the table is
+*"at `medium`, the brief explains none of the matched-budget gap"* and nothing
+wider.
+
+*One asymmetry the budget fix does not touch: `extract_solution` takes the last
+parseable proposal by any agent, so a four-agent episode gets four chances per
+round to leave a well-formed answer in the transcript and a solo episode gets
+one. `feasible` is 0.000 in every single-agent arm and 0.042 in the team arm,
+which is the shape that asymmetry would produce. It is not a truncation effect
+and the answer budget cannot remove it.*
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
