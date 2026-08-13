@@ -66,6 +66,25 @@ class TeamConfig:
     (RESEARCH-LOG 4.10). Raising `max_tokens` everywhere would change the whole
     instrument; raising it for the answer-bearing turn alone stops reasoning and
     answer competing for one budget, which is the actual defect."""
+    working_notes: bool = False
+    """Carry each agent's own `<notes>` block forward across its turns.
+
+    Deliberately not called `scratchpad`: `Agent.scratch` and
+    `SymmetryBreaking.NAME_SEED_SCRATCH` already mean the one-line disposition
+    that breaks symmetry between agents, which is a different mechanism with a
+    different purpose.
+
+    Off by default, and available to every condition when on -- a working area
+    given to one arm and not another would swap the handicap of RESEARCH-LOG
+    4.12 for its mirror image rather than remove it.
+
+    The problem it addresses: an agent has no way to keep state except to write
+    it again, so `solo_budget` re-emitted the whole 24-line schedule every turn
+    and 25-33% of its consecutive turns were >80% repeats of the previous one.
+    Each restatement is another chance to corrupt a constraint that was already
+    satisfied, which is why more turns made a lone agent worse. With this on, an
+    agent writes `<notes>...</notes>` once and sees it at the top of its own
+    next turn, so progress can accumulate instead of being retyped."""
     temperature: float = 0.8
     top_p: float = 0.95
     symmetry: SymmetryBreaking = SymmetryBreaking.NAME_SEED
@@ -84,6 +103,7 @@ class TeamConfig:
             "rounds": self.rounds,
             "max_tokens": self.max_tokens,
             "answer_max_tokens": self.answer_max_tokens,
+            "working_notes": self.working_notes,
             "temperature": self.temperature,
             "top_p": self.top_p,
             "symmetry": self.symmetry.value,
@@ -103,6 +123,7 @@ class TeamConfig:
                 if d.get("answer_max_tokens") is not None
                 else None
             ),
+            working_notes=bool(d.get("working_notes", False)),
             temperature=float(d.get("temperature", 0.8)),
             top_p=float(d.get("top_p", 0.95)),
             symmetry=SymmetryBreaking(d.get("symmetry", "name_seed")),

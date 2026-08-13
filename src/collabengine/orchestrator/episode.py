@@ -9,6 +9,7 @@ plays the same number of rounds with one fewer voice per round.
 from __future__ import annotations
 
 import random
+import re
 from collections.abc import Sequence
 
 from collabengine.backends.base import ChatMessage, GenRequest, LLMBackend
@@ -72,6 +73,7 @@ def build_system_prompt(
     *,
     solo_long: bool = False,
     rounds: int | None = None,
+    working_notes: bool = False,
 ) -> str:
     """The per-agent system prompt.
 
@@ -84,29 +86,67 @@ def build_system_prompt(
     is held.
     """
     if solo_long:
-        return "\n\n".join(
-            [
-                SOLO_BRIEF.format(rounds=rounds if rounds is not None else "several"),
-                render_instance(instance),
-                render_answer_format(),
-            ]
-        )
-    parts = [TEAM_BRIEF.format(n=n_agents, agent_id=agent.agent_id)]
-    if agent.scratch:
-        parts.append(agent.scratch)
+        parts = [SOLO_BRIEF.format(rounds=rounds if rounds is not None else "several")]
+    else:
+        parts = [TEAM_BRIEF.format(n=n_agents, agent_id=agent.agent_id)]
+        if agent.scratch:
+            parts.append(agent.scratch)
+    # Appended to whichever brief is in force. The mechanism is symmetric across
+    # conditions, so the sentence describing it has to be too -- describing it to
+    # one arm only would hand that arm a protocol the other cannot use.
+    if working_notes:
+        parts.append(NOTES_BRIEF)
     parts.append(render_instance(instance))
     parts.append(render_answer_format())
     return "\n\n".join(parts)
 
 
-def build_context(agent: Agent, history: Sequence[Message]) -> list[ChatMessage]:
+NOTES_RE = re.compile(r"<notes>(.*?)</notes>", re.DOTALL | re.IGNORECASE)
+
+NOTES_BRIEF = (
+    "You have a working area. Anything you put inside <notes>...</notes> is "
+    "carried forward and shown back to you at the start of every one of your "
+    "turns, so you do not have to repeat it to keep it. Use it for the "
+    "assignment you are building and what you have already checked. Only your "
+    "most recent <notes> block is kept."
+)
+
+
+def latest_notes(agent_id: str, history: Sequence[Message]) -> str:
+    """The most recent `<notes>` block this agent wrote, or ''.
+
+    Only the newest is kept. Accumulating them would reintroduce the problem the
+    mechanism exists to remove -- an agent re-reading every past state instead of
+    one current one -- and would grow the prompt exactly as fast as restating the
+    schedule did (RESEARCH-LOG 4.12).
+    """
+    for m in reversed(history):
+        if m.speaker is Speaker.AGENT and m.author == agent_id:
+            found = NOTES_RE.findall(m.content or "")
+            if found:
+                return found[-1].strip()
+    return ""
+
+
+def build_context(
+    agent: Agent, history: Sequence[Message], *, working_notes: bool = False
+) -> list[ChatMessage]:
     """Render shared history from one agent's point of view.
 
     Each agent sees its own prior turns as `assistant` and everyone else's as
     `user`. That asymmetry is what gives an agent a sense of its own continuity
     across turns -- the substrate a stable role would have to form on.
+
+    With `working_notes`, the agent's own latest `<notes>` block is surfaced
+    ahead of the transcript. The block stays in the transcript too, visible to
+    everyone: making notes private would change what agents know about each
+    other, which is a different experiment from the one this flag is for.
     """
     out: list[ChatMessage] = []
+    if working_notes:
+        notes = latest_notes(agent.agent_id, history)
+        if notes:
+            out.append(ChatMessage(role="user", content=f"Your working notes:\n{notes}"))
     for m in history:
         if m.speaker is Speaker.AGENT and m.author == agent.agent_id:
             out.append(ChatMessage(role="assistant", content=m.content))
@@ -207,9 +247,12 @@ async def run_episode(
                             len(roster),
                             solo_long=(condition == "solo_long"),
                             rounds=config.rounds,
+                            working_notes=config.working_notes,
                         ),
                     ),
-                    *build_context(agent, history),
+                    *build_context(
+                        agent, history, working_notes=config.working_notes
+                    ),
                 ],
                 max_tokens=turn_cap,
                 temperature=config.temperature,

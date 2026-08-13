@@ -397,3 +397,68 @@ def test_kappa_compares_within_one_codebook(tmp_path) -> None:
     write(a, "propose")
     write(b, "propose")
     assert main(["kappa", str(a), str(b)]) == 0
+
+
+# ------------------------------------------------- working notes (item 3) ----
+
+
+def test_working_notes_is_off_by_default_and_changes_nothing() -> None:
+    """Every corpus before this feature must reproduce byte for byte.
+
+    A protocol change that silently applies is a change to what all prior
+    numbers mean -- the failure RESEARCH-LOG 3.2 is about.
+    """
+    from collabengine.orchestrator.episode import build_context, build_system_prompt
+    from collabengine.orchestrator.team import Agent, TeamConfig
+    from collabengine.protocol import Message, Speaker
+    from collabengine.tasks.generator import generate
+
+    assert TeamConfig().working_notes is False
+
+    agent = Agent(agent_id="A1", index=0, seed=1, scratch="")
+    instance = generate(0, "tiny")
+    history = [Message(1, Speaker.AGENT, "A1", "draft <notes>keep me</notes>", meta={})]
+
+    assert "<notes>" not in build_system_prompt(agent, instance, 4)
+    plain = build_context(agent, history)
+    assert len(plain) == 1 and "working notes" not in plain[0].content
+
+
+def test_working_notes_surfaces_only_the_agents_own_latest_block() -> None:
+    from collabengine.orchestrator.episode import build_context, latest_notes
+    from collabengine.orchestrator.team import Agent
+    from collabengine.protocol import Message, Speaker
+
+    history = [
+        Message(1, Speaker.AGENT, "A1", "<notes>first</notes>", meta={}),
+        Message(2, Speaker.AGENT, "A2", "<notes>someone else</notes>", meta={}),
+        Message(3, Speaker.AGENT, "A1", "<notes>second</notes>", meta={}),
+    ]
+    assert latest_notes("A1", history) == "second"
+    assert latest_notes("A2", history) == "someone else"
+    assert latest_notes("A3", history) == ""
+
+    agent = Agent(agent_id="A1", index=0, seed=1, scratch="")
+    ctx = build_context(agent, history, working_notes=True)
+    # Surfaced ahead of the transcript, and only the newest -- accumulating them
+    # would grow the prompt as fast as restating the schedule did.
+    assert ctx[0].content == "Your working notes:\nsecond"
+    assert "first" not in ctx[0].content
+    assert len(ctx) == len(history) + 1
+
+
+def test_the_notes_brief_reaches_both_briefs() -> None:
+    """Symmetric by construction: describing the mechanism to one arm only would
+    hand it a protocol the other cannot use (RESEARCH-LOG 4.12's mirror image)."""
+    from collabengine.orchestrator.episode import build_system_prompt
+    from collabengine.orchestrator.team import Agent
+    from collabengine.tasks.generator import generate
+
+    agent = Agent(agent_id="A1", index=0, seed=1, scratch="")
+    instance = generate(0, "tiny")
+
+    team = build_system_prompt(agent, instance, 4, working_notes=True)
+    solo = build_system_prompt(agent, instance, 1, solo_long=True, rounds=12,
+                               working_notes=True)
+    for prompt in (team, solo):
+        assert "<notes>" in prompt
