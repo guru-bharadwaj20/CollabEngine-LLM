@@ -153,23 +153,72 @@ def report(label: str, team_path: Path, solo_path: Path, rng: random.Random) -> 
           f"{', '.join(sig) if sig else 'none'}")
 
     _sensitivity(team_path, solo_path, out, rng)
-    _matched_budget(team_path, out, rng)
+    for condition, tag, brief in _MATCHED_ARMS:
+        _matched_budget(team_path, out, rng, condition, tag, brief)
+    _brief_effect(team_path, rng)
     return out
 
 
-def _matched_budget(team_path: Path, headline: dict, rng: random.Random) -> None:
-    """C4: team vs one agent holding the team's whole turn budget.
+def _brief_effect(team_path: Path, rng: random.Random) -> None:
+    """C5 minus C4: the same agent, the same budget, a different brief.
+
+    This is the only place the brief is isolated. Both arms are one agent over
+    twelve turns on one instrument, so every difference between them is the
+    wording -- no phantom co-workers, no instruction that the group's last
+    message is the answer of record, and an explicit licence not to restate the
+    whole assignment every turn (RESEARCH-LOG 4.12).
+
+    Reported as its own comparison rather than inferred from the two gaps to the
+    team: those share the team arm, so differencing them would reuse one sample
+    on both sides and understate the interval.
+    """
+    old, new = scores(team_path, "solo_budget"), scores(team_path, "solo_long")
+    if not (old.get("fraction") and new.get("fraction")):
+        return
+    n_o, n_n = len(old["fraction"]), len(new["fraction"])
+    print(f"\n  -- the brief alone: C5 - C4 (solo_long n={n_n}, solo_budget n={n_o}) --")
+    if min(n_o, n_n) < 5:
+        print("     too few usable episodes to read.")
+        return
+    print(f"     {'metric':<11}{'C4':>9}{'C5':>8}{'gap':>9}{'perm p':>9}")
+    for metric in METRICS:
+        a, b = old[metric], new[metric]
+        print(f"     {metric:<11}{st.mean(a):>9.3f}{st.mean(b):>8.3f}"
+              f"{st.mean(b) - st.mean(a):>+9.3f}{perm_p(a, b, rng):>9.3f}")
+
+
+#: The two matched-budget arms, both one agent spending the team's whole turn
+#: budget and differing only in which brief they were given. They go through the
+#: same function rather than two similar ones on purpose: C4 and C5 are meant to
+#: be read against each other, and two implementations of "the same comparison"
+#: is how the difference between them stops being the brief.
+_MATCHED_ARMS: tuple[tuple[str, str, str], ...] = (
+    ("solo_budget", "C4", "TEAM_BRIEF, the brief written for a group"),
+    ("solo_long", "C5", "SOLO_BRIEF, written for one agent"),
+)
+
+
+def _matched_budget(
+    team_path: Path,
+    headline: dict,
+    rng: random.Random,
+    condition: str = "solo_budget",
+    tag: str = "C4",
+    brief: str = "TEAM_BRIEF, the brief written for a group",
+) -> None:
+    """Team vs one agent holding the team's whole turn budget.
 
     Silent when the arm has not been generated, because it is off by default in
     the pipeline -- absence here means "not run", never "no difference".
     """
-    budget = scores(team_path, "solo_budget")
+    budget = scores(team_path, condition)
     if not budget.get("fraction"):
         return
     team = scores(team_path, "baseline")
     n_b, n_t = len(budget["fraction"]), len(team["fraction"])
 
-    print(f"\n  -- C4: matched turn budget (solo_budget n={n_b}, team n={n_t}) --")
+    print(f"\n  -- {tag}: matched turn budget, {brief}")
+    print(f"     ({condition} n={n_b}, team n={n_t}) --")
     if min(n_b, n_t) < 5:
         print("     too few usable episodes to read.")
         return
@@ -188,7 +237,7 @@ def _matched_budget(team_path: Path, headline: dict, rng: random.Random) -> None
     # arms here run twelve turns, so if `solo_budget` still spends its last turn
     # writing the answer while the team spends its last turn restating one, the
     # asymmetry of 4.10 survives the fix and has to be reported the same way.
-    cut_b = scores(team_path, "solo_budget", drop_final_truncated=True)
+    cut_b = scores(team_path, condition, drop_final_truncated=True)
     cut_t = scores(team_path, "baseline", drop_final_truncated=True)
     if not (cut_b.get("fraction") and cut_t.get("fraction")):
         return
