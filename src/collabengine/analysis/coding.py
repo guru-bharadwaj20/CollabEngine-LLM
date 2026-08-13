@@ -262,11 +262,20 @@ async def code_episode(
 
 
 async def _code_one(
-    backend: LLMBackend, message: Message, max_chars: int, stats: CodingStats
+    backend: LLMBackend,
+    message: Message,
+    max_chars: int,
+    stats: CodingStats,
+    system: str | None = None,
 ) -> ActionType:
+    # `system` exists so the codebook sweep can vary the prompt without
+    # reimplementing the call. Defaulting to JUDGE_SYSTEM keeps every existing
+    # caller on the codebook the corpus was coded under -- a sweep that
+    # accidentally became the default would silently mix codebook versions,
+    # which is the thing CODEBOOK_VERSION is stamped to prevent.
     request = GenRequest(
         messages=[
-            ChatMessage(role="system", content=JUDGE_SYSTEM),
+            ChatMessage(role="system", content=system or JUDGE_SYSTEM),
             ChatMessage(role="user", content=_strip_identity(message.content)[:max_chars]),
         ],
         max_tokens=8,
