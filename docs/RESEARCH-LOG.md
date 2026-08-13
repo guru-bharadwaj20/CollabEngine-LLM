@@ -2217,6 +2217,133 @@ reporting that it cannot be interpreted.
 
 ---
 
+### 4.18 What it costs to run Phase 3, and three things measured on the way
+
+`medium` at n = 48 put the ablation grid back on the table (§4.16b: "no longer
+blocked on principle, only on power"). This section prices it. Nothing here
+needed the card except the pilot at the end; it is all arithmetic over corpora
+already on disk.
+
+#### The propagation caveat is confirmed, and `frozen_excise` is dead here
+
+PLAN §C1 left one question explicitly open: *"whether real 7–8B agents restate
+as aggressively as the mock is an open empirical question for Phase 2."*
+Measured on the 48 `medium` team episodes:
+
+| | A1 | A2 | A3 | A4 | all |
+|---|---|---|---|---|---|
+| propagation index | 0.612 | 0.588 | 0.581 | 0.576 | **0.589** |
+| `frozen_excise` drop | +0.000 | −0.002 | +0.000 | +0.003 | ~0 |
+
+**Yes, they restate.** Nearly 60% of an agent's distinct content reappears in
+later messages by other agents, and the excision drops are the same ~0.000 the
+mock produced against live drops of 0.03–0.23. The diagnostic PLAN insisted on
+running before reporting any excision number has now earned itself twice: once
+on the mock, once here.
+
+**Consequence for Phase 3, and it is a cost consequence.** The free mode is
+unusable, so the grid is `live` + `frozen_replay`, both of which cost model
+calls. There is no cheap preview of the ablation matrix on this corpus.
+
+#### The matched-budget arms were never matched on generation
+
+`gate_report` asserted for three sections that C4 and C5 "spend the same
+generation" as the team. They do not; nothing had measured it. Agent-generated
+characters per episode at `medium`:
+
+| arm | agent turns | chars generated |
+|---|---|---|
+| C5, one agent | 12 | 25,901 |
+| team, four agents | 12 | **13,873** |
+
+**A factor of 1.87.** One agent restates the whole working solution every round;
+four agents each add to a shared transcript. The arms are matched on turn count
+and on the per-turn cap, which is not the same claim.
+
+This cuts both ways and both belong in the record. The team's `medium` win is on
+roughly half the generation — stronger than the old wording implied. And
+"matched budget", the sentence the entire C4/C5 interpretation rests on, was not
+what the instrument was doing.
+
+#### C5 is not the best single-agent baseline, and the report never said so
+
+The one contrast with no team arm in it, which is likely why it went unprinted
+for so long — every other block was written to answer *does the team win*, and
+this one asks whether the thing it wins against was built right.
+
+| `medium`, one agent, one brief | 3 rounds | 12 rounds | gap | perm *p* |
+|---|---|---|---|---|
+| `fraction` | 0.585 | 0.504 | **−0.081** | 0.065 |
+| `strict` | 0.210 | 0.147 | **−0.063** | **0.028** |
+
+**Quadrupling one agent's turn budget makes it significantly worse on `strict`.**
+So C5 is the best single-agent baseline *by construction* — correctly briefed,
+holding the team's whole budget — and the worse one *by measurement*. §4.16c's
+third surviving statement, "the team beats the best single-agent baseline this
+project can build", is therefore too strong as written. The team beats one agent
+spending the same *turns*. Against the best single agent actually recorded — the
+three-round one — it is **+0.045 at *p* = 0.243**, which is the headline gate row
+and is null.
+
+Both readings are real and they do not cancel. `gate_report` now prints both.
+
+#### What Phase 3 costs
+
+Team arm at `medium`: `fraction` sd **0.142**, `strict` sd 0.197, n = 48. At 80%
+power and α = 0.05 that resolves a gap of **0.081** — which is why the +0.126
+team-vs-C5 gap came out significant and why nothing smaller has.
+
+Sized on nine generating arms (baseline + 4 agents × {live, frozen_replay}) at
+`medium`'s measured 0.85 min/episode:
+
+| effect to detect | n/arm | episodes | GPU h |
+|---|---|---|---|
+| the measured team-vs-C5 gap (+0.126) | 20 | 178 | 2.5 |
+| one agent's share of it (~0.042) | 174 | 1,566 | **22** |
+| half that, if agents differ (~0.021) | 696 | 6,263 | 89 |
+| agent × component interaction (~0.015) | 1,364 | 12,275 | **174** |
+
+**The split is the finding.** The main effect is affordable — 22 GPU hours is
+two or three nights. The interaction is ~174 hours, a week of continuous
+exclusive use of a card shared with four other accounts. And PLAN §0 is explicit
+that the affordable half is the half that proves nothing: *"A scalar performance
+drop does not demonstrate specialization. It demonstrates participation... A
+main effect proves nothing; the crossover interaction is the result."*
+
+**Pairing does not rescue it.** Live and `frozen_replay` re-run the same instance
+seeds, so the comparison is paired and the relevant variance is the sd of the
+within-seed difference. Measured at `medium`:
+
+| pair | *r* | sd(diff) | vs unpaired | n falls |
+|---|---|---|---|---|
+| team vs `solo` | +0.004 | 0.266 | 0.200 | 0.56× |
+| team vs C5 | +0.362 | 0.198 | 0.200 | 1.03× |
+| team vs C4 | −0.044 | 0.292 | 0.200 | 0.47× |
+
+Scores on the same instance are essentially uncorrelated across arms: instance
+difficulty explains almost none of the variance, run-to-run sampling explains
+nearly all of it. Pairing buys a factor of 1.03 at best. **It also means PLAN's
+"episode as a random effect" will absorb almost nothing**, which is worth knowing
+before the mixed model is written rather than after.
+
+> **The 0.015 in that table is a guess, and the table is sized on the null.**
+> 0.042 is one agent's share of the C5 gap *assuming agents contribute
+> uniformly* — which is the hypothesis Phase 3 exists to reject. If
+> specialization is real, removing the agent that does the checking could cost
+> far more than 0.042 on the verification-loaded components specifically, and
+> the interaction could be large where the pooled main effect is small. The
+> power arithmetic above is therefore circular in the direction that argues
+> against running the experiment.
+
+**So: pilot rather than grid.** 4 agents × the existing 48 `medium` baseline
+episodes, `live` only — 192 episodes, ~2.7 GPU h, one evening. It replaces the
+0.042 guess with a measurement and gives the per-component spread that sizes the
+interaction properly. If per-agent drops come back at 0.10+, the full grid is
+back in budget; if they come back at 0.01, one evening bought the knowledge that
+the 174-hour run would have measured its own noise floor.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
