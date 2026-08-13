@@ -1936,6 +1936,77 @@ and the answer budget cannot remove it.*
 
 ---
 
+### 4.15 Answer-budget instrument, `hard`: the gate does not pass, and §4.10 was right
+
+`hard` is the tier that produced the only significant Phase 1 result this project
+has ever had — *d* = 1.09, *p* < 0.0001, §4.1b and §4.10. Re-measured with the
+answer-bearing turn on its own 3072-token budget, same seeds, same model, same
+slot geometry, everything else held:
+
+| | old instrument | answer budget |
+|---|---|---|
+| solo mean | 0.342 | **0.581** |
+| team mean | 0.591 | 0.555 |
+| gap | **+0.249** | **−0.026** |
+| *d* | +1.09 | −0.22 |
+| perm *p* | **0.000** | **0.500** |
+| solo `cut@end` | 10 | **1** |
+| team `cut@end` | 1 | 1 |
+| solo malformed | 11 | **1** |
+
+**The gate does not pass.** The gap is negative — one agent nominally ahead of
+four — and nowhere near significance. §4.10's claim is confirmed on the
+instrument built to test it: *the entire Phase 1 pass at `hard` was the token
+cap.*
+
+**And the mechanism is exactly the one §4.10 named.** The team's mean barely
+moved (0.591 → 0.555). The solo arm's mean rose by **+0.239**, which is the
+whole of the old gap, because its answer turn stopped being cut off: ten
+truncated answers became one, eleven malformed solutions became one. Nothing
+about the models or the task changed. The measurement was reading its own cap.
+
+**The preregistered sensitivity analysis was right, and this is the best evidence
+for it in the project.** On the old corpus the complete-case row said the gap was
++0.024 at *p* = 0.641 — no effect — while the headline said +0.249 at *p* <
+0.0001. The fixed instrument now says **−0.026 at *p* = 0.500**, on all 24
+episodes instead of the 14 that survived filtering. The filter reached the right
+answer from biased data. §4.6's rule — that every resource limit lands on the arm
+being measured — was worth the effort it cost.
+
+#### The matched-budget arms disagree with `medium`
+
+| | C4 `TEAM_BRIEF` | C5 `SOLO_BRIEF` | team | C4→C5 brief effect |
+|---|---|---|---|---|
+| `medium` | 0.502 (*p*=0.009 vs team) | 0.521 (*p*=0.002 vs team) | 0.663 | +0.019, *p*=0.762 |
+| `hard` | 0.454 (*p*=0.038 vs team) | **0.539 (*p*=0.719 vs team)** | 0.555 | +0.085, *p*=0.094 |
+
+At `hard` the honest baseline draws level with the team — +0.016 at *p* = 0.719,
+and +0.017 at *p* = 0.582 with answer-truncation dropped — while the defective
+one still trails significantly. At `medium` the honest baseline trailed by +0.142
+at *p* = 0.002 and the brief bought nothing.
+
+**So §4.14's reading does not replicate.** Written one tier ago: *"the lone agent
+is worse at matched budget because it is worse, not because the prompt was
+holding it down."* That was scoped to `medium` and it holds there. At `hard` the
+opposite is true, and §4.12's original instinct — that the C4 margin was inflated
+by a brief written for a group — is the better description of this tier.
+
+**What is not established:** the direct C4→C5 contrast at `hard` is +0.085 at
+*p* = 0.094. That is not significant at n = 24, so "the brief explains the
+matched-budget gap at `hard`" is a reading of the data, not a result. What is
+solid is narrower and still worth having: *at `hard`, one agent given a brief
+written for one agent is statistically indistinguishable from four agents on the
+same total budget.*
+
+**Standing after two tiers on the fixed instrument: the Phase 1 gate is not
+significant at either.** The one significant result the project had is gone. H1
+predicted a team advantage growing with instance size; what grew with instance
+size was the truncation asymmetry. `xhard` is running and is the third point, not
+a tiebreaker — two tiers already disagree about the brief, and a third will not
+settle that on its own.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
