@@ -34,9 +34,9 @@ Llama-3.1-8B-Instruct (Q4_K_M, served by llama.cpp) on constraint-satisfaction i
 |---|---|---|---|---|---|
 | **medium** | +0.067 | +0.31 | **+0.059** | 0.269 | 7 → **0** |
 | **hard** | **+0.249** | **+1.09** | **−0.026** | **0.500** | 10 → **1** |
-| **xhard** | +0.188 | +0.75 | *running* | | 15 → *tbd* |
+| **xhard** | **+0.188** | +0.75 | **+0.069** | **0.263** | 15 → **1** |
 
-**The project's only significant Phase 1 result was the token cap.** At `hard` the gap is now negative and nowhere near significance.
+**Both significant Phase 1 results were the token cap.** The gate is now non-significant at every operating point measured, largest |*d*| = 0.35, and at `hard` the gap is negative.
 
 **The two arms did not use `max_tokens` the same way.** A solo episode is three turns and the last one carries the entire answer. A team episode is twelve and the last one commits an answer the transcript already contains. The same per-turn cap therefore landed on solo's answer and on the team's *summary* of one — identical, and not symmetric.
 
@@ -74,16 +74,17 @@ Two matched-budget arms now exist, differing only in the brief the single agent 
 - **C4 `solo_budget`** — `TEAM_BRIEF`, the prompt written for a group. Told it has co-workers and that the group's last message is what gets scored, it restated its whole answer on 25–33% of consecutive turns.
 - **C5 `solo_long`** — `SOLO_BRIEF`, written for one agent. No phantom co-workers, no last-message-is-the-answer instruction, explicit licence not to restate.
 
-| `fraction`, answer-budget instrument | C4 `TEAM_BRIEF` | **C5 `SOLO_BRIEF`** | team | team − C5 |
-|---|---|---|---|---|
-| **medium** | 0.502 (*p* = 0.009) | 0.521 | 0.663 | **+0.142 (*p* = 0.002)** |
-| **hard** | 0.454 (*p* = 0.038) | **0.539** | 0.555 | **+0.016 (*p* = 0.719)** |
+| team − 1 agent, `fraction` | under C4 `TEAM_BRIEF` | under **C5 `SOLO_BRIEF`** | the brief alone |
+|---|---|---|---|
+| **medium** | +0.161 (*p* = **0.009**) | **+0.142 (*p* = 0.002)** | +0.019 (*p* = 0.762) |
+| **hard** | +0.102 (*p* = **0.038**) | +0.016 (*p* = 0.719) | +0.085 (*p* = 0.094) |
+| **xhard** | +0.150 (*p* = **0.022**) | +0.080 (*p* = 0.161) | +0.070 (*p* = 0.319) |
 
-**The brief matters, and the two tiers disagree about how much.** At `hard`, one agent given a brief written for one agent is statistically indistinguishable from four agents on the same total budget — while the same agent under the group brief still trails significantly. At `medium` the brief buys nothing (+0.019, *p* = 0.762) and the team leads either way.
+**Under the brief written for a group, the team beats one agent at matched budget at three tiers out of three. Under a brief written for one agent, at one out of three.** Same corpus, same instrument, same budget, same model — the arms differ only in wording.
 
-**This inverts the earlier reading in one direction and confirms it in the other.** [§4.12](docs/RESEARCH-LOG.md) called the C4 margin an upper bound because the harness was degrading the baseline. At `hard` that was right: fix the brief and the margin goes. At `medium` it was wrong: the brief was fixed, the transcripts got measurably cleaner — truncation 40% → 22%, answer cuts 6 → 2, malformed 5 → 2 — and the score did not move.
+**This confirms the earlier reading at two tiers and contradicts it at one.** [§4.12](docs/RESEARCH-LOG.md) called the C4 margin an upper bound because the harness was degrading the baseline. At `hard` and `xhard` that was right. At `medium` it was wrong: the brief was fixed, the transcripts got measurably cleaner — truncation 40% → 22%, answer cuts 6 → 2, malformed 5 → 2 — and the score did not move.
 
-> **Underpowered, and exploratory.** The direct C4 → C5 contrast at `hard` is +0.085 at *p* = 0.094 (*n* = 24), so "the brief explains the matched-budget gap" is a reading of the data, not a result. Neither arm was preregistered — [PREREG-xhard](docs/PREREG-xhard.md) says so. What is solid is narrower: *at `hard`, one properly-briefed agent matches four on the same budget.*
+> **A pattern at *n* = 24, not three results.** No individual brief contrast is significant. What keeps it from being dismissed: the direction is the same at both tiers where it is large, and the mechanism was predicted before C5 existed rather than found by inspection after. What keeps it from being asserted: `medium` shows nothing, and *n* = 24 cannot separate +0.07 from zero. **An n = 48 extension at `medium` and `hard` is running for exactly this reason.** Neither arm was preregistered — [PREREG-xhard](docs/PREREG-xhard.md) says so.
 
 **The design rule this produces is worth more than the effect size.** A single-agent baseline needs a single-agent brief. Running `n=1` through a prompt that says "you are one of 1 participants" and "the others" measures the harness, not the model — and it does so in the direction that flatters the team.
 
