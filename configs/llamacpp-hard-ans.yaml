@@ -31,13 +31,13 @@ seed_start: 0
 n_episodes: 24
 out_dir: runs
 
-max_concurrency: 4
+max_concurrency: 7
 
 backend:
   kind: openai
   model: Meta-Llama-3.1-8B-Instruct-Q4_K_M
   base_url: http://127.0.0.1:8000/v1
-  max_concurrency: 4
+  max_concurrency: 7
   timeout_s: 900
   max_retries: 4
   verify_model: true
