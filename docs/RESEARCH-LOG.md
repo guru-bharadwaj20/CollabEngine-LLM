@@ -2389,12 +2389,15 @@ because every test went through that subclass (§3.3).
 
 | Script | Role |
 |---|---|
-| `scripts/gate_report.py` | **The one path to a gate number.** Prints the integrity audit above the means, then the headline, the answer-turn sensitivity (§4.10) and C4 (§4.12). Reads run directories from the configs, because hardcoding them has been wrong three times |
+| `scripts/gate_report.py` | **The one path to a gate number.** Prints the integrity audit above the means, then the headline, the answer-turn sensitivity (§4.10), C4 and C5 through one shared function, and the C5 − C4 brief contrast (§4.15). Reads run directories from the configs, because hardcoding them has been wrong three times |
 | `scripts/figures.py` | Regenerates every README figure from the corpus, through the same integrity filter and scoring module the analysis uses. Refuses to plot a tier still generating |
 | `scripts/rescore.py` | Offline re-scoring of archived corpora under alternative metrics — no GPU, since instances are deterministic in `(seed, difficulty)` |
 | `scripts/serve.sh` | Starts llama-server with the geometry `LLAMACPP-SETUP.md` derives; prints tokens-per-slot and refuses to race a server already on the port |
 | `scripts/served-run.sh` | The whole difficulty curve on the served instrument — three tiers, preflight-gated, resumable (§4.9–4.11) |
 | `scripts/budget-run.sh` | The C4 matched-budget arm across the three tiers (§4.12). Off by default in the pipeline: it costs what the team arm costs |
+| `scripts/answer-run.sh` | The answer-budget re-measurement and the C5 baseline together — four arms × three tiers, preflight-gated, resumable (§4.14–4.15). Both in one run because they share every other setting, and measuring C5 on a different instrument from the gate it informs is §4.1c's mistake |
+| `scripts/guard.sh` | Restarts the server and resumes the run if it dies, on a box where four of the local accounts are administrators and no process can be made unkillable. Waits for the card rather than competing for it, signals only processes owned by the current user with a command line rooted in this repo, and releases the card on `ALL DONE`. `--list-clients` dry-runs the selector (lesson 16) |
+| `scripts/handcode_kappa.py` | κ between the served judge and the human coding, with a bootstrap CI and a refusal to compare labels from two codebook versions (§4.13, §4.13b) |
 | `scripts/repair.py` | Regenerates instrument failures at low concurrency. Refuses to touch conditions the regeneration pass would not rewrite, after a dry run showed it would have deleted a `fixed_order` episode |
 | `scripts/gatecheck.sh` | Evaluates the Phase 1 gate as soon as the episodes exist; refuses a verdict below 5 usable episodes per arm |
 | `scripts/queue-judge.sh` | Waits for ≥18 GiB free, stable across three checks, before starting a second model on the shared card |
@@ -2412,4 +2415,7 @@ because every test went through that subclass (§3.3).
 | `configs/llamacpp-medium.yaml` | `medium` on the served Q4 instrument (§3.11). Measured; fails the gate, and its apparent gap reverses under the answer-turn control (§4.9) |
 | `configs/llamacpp-hard.yaml` | `hard`, same. Regenerated because H1 is a trend and H4 a comparison, and neither survives a change of instrument at one point only. Measured; *passes* the gate at *d* = 1.09 and the pass is the token cap (§4.10) |
 | `configs/llamacpp-xhard.yaml` | `xhard`, same — the tier bf16 could not reach, which it reached in 69.6 minutes. Measured; passes at *p* = 0.020, controlled gap −0.056 (§4.11) |
+| `configs/llamacpp-medium-ans.yaml` | `medium` on the answer-budget instrument — `answer_max_tokens` 3072, `max_model_len` 15,360 so the slot stays 18,432, `max_concurrency` 7. Measured; gate not significant and `cut@end` is 0 in both arms (§4.14) |
+| `configs/llamacpp-hard-ans.yaml` | `hard`, same. **The tier that decides §4.10.** Measured; the *d* = 1.09 pass becomes −0.026 at *p* = 0.500 (§4.15) |
+| `configs/llamacpp-xhard-ans.yaml` | `xhard`, same |
 | `configs/vllm-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |
