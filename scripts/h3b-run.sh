@@ -29,17 +29,31 @@ if ! python -u scripts/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; the
   exit 1
 fi
 
-say "=== 1/2 baseline, $EPISODES episodes at seeds 1000-$((1000 + EPISODES - 1)) ==="
-if ! python -u -m collabengine.cli pipeline --config "$CONFIG" \
-     --phases baseline --episodes "$EPISODES" 2>&1 | tee -a "$LOG"; then
-  say "FAILED baseline"
-  exit 1
-fi
-
-say "=== 2/2 live:$AGENT + capacity, the roster-matched pair ==="
+# Ablation FIRST, baseline second, and the order is the point.
+#
+# H3b is a two-arm contrast -- live:A4 against capacity:3, same roster, same
+# seeds. It does not use the baseline at all; the baseline only expresses those
+# two as drops. Running it first put 150 twelve-turn episodes, about 40% of the
+# total work, on the critical path of a question that does not ask them. On a
+# card already at 94-99% utilisation the only way to reduce wall clock is to
+# reduce work, and this is the one piece of it that is genuinely optional.
+#
+# `live` and `capacity` re-run from scratch and need only the seed, which is
+# why they can go first at all. The baseline still runs, because the
+# confirmatory grid wants it and the card would otherwise idle -- it is simply
+# no longer between us and the answer.
+say "=== 1/2 live:$AGENT + capacity, the roster-matched pair (the H3b test) ==="
 if ! python -u -m collabengine.cli ablate --config "$CONFIG" \
      --modes live,capacity --agents "$AGENT" 2>&1 | tee -a "$LOG"; then
   say "FAILED ablation"
+  exit 1
+fi
+say "H3B ARMS COMPLETE -- the contrast is readable now"
+
+say "=== 2/2 baseline, $EPISODES episodes at seeds 1000-$((1000 + EPISODES - 1)) ==="
+if ! python -u -m collabengine.cli pipeline --config "$CONFIG" \
+     --phases baseline --episodes "$EPISODES" 2>&1 | tee -a "$LOG"; then
+  say "FAILED baseline (the H3b arms above are unaffected)"
   exit 1
 fi
 
