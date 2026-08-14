@@ -2729,6 +2729,90 @@ Amendment 2 records the consequence.
 
 ---
 
+### 4.23 `medium` re-measured on fresh seeds: the last positive finding is the token cap
+
+§4.22 showed the pilot's four-agent baseline was a high draw. `medium` was
+*selected* on that corpus — §4.16b, C5 +0.126 at *p* < 0.001 — so the selection
+inherits the doubt. Both single-agent arms re-run on seeds 1000–1149 against the
+baseline already recorded there, 300 episodes, 0 failed.
+
+| contrast | pilot (n=48) | **fresh (n≈150)** |
+|---|---|---|
+| gate: team − `solo` | +0.045 (*p* = 0.243) | **−0.003 (*p* = 0.865)** |
+| C5: team − `solo_long` | **+0.126 (*p* < 0.001)** | **+0.060 (*p* = 0.008)** |
+| C5 − `solo`, within one agent | −0.081 (*p* = 0.065) | **−0.063 (*p* = 0.012)** |
+
+#### The C5 gap halved, and what is left of it is truncation
+
++0.060 at *p* = 0.008 looks like a survival. It is not. The answer-turn
+sensitivity, printed under every gate number since §4.10 for exactly this
+reason:
+
+> ...same, answer-turn truncation dropped (1 agent −19, team −4):
+> **fraction +0.003 (*p* = 0.865)**
+
+**The entire remaining gap is the answer cap.** Drop the episodes whose answer
+turn was cut and the team's advantage over a matched-budget single agent is
++0.003. The integrity row says why: `solo_long` carries **34% truncation, 22
+malformed and 20 cut answers out of 150**, against the team's 8%, 4 and 4.
+
+This is the third time a positive result in this project has turned out to be
+the token cap — §4.1b/§4.10 at `hard` (*d* = 1.09 → −0.026), §4.14 at `medium`,
+and now C5. Each time the arm that truncates is the single-agent one, because
+one agent must write the whole answer in its own last turn while four agents
+commit one the transcript already holds. **The answer budget was built to remove
+this and it did remove it for the team arm; `solo_long` at twelve rounds writes
+2.04× the team's text and still hits the cap.**
+
+#### The within-agent result replicates, and it is now significant
+
+`solo` at 3 rounds scores **0.579**; the same agent under the same brief at 12
+rounds scores **0.516**. **−0.063 at *p* = 0.012**, where the pilot had −0.081 at
+*p* = 0.065. Giving one agent four times the turns makes it reliably worse.
+
+So C5 is not merely an imperfect baseline, it is a *degraded* one, and the
+comparison that made `medium` the project's operating point was the team against
+a single agent handicapped by the budget-matching meant to make it fair.
+
+#### Every arm on fresh seeds, which is the whole result
+
+| arm | fresh `fraction` |
+|---|---|
+| `solo`, 1 agent × 3 rounds | **0.579** |
+| team, 4 agents × 3 rounds | **0.576** |
+| 3-agent ablated arms (pooled, n=599) | **0.574** |
+| `solo_long`, 1 agent × 12 rounds | 0.516 |
+
+**One agent, three agents and four agents score the same.** 0.579, 0.574, 0.576 —
+a spread of 0.005 across 899 episodes. Team size does nothing at `medium`. The
+only arm that differs is the one given *more turns*, and it differs downward.
+
+#### What replicated and what did not
+
+Worth separating, because the two lists are the finding:
+
+**Did not replicate** — the four-agent baseline (0.631 → 0.576), the gate
+(+0.045 → −0.003), C5 (+0.126 → +0.060, and → +0.003 without truncation), the
+participation effect (+0.055 → +0.003, §4.22).
+
+**Did replicate** — `solo` (0.585 → 0.579), the three-agent arms (0.575 → 0.574),
+the within-agent budget penalty (−0.081 → −0.063, and now significant), the
+generation asymmetry (1.87× → 2.04×), and the flat interaction.
+
+**Everything that reproduced is a null or a negative. Everything that failed to
+reproduce was a positive measured against the 48-episode four-agent baseline.**
+
+#### The honest headline
+
+`medium` was the last operating point where anything favoured the team, and it
+was chosen on the corpus §4.22 discredited. Re-measured, it shows a flat gate, a
+truncation-driven C5, and no team-size effect at all. **This task family rewards
+collaboration at no operating point measured — three tiers, two instruments, two
+seed sets, 8B.** That is PLAN §7's negative result, arrived at by a longer road
+than expected and standing on more episodes than any positive one ever did.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
@@ -2967,14 +3051,22 @@ predicts.** Three findings collapse into one. At `medium`, on this model,
 removing one of four agents costs nothing measurable, and there is nothing to
 decompose.
 
-**What now needs re-measuring is upstream of Phase 3 entirely.** `medium` was
+**And the upstream re-measurement is now done too (§4.23).** `medium` was
 selected as the one operating point where the team beats a matched-budget single
-agent — C5 +0.126 at *p* < 0.001, §4.16b — **on the same 48-episode corpus whose
-four-agent baseline §4.22 has just shown to be the high draw.** `solo` and
-`solo_long` are being re-run on seeds 1000–1149 against the baseline already
-recorded there. If that contrast does not replicate either, the project's last
-positive finding goes with it, and the honest headline becomes that this task
-family rewards collaboration nowhere at 8B.
+agent — C5 +0.126 at *p* < 0.001, §4.16b — on the same 48-episode corpus whose
+four-agent baseline §4.22 discredited. Re-run on seeds 1000–1149:
+
+| | pilot | fresh |
+|---|---|---|
+| gate: team − `solo` | +0.045 | **−0.003** (*p* = 0.865) |
+| C5: team − `solo_long` | +0.126 | +0.060, and **+0.003 with answer truncation dropped** |
+| 1 vs 3 vs 4 agents | — | **0.579 / 0.574 / 0.576** |
+
+**One agent, three agents and four agents score the same to within 0.005 across
+899 episodes.** What remained of C5 was the token cap, for the third time in this
+project. The last positive finding is gone, and the result is the negative one
+PLAN §7 named: **this task family rewards collaboration at no operating point
+measured** — three tiers, two instruments, two seed sets, at 8B.
 
 ---
 
