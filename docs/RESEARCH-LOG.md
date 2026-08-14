@@ -2551,6 +2551,99 @@ candidate mechanism for why `medium` is the only tier where four agents help.
 
 ---
 
+### 4.21 Two seed sets, two baselines: audited before it was believed
+
+H3b ran on fresh seeds 1000–1149 (§4.22). Its baseline came back at **0.577**
+against the pilot's **0.631** on seeds 0–47 — a gap of −0.054 at perm *p* =
+0.032, which is the size of every effect this project is trying to measure.
+
+A difference that convenient is a plumbing bug until proven otherwise, so it was
+audited before it was interpreted. Four checks, in the order that would have
+killed it fastest.
+
+#### 1. The configs, diffed rather than assumed
+
+`diff` on the two `config.resolved.yaml` files — what actually ran, not what was
+intended:
+
+```
+1,3c1,3
+< name: llama31-8b-q4-medium-ans      > name: llama31-8b-q4-medium-h3b
+< seed_start: 0                       > seed_start: 1000
+< n_episodes: 48                      > n_episodes: 150
+```
+
+Three lines, all of them the independent variable. Nothing else differs: same
+model, same `max_model_len`, same `answer_max_tokens`, same slot, same
+`max_concurrency`, same temperature and `top_p`.
+
+#### 2. The generator, deterministic and untouched
+
+Last commit to `tasks/generator.py` is `24152d8`, **2026-08-09** — four days
+before the pilot and five before H3b, so both ranges came from identical code.
+`generate(seed, "medium")` is byte-stable across repeat calls on six probe
+seeds spanning both ranges. Seed overlap between the two sets: **0**.
+
+And the instances are structurally identical, which is checkable with no model
+output at all:
+
+| | jobs | workers | constraints | planted errors | ground truth |
+|---|---|---|---|---|---|
+| seeds 0–47 | 16 | 5 | 29 | 3 | 16 |
+| seeds 1000–1149 | 16 | 5 | 29 | 3 | 16 |
+
+Zero variance within either range. The `DifficultySpec` fixes the size of the
+problem; the seed varies its content. So "seeds 1000–1149 are bigger instances"
+is excluded outright.
+
+#### 3. The instrument, side by side — and here there is something
+
+| set | n | unusable | malformed | cut@end | mid-turn trunc | turns | chars |
+|---|---|---|---|---|---|---|---|
+| pilot 0–47 | 48 | 0 | **0** | **0** | 0.0% | 12.0 | 13,873 |
+| fresh 1000–1149 | 149 | 0 | **4** | **4** | 0.0% | 12.0 | 13,868 |
+
+Turn counts and generated volume match to within 5 characters, and neither set
+lost an episode to the instrument. But the fresh set has 4 malformed answers and
+4 truncated ones where the pilot had none — 2.7% against 0%.
+
+#### 4. What that asymmetry is worth
+
+| | pilot | fresh | gap | perm *p* |
+|---|---|---|---|---|
+| all usable | 0.631 | 0.577 | **−0.054** | **0.032** |
+| malformed dropped | 0.631 | 0.593 | −0.038 | — |
+| + `cut@end` dropped | 0.631 | 0.594 | **−0.036** | **0.090** |
+
+**About a third of the gap is four malformed answers**, and the residual −0.036
+is not significant at 0.05.
+
+Both rows are needed and neither settles it. Dropping malformed answers is
+post-treatment filtering — a malformed answer is a legitimate model outcome, not
+an instrument failure — which is the exact trap §4.10 and §4.14 document. So
+−0.054 is the honest headline and −0.036 is the complete-case bracket, and they
+bracket rather than resolve, the same way §4.10's pair did.
+
+#### The verdict, and what it costs
+
+**Not a plumbing bug.** Configs, generator, instance structure, turn counts and
+text volume are identical; the one asymmetry is in model output, not in the
+harness.
+
+**But the operative consequence does not depend on the *p* value.** Every drop
+in §4.19 and §4.20 was computed against a baseline of 0.631 estimated from 48
+seeds. A 3× larger sample puts the same quantity at 0.577–0.594. Whether that is
+chance or a range effect, the reference those drops are expressed against is not
+as well determined as a single significant-looking number made it look — and
+`sd` on the baseline arm is 0.142–0.155, so a 48-episode estimate carries a
+standard error of ~0.021 while the effects being read off it are ~0.05.
+
+**The fresh-seed rule in PREREG-phase3 was written to catch exactly this, and it
+caught it on the one agent it covered.** That is the argument for the rule, made
+by the rule.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of
