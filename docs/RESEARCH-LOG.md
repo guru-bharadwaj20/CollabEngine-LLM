@@ -2950,21 +2950,31 @@ costs the team, which is all the grid ever needed.
 **Where the project actually stands.** Three findings, none of which is the one
 the project set out to make, and together they are more interesting than it was:
 
-1. **Participation is real.** +0.055 [+0.023, +0.087] per agent at `medium`.
+1. ~~**Participation is real.** +0.055 [+0.023, +0.087] per agent at `medium`.~~
+   **Withdrawn, §4.22.** On fresh seeds the same quantity is **+0.003
+   [−0.015, +0.021]** over 599 episodes. The three-agent arms reproduce to
+   within 0.002 across 791 episodes; only the 48-episode baseline moved.
 2. **Specialization is not.** Interaction *p* = 0.928, shrinking at every
    checkpoint, with a residual matrix holding less structure than a true null
    would produce.
 3. **Compensation is not either.** Fungibility −0.005. Survivors do not absorb
    a missing agent's share.
 
-That is a team which is additive and non-substitutable at once: four agents each
-contributing an equal, unspecialised, unreplaceable increment. A volume machine.
-PLAN §7 anticipated the second finding as the strongest form of the thesis; it
-did not anticipate the third, and the third is what makes the first two a
-picture rather than two nulls.
+~~That is a team which is additive and non-substitutable at once.~~ With the
+first finding withdrawn, the other two stop being surprising and start being
+implied: **a flat interaction and zero fungibility are what a zero main effect
+predicts.** Three findings collapse into one. At `medium`, on this model,
+removing one of four agents costs nothing measurable, and there is nothing to
+decompose.
 
-**What would overturn all of it is H3b**, and it is being measured before
-anything is built on top.
+**What now needs re-measuring is upstream of Phase 3 entirely.** `medium` was
+selected as the one operating point where the team beats a matched-budget single
+agent — C5 +0.126 at *p* < 0.001, §4.16b — **on the same 48-episode corpus whose
+four-agent baseline §4.22 has just shown to be the high draw.** `solo` and
+`solo_long` are being re-run on seeds 1000–1149 against the baseline already
+recorded there. If that contrast does not replicate either, the project's last
+positive finding goes with it, and the honest headline becomes that this task
+family rewards collaboration nowhere at 8B.
 
 ---
 

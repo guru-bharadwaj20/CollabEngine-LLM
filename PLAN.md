@@ -265,14 +265,24 @@ to be dropped to say so. Three clauses qualify how it must be read:
 ### Phase 3 — Causal ablation (GPU, ~2 weeks) — *the core contribution*
 - Implement both ablation modes from C1 (live re-run; frozen-transcript excision).
 
-> **Measured, 2026-08-13/14 — the stop condition is cleared and the grid is
-> piloted.** At `medium`, removing one of four agents costs **+0.055
-> [+0.023, +0.087]** over 192 live episodes (§4.19). That is the participation
-> effect this section's own §0 warns proves nothing, and the interaction that
-> would prove something is **chi2 = 3.73, *p* = 0.928**, shrinking at every
-> checkpoint. Fungibility is **−0.005**: survivors do not absorb a missing
-> agent's share, so the three-mode design's central expectation does not hold
-> here either (§4.20).
+> **Measured, 2026-08-13/14 — piloted, then withdrawn.** On seeds 0–47,
+> removing one of four agents at `medium` cost **+0.055 [+0.023, +0.087]** over
+> 192 live episodes (§4.19) — the participation effect this section's own §0
+> warns proves nothing. **On fresh seeds 1000–1149 the same quantity is +0.003
+> [−0.015, +0.021]** across 599 episodes, no agent distinguishable from zero
+> (§4.22). The three-agent arms reproduce across the two seed sets to within
+> 0.002 over 791 episodes; only the 48-episode four-agent baseline moved. The
+> effect was the reference, not the treatment.
+>
+> The interaction that would have proved something was already **chi2 = 3.73,
+> *p* = 0.928** and shrinking at every checkpoint, and fungibility is
+> **−0.005** — survivors do not absorb a missing agent's share, so the
+> three-mode design's central expectation does not hold here either (§4.20).
+> Those two now sit against a zero main effect, which makes them coherent
+> rather than separate: **there is nothing to decompose.**
+>
+> **The grid is halted at the preregistration's own branch rule**
+> (PREREG-phase3 Amendment 2), not paused pending more episodes.
 >
 > Two corrections to the plan above. **`frozen_excise` is not an available
 > mode** — see the C1 note. And **the capacity control does not control what
