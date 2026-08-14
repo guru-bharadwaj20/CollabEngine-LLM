@@ -114,6 +114,14 @@ When you remove agent i and re-run, the survivors reorganize and absorb its func
 > The cause is content propagation. Agents restate the whole working answer every turn, so a contribution is copied into everyone else's messages almost as soon as it is made. Deleting the originating messages removes the words but not the content. Read naively this reports "agent contributed nothing" when the truth is "this measurement does not work on this transcript."
 >
 > `ablation.propagation_index()` measures how much of an agent's content is echoed by others later in the episode, and decides which frozen mode to trust. **Run it before reporting any excision-based number.** Whether real 7–8B agents restate as aggressively as the mock is an open empirical question for Phase 2 — but the diagnostic is now in place to answer it rather than assume.
+>
+> **Answered, 2026-08-13 (RESEARCH-LOG §4.18): yes, they restate.** Propagation
+> on the 48 real `medium` team episodes is **0.589** (A1 0.612, A2 0.588,
+> A3 0.581, A4 0.576), and the excision drops are the same ~0.000 the mock
+> produced against live drops of 0.03–0.23. **`frozen_excise` is unusable on
+> this corpus** and is not an arm of the grid. Phase 3 is `live` +
+> `frozen_replay`, both of which cost model calls, so there is no free preview
+> of the ablation matrix. The diagnostic has now earned itself twice.
 
 ### C2 — Position, not identity
 The most likely deflating explanation of the entire phenomenon: agent 1 "plans" only because it speaks first. Roles attach to *turn position*, not to *agent identity* — and that is not specialization, it is protocol.
@@ -256,6 +264,25 @@ to be dropped to say so. Three clauses qualify how it must be read:
 
 ### Phase 3 — Causal ablation (GPU, ~2 weeks) — *the core contribution*
 - Implement both ablation modes from C1 (live re-run; frozen-transcript excision).
+
+> **Measured, 2026-08-13/14 — the stop condition is cleared and the grid is
+> piloted.** At `medium`, removing one of four agents costs **+0.055
+> [+0.023, +0.087]** over 192 live episodes (§4.19). That is the participation
+> effect this section's own §0 warns proves nothing, and the interaction that
+> would prove something is **chi2 = 3.73, *p* = 0.928**, shrinking at every
+> checkpoint. Fungibility is **−0.005**: survivors do not absorb a missing
+> agent's share, so the three-mode design's central expectation does not hold
+> here either (§4.20).
+>
+> Two corrections to the plan above. **`frozen_excise` is not an available
+> mode** — see the C1 note. And **the capacity control does not control what
+> this section reads it as controlling**: `capacity_control` lowers `n_agents`
+> by one, which always removes the *last* agent, so three of the four live
+> cells have no matched control. On the one roster-matched cell, 74% of the
+> attributed drop is unexplained by head-count at *p* = 0.123 — under-powered,
+> and exactly the size that would matter. Whether the ablation instrument is
+> neutral is now a preregistered hypothesis in its own right (H3b,
+> `docs/PREREG-phase3.md`) and is logically prior to the grid.
 - Run the full condition grid: baseline + per-agent ablation × both modes.
 - **Controls that make the result interpretable:**
   - **Capacity control** — an N−1 team that *never had* agent i, run from scratch. Separates "specialization" from "one fewer worker."
