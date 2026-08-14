@@ -104,6 +104,12 @@ The agent × component interaction was already null on the pilot — chi2 = 3.73
 
 **What caught this was the fresh-seed rule**, and it is worth being plain about what it caught: a headline finding, in a project that had already survived seven corrections, produced entirely by a 48-episode reference on an arm with `sd` ≈ 0.15.
 
+**`medium` itself was selected on that same corpus, so it was re-measured too** ([§4.23](docs/RESEARCH-LOG.md)). The gate goes +0.045 → **−0.003** (*p* = 0.865). C5 — the contrast that made `medium` the operating point — goes +0.126 → +0.060, and **+0.003 once answer-turn truncation is dropped**, because `solo_long` carries 34% truncation and 20 cut answers against the team's 8% and 4. That is the **third** positive result in this project to turn out to be the token cap, after `hard` at *d* = 1.09 (§4.10) and `medium` at §4.14.
+
+**On fresh seeds, one agent scores 0.579, three agents 0.574, four agents 0.576** — a spread of 0.005 across 899 episodes. Team size does nothing here. The only arm that differs is the one given *more turns*, and it differs downward: the same agent at 12 rounds instead of 3 scores 0.516, **−0.063 at *p* = 0.012**.
+
+So the result is the negative one, and it is worth stating in the form the evidence supports: **this task family rewards collaboration at no operating point measured — three tiers, two instruments, two seed sets, at 8B.** Everything that reproduced across seed sets is a null or a negative; everything that failed to reproduce was a positive measured against that 48-episode baseline.
+
 **Phase 2 finds no role differentiation either.** 468 messages coded against an eight-action taxonomy: agents within an episode differ no more in what they do than shuffling the labels among them produces (*p* = 0.45), and no agent identity carries a stable tendency across episodes (*p* = 1.00). The one robust behavioural result is between conditions rather than within teams — **teams generate and lone agents audit**: propose as a share of propose+verify is 0.674 for teams against 0.403 for solo, *p* < 0.0001.
 
 That null was defended with an instrument check: the local 8B coder agreed with a stronger blind rater at **κ = 0.68 [0.50, 0.85]**. Both raters were Google models, and the log always flagged their agreement as an upper bound.
