@@ -2737,14 +2737,23 @@ the reading of §4.12 in opposite directions at the two tiers analysed so far.
    happen before Phase 2 is re-run: `organize` must be disambiguated against a
    task whose content *is* dividing up work, and the judge must be re-validated
    against a rater who has not seen this project.
-5. **Convergent validity:** do transcript labels predict causal profiles? With
-   no ablation grid there is no causal profile to correlate against, so
-   convergence can only be reported against *score* contribution — a weaker
-   target that must be labelled as such.
+5. **Convergent validity:** do transcript labels predict causal profiles?
+   ~~With no ablation grid there is no causal profile to correlate against.~~
+   **There is one now** (§4.19): per-agent live drops at `medium`, n=48. The
+   blocker has moved to the *other* side of the correlation — §4.17 has the
+   judge at κ = 0.29 against a needed 0.78, so there are causal profiles and no
+   trustworthy labels to correlate them with.
 6. Extend N via resume; Phase 4 robustness across model families and team sizes.
-7. Preregister Phases 3–4 — and C4 — before running them again. C4 was built
-   and run in a single afternoon in response to §4.9; it is exploratory, and
-   §4.12 says so.
+7. ~~Preregister Phases 3–4 — and C4 — before running them again.~~
+   **Done for Phase 3**, `docs/PREREG-phase3.md`, written before any
+   confirmatory episode existed and amended once from a control result. Phase 4
+   is still unpreregistered and is blocked on item 5 regardless.
+8. **Is the ablation instrument neutral?** (§4.20, PREREG-phase3 H3b.) The
+   newest open question and the one that gates the others: `live:A4` and
+   `capacity:3` leave the identical roster and differ by +0.052 at *p* = 0.123.
+   If that is real, every drop in §4.19–4.20 measures the configuration as much
+   as the agent. Being tested at n=150 before the confirmatory grid is sized,
+   because it is an eighth of the cost and logically prior.
 
 **The honest summary of what Phase 1 cost and bought.** It bought a negative
 result that has now survived three instruments, five operating points and seven
@@ -2754,13 +2763,30 @@ published a *d* = 1.09 at *p* < 0.0001 as the project's headline. That last one
 is no longer a near miss to be described carefully — the artifact was removed at
 the source and the number it produced is now measured at −0.026, *p* = 0.500.
 
-It cost the ablation grid, which was the headline deliverable. The grid stays
-blocked, and the case for it is weaker than it was on 2026-08-12: §4.12 was the
-first evidence that an operating point might exist where the team contributes
-something to ablate, and §4.15 shows that at `hard` most of that evidence was
-the single-agent baseline's brief rather than the team's contribution. What
-remains is `medium`, where the team leads a properly-briefed single agent by
-+0.142 at *p* = 0.002 on matched budget. One tier is not an operating point.
+~~It cost the ablation grid, which was the headline deliverable. The grid stays
+blocked.~~ **Superseded 2026-08-13/14.** The stop condition is cleared and the
+grid is piloted (§4.19–4.20). `medium` is still one tier of three, and that has
+not changed — but it is an operating point where removing an agent measurably
+costs the team, which is all the grid ever needed.
+
+**Where the project actually stands.** Three findings, none of which is the one
+the project set out to make, and together they are more interesting than it was:
+
+1. **Participation is real.** +0.055 [+0.023, +0.087] per agent at `medium`.
+2. **Specialization is not.** Interaction *p* = 0.928, shrinking at every
+   checkpoint, with a residual matrix holding less structure than a true null
+   would produce.
+3. **Compensation is not either.** Fungibility −0.005. Survivors do not absorb
+   a missing agent's share.
+
+That is a team which is additive and non-substitutable at once: four agents each
+contributing an equal, unspecialised, unreplaceable increment. A volume machine.
+PLAN §7 anticipated the second finding as the strongest form of the thesis; it
+did not anticipate the third, and the third is what makes the first two a
+picture rather than two nulls.
+
+**What would overturn all of it is H3b**, and it is being measured before
+anything is built on top.
 
 ---
 
@@ -2915,6 +2941,17 @@ remains is `medium`, where the team leads a properly-briefed single agent by
 | `5ea7875` | **Move the operating point to `hard`** |
 | `2c9aa07` | **Record the Phase 1 gate result** |
 
+| Day 6 — Phase 3 opens | |
+|---|---|
+| `f65b09a` | **Gate report: the matched arms are matched on turns, not on generation** |
+| `fd84c54` | Gate report: print the contrast that says whether C5 is a fair baseline |
+| `4f747c4` | Log 4.18: what Phase 3 costs, and why `frozen_excise` cannot help pay |
+| `7c1d56f` | Log 4.16c: qualify statement 3 where it is made |
+| `a343fb1` | **Log 4.19: the live-ablation pilot — participation is real, specialization is not** |
+| `5a5b67d` | Overnight watch: take the card when it is free, spend it, hand it back |
+| `1aa046a` | Prereg Phase 3: register the bound, and the crossover I am not testing |
+| `c3e8810` | **Log 4.20: no compensation, and a control that controls one cell** |
+
 ## Appendix B — Module inventory
 
 | Module | Lines | Role |
@@ -2952,6 +2989,8 @@ because every test went through that subclass (§3.3).
 | `scripts/served-run.sh` | The whole difficulty curve on the served instrument — three tiers, preflight-gated, resumable (§4.9–4.11) |
 | `scripts/budget-run.sh` | The C4 matched-budget arm across the three tiers (§4.12). Off by default in the pipeline: it costs what the team arm costs |
 | `scripts/answer-run.sh` | The answer-budget re-measurement and the C5 baseline together — four arms × three tiers, preflight-gated, resumable (§4.14–4.15). Both in one run because they share every other setting, and measuring C5 on a different instrument from the gate it informs is §4.1c's mistake |
+| `scripts/h3b-run.sh` | The one roster-matched pair at n=150 — `live:A4` against `capacity:3`, baseline first because `ablate` derives its plans from recorded episodes. Tests whether the ablation instrument is neutral (§4.20, PREREG-phase3 H3b) at an eighth the cost of the grid it gates |
+| `scripts/overnight-watch.sh` | Waits for a wall-clock time, then takes the card only on 22 GB free **stable across three checks** — a single free reading is one moment, and the gap between two phases of somebody else's job looks exactly like an idle card. Signals only the `llama-server` it started, by the Windows pid it looks up afterwards, because `serve.sh --detach` prints an MSYS pid and killing by it is how the wrong process dies here. Releases the card on ALL DONE |
 | `scripts/guard.sh` | Restarts the server and resumes the run if it dies, on a box where four of the local accounts are administrators and no process can be made unkillable. Waits for the card rather than competing for it, signals only processes owned by the current user with a command line rooted in this repo, and releases the card on `ALL DONE`. `--list-clients` dry-runs the selector (lesson 16) |
 | `scripts/handcode_kappa.py` | κ between the served judge and the human coding, with a bootstrap CI and a refusal to compare labels from two codebook versions (§4.13, §4.13b) |
 | `scripts/repair.py` | Regenerates instrument failures at low concurrency. Refuses to touch conditions the regeneration pass would not rewrite, after a dry run showed it would have deleted a `fixed_order` episode |
@@ -2974,4 +3013,5 @@ because every test went through that subclass (§3.3).
 | `configs/llamacpp-medium-ans.yaml` | `medium` on the answer-budget instrument — `answer_max_tokens` 3072, `max_model_len` 15,360 so the slot stays 18,432, `max_concurrency` 7. Measured at n=24 and n=48; gate not significant at either (§4.14, §4.16b) |
 | `configs/llamacpp-hard-ans.yaml` | `hard`, same. **The tier that decides §4.10.** Measured; the *d* = 1.09 pass becomes −0.026 at *p* = 0.500 (§4.15) |
 | `configs/llamacpp-xhard-ans.yaml` | `xhard`, same |
+| `configs/llamacpp-medium-h3b.yaml` | `medium`, identical to `-ans` except seeds 1000–1149 and n=150. Identical on purpose: H3b asks whether two ways of running the *same* three agents agree, so any other difference would be the thing measured (§4.20) |
 | `configs/vllm-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |

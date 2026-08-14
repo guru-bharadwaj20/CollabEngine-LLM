@@ -106,6 +106,15 @@ def main(argv: list[str] | None = None) -> int:
             "capacity, random_message"
         ),
     )
+    p.add_argument(
+        "--agents",
+        help=(
+            "comma-separated agent ids to ablate; default all. Exists so the "
+            "one roster-matched cell can be run on its own: capacity_control "
+            "lowers n_agents by one, which always drops the LAST agent, so "
+            "only live:<last> shares a roster with it (RESEARCH-LOG 4.20)"
+        ),
+    )
 
     p = sub.add_parser("analyze", help="interaction report from transcripts")
     p.add_argument("--config", type=Path, required=True)
@@ -333,7 +342,16 @@ def cmd_ablate(args: argparse.Namespace) -> int:
     records = [r for r in TranscriptReader(baseline_path) if r.condition == "baseline"]
     modes = {m.strip() for m in args.modes.split(",") if m.strip()}
     agents = [a.agent_id for a in build_team(config.team, config.seed_start)]
-    plans = _ablation_plans(config, backend, records, modes)
+    only = None
+    if getattr(args, "agents", None):
+        only = [a.strip() for a in args.agents.split(",") if a.strip()]
+        unknown = sorted(set(only) - set(agents))
+        if unknown:
+            print(f"no such agent(s): {', '.join(unknown)}; roster is "
+                  f"{', '.join(agents)}", file=sys.stderr)
+            return 2
+        agents = only
+    plans = _ablation_plans(config, backend, records, modes, only=only)
 
     stats = asyncio.run(
         run_plan(
@@ -348,14 +366,25 @@ def cmd_ablate(args: argparse.Namespace) -> int:
     return 0 if stats.failed == 0 else 1
 
 
-def _ablation_plans(config, backend, records, modes: set[str]) -> list[RunPlan]:
+def _ablation_plans(
+    config, backend, records, modes: set[str], only: list[str] | None = None
+) -> list[RunPlan]:
     """The Phase 3 condition grid over a recorded baseline.
 
     `frozen_excise` and `random_message` cost zero model calls, so they run over
     every episode rather than a sampled subset -- and the second is what makes
     the first interpretable, since excising k messages also shortens the context.
+
+    `only` restricts which agents are ablated. It exists because the capacity
+    control is roster-matched to exactly one live cell: `capacity_control`
+    lowers `n_agents` by one and `build_team` numbers positionally, so the
+    smaller team is always A1..A(n-1) and only `live:A(n)` leaves that same
+    roster. Testing whether the ablation instrument is neutral therefore needs
+    one cell at high n, not four at low n (RESEARCH-LOG 4.20, PREREG-phase3 H3b).
     """
     agents = [a.agent_id for a in build_team(config.team, config.seed_start)]
+    if only:
+        agents = [a for a in agents if a in only]
     plans: list[RunPlan] = []
 
     difficulty = config.team.difficulty
