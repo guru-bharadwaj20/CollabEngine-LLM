@@ -334,13 +334,24 @@ def cmd_ablate(args: argparse.Namespace) -> int:
     config = ExperimentConfig.load(args.config)
     backend = config.backend.build()
     baseline_path = config.run_dir / BASELINE
+    modes = {m.strip() for m in args.modes.split(",") if m.strip()}
+    needs_transcripts = bool(modes & _TRANSCRIPT_MODES)
 
-    if not baseline_path.exists():
-        print(f"no baseline at {baseline_path}; run `baseline` first", file=sys.stderr)
+    if not baseline_path.exists() and needs_transcripts:
+        print(f"no baseline at {baseline_path}; run `baseline` first -- "
+              f"{', '.join(sorted(modes & _TRANSCRIPT_MODES))} counterfactual "
+              f"against a recorded transcript", file=sys.stderr)
         return 2
 
-    records = [r for r in TranscriptReader(baseline_path) if r.condition == "baseline"]
-    modes = {m.strip() for m in args.modes.split(",") if m.strip()}
+    records = (
+        [r for r in TranscriptReader(baseline_path) if r.condition == "baseline"]
+        if baseline_path.exists()
+        else []
+    )
+    # Scratch modes are driven by the config's seed range rather than by what
+    # happens to be recorded, so they do not silently shrink to the number of
+    # baseline episodes that exist yet.
+    seeds = list(range(config.seed_start, config.seed_start + config.n_episodes))
     agents = [a.agent_id for a in build_team(config.team, config.seed_start)]
     only = None
     if getattr(args, "agents", None):
@@ -351,7 +362,7 @@ def cmd_ablate(args: argparse.Namespace) -> int:
                   f"{', '.join(agents)}", file=sys.stderr)
             return 2
         agents = only
-    plans = _ablation_plans(config, backend, records, modes, only=only)
+    plans = _ablation_plans(config, backend, records, modes, only=only, seeds=seeds)
 
     stats = asyncio.run(
         run_plan(
@@ -366,8 +377,19 @@ def cmd_ablate(args: argparse.Namespace) -> int:
     return 0 if stats.failed == 0 else 1
 
 
+#: Modes that counterfactual against a recorded transcript, and therefore
+#: cannot run before the baseline exists. `live` and `capacity` re-run the
+#: episode from scratch and need only the seed.
+_TRANSCRIPT_MODES = frozenset({"frozen_replay", "frozen_excise", "random_message"})
+
+
 def _ablation_plans(
-    config, backend, records, modes: set[str], only: list[str] | None = None
+    config,
+    backend,
+    records,
+    modes: set[str],
+    only: list[str] | None = None,
+    seeds: list[int] | None = None,
 ) -> list[RunPlan]:
     """The Phase 3 condition grid over a recorded baseline.
 
@@ -390,8 +412,13 @@ def _ablation_plans(
     difficulty = config.team.difficulty
     capacity_size = max(1, config.team.n_agents - 1)
 
-    for record in records:
-        seed = record.instance_seed
+    # `live` and `capacity` re-run the episode from scratch, so a seed is all
+    # they need -- they never read the recorded transcript. Splitting them out
+    # is what lets the cheap arms run before the expensive baseline they would
+    # otherwise wait on: H3b is a two-arm contrast that does not use the
+    # baseline at all, and making it wait for 150 twelve-turn episodes put 40%
+    # of the work on the critical path of a question that does not ask it.
+    for seed in seeds if seeds is not None else [r.instance_seed for r in records]:
         if "capacity" in modes:
             plans.append(
                 RunPlan(
@@ -414,6 +441,12 @@ def _ablation_plans(
                         ),
                     )
                 )
+
+    # The frozen and volume modes counterfactual against what was actually
+    # said, so these genuinely need the recorded episode.
+    for record in records:
+        seed = record.instance_seed
+        for agent in agents:
             if "frozen_replay" in modes:
                 plans.append(
                     RunPlan(
