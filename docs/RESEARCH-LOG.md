@@ -2644,6 +2644,91 @@ by the rule.
 
 ---
 
+### 4.22 H2 does not replicate, and the participation effect was a 48-episode baseline
+
+Fresh seeds 1000–1149, live ablation for all four agents, 599 usable episodes
+against a 149-episode baseline. 0 failed. Nothing here is blended with the pilot.
+
+| agent | n | ablated | drop | 95% CI | perm *p* | pilot | Δ |
+|---|---|---|---|---|---|---|---|
+| A1 | 149 | 0.575 | +0.002 | [−0.034, +0.038] | 0.911 | +0.049 | −0.047 |
+| A2 | 149 | 0.561 | +0.015 | [−0.023, +0.054] | 0.408 | +0.037 | −0.022 |
+| A3 | 149 | 0.599 | **−0.022** | [−0.057, +0.013] | 0.230 | +0.064 | −0.086 |
+| A4 | 148 | 0.560 | +0.016 | [−0.019, +0.051] | 0.396 | +0.071 | −0.055 |
+| **pooled** | **595** | | **+0.003** | **[−0.015, +0.021]** | | +0.055 | −0.052 |
+
+**Not one agent shows a drop distinguishable from zero, and the pooled interval
+is [−0.015, +0.021].** That is not an underpowered null — it is a *tight* null at
+n = 595 against the pilot's 192. A3's drop changes sign.
+
+#### Where the effect went, which is answerable exactly
+
+The two seed sets disagree about the four-agent baseline and agree about
+everything else:
+
+| | pilot 0–47 | fresh 1000–1149 | |
+|---|---|---|---|
+| baseline, 4 agents | **0.631** (n=48) | **0.577** (n=149) | −0.054, *p* = 0.032 |
+| `live:A1`, 3 agents | 0.582 | 0.575 | |
+| `live:A2`, 3 agents | 0.593 | 0.562 | |
+| `live:A3`, 3 agents | 0.567 | 0.598 | |
+| `live:A4`, 3 agents | 0.560 | 0.559 | |
+| **all 3-agent arms** | **0.575** (n=192) | **0.574** (n=599) | **−0.002, *p* = 0.905** |
+
+**The three-agent arms reproduce to within 0.002 across 791 episodes. Only the
+four-agent baseline moved.** The +0.055 "participation effect" of §4.19 was the
+difference between a 48-episode baseline that drew high and a set of ablated
+arms that were always where they are now.
+
+#### This also corrects §4.21
+
+§4.21 audited the −0.054 and concluded "not a plumbing bug — treat as genuine
+seed variance". The first half stands. **The second half is wrong**, and these
+791 episodes are what show it: if seeds 1000–1149 were genuinely harder, the
+three-agent arms would carry the same penalty. They do not move at all
+(*p* = 0.905). The seed ranges are equivalent; what varied was a mean estimated
+from 48 episodes on an arm with `sd` ≈ 0.15, giving a standard error of ~0.021
+against an effect being read off it of ~0.05.
+
+Not seed variance. **Sampling noise in a small baseline, mistaken for a
+treatment effect** — and §4.21 reached for the more interesting explanation
+before the cheaper one had been excluded.
+
+#### A verdict heuristic that fired wrongly, recorded because it nearly stuck
+
+The analysis prints a branch verdict, and it printed **MIXED — spread exceeds the
+pooled effect; report per agent**. That trigger is degenerate here: the spread
+(0.038) exceeds the pooled effect (0.003) because the pooled effect is *zero*,
+not because the agents disagree. All four intervals overlap heavily and all four
+contain zero — they agree, on nothing. The honest verdict is **DOES NOT
+REPLICATE**. A rule written to stop a real disagreement being averaged away
+manufactured a disagreement out of a null.
+
+#### What now stands, and it is three nulls
+
+| | §4.19–4.20 claim | after fresh seeds |
+|---|---|---|
+| participation | +0.055 [+0.023, +0.087] | **+0.003 [−0.015, +0.021]** |
+| specialization | *p* = 0.928, sub-chance residuals | unchanged, and now against a null main effect |
+| compensation | fungibility −0.005 | unchanged |
+
+Removing an agent from a four-agent team at `medium` costs nothing measurable.
+There is no participation effect to decompose, so the agent × component
+interaction has no main effect to be an interaction *of*, and the fungibility
+metric is a difference between two zeros.
+
+**Per the preregistration's own branch rule the grid stays paused.** H3, H4, H1e
+and the remaining `frozen_replay`, `random_message` and capacity cells are all
+expressed as drops from a baseline that H2 has just shown does not support them.
+Running them now would generate numbers, not results.
+
+**The fresh-seed rule is what caught this**, and it is worth stating plainly what
+it caught: a headline finding, in a project that had already survived seven
+corrections, produced entirely by a 48-episode reference. PREREG-phase3
+Amendment 2 records the consequence.
+
+---
+
 ## 5. Instrument validity work
 
 Disproportionate effort went here, and in retrospect that was correct: four of

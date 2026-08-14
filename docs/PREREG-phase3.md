@@ -169,6 +169,62 @@ against the capacity arm rather than against the four-agent baseline.
 Nothing else changes. No hypothesis direction is edited, and this amendment is
 written from a control result, not from any test of H1–H5.
 
+## Amendment 2 — 2026-08-14 23:3x, after H2 and before anything else
+
+**H2 failed. The grid is halted, and the headline changes.**
+
+Fresh seeds 1000–1149, all four agents, 599 usable ablation episodes against a
+150-episode baseline: pooled live drop **+0.003, 95% CI [−0.015, +0.021]**, no
+agent individually distinguishable from zero, A3 negative. The pilot's estimate
+was +0.055 [+0.023, +0.087] (§4.22).
+
+**The cause is identified rather than suspected.** The three-agent arms reproduce
+across the two seed sets to within 0.002 over 791 episodes (*p* = 0.905); only
+the four-agent baseline moved, 0.631 → 0.577. The participation effect was the
+difference between a 48-episode baseline that drew high and ablated arms that
+have not moved at all.
+
+### What halts
+
+**H1, H1e, H3, H4 and H5 are suspended, and the remaining `frozen_replay`,
+`random_message` and capacity arms are not run.** Every one of them is expressed
+as a drop from the four-agent baseline. With the pooled drop at +0.003 there is
+no main effect to decompose: an agent × component interaction needs a
+contribution to be differentially distributed, and the fungibility metric would
+be a difference between two zeros. Running them would produce numbers with no
+quantity behind them.
+
+This is the preregistration's own branch rule — *"H1 fails, H2 fails → report the
+failure to replicate and stop"* — and it is being followed rather than
+renegotiated now that it has fired.
+
+### What the project's result now is
+
+Three nulls, and they are consistent with each other: no participation, no
+specialization, no compensation. At `medium`, on this model, removing one of four
+agents costs nothing measurable — which subsumes rather than contradicts
+§4.19–4.20, since a flat interaction and zero fungibility are what a
+zero main effect predicts.
+
+### What replaces the grid
+
+Not more ablation. The open question is now upstream of Phase 3 entirely:
+**`medium` was selected as the one operating point where the team beats a
+matched-budget single agent, and that selection rests on the same 48-episode
+corpus** (§4.16b, +0.126 at *p* < 0.001 against C5). H2 has just shown that
+corpus's four-agent baseline to be the high draw. The C5 contrast must be
+re-measured on seeds 1000–1149 before any claim resting on `medium` stands.
+
+That is one arm — `solo_long` at n=150, ~2 GPU h — and it is now the highest
+value measurement available, because if it does not replicate either, the
+project's remaining positive finding goes with it.
+
+### What does not change
+
+The fresh-seed rule, which is what caught this. No hypothesis direction is
+edited. No result is deleted; §4.19 and §4.20 stand as recorded with §4.22
+attached to them.
+
 ## What would make me amend this
 
 Stated in advance, since amendments after a glimpse are how a preregistration is
