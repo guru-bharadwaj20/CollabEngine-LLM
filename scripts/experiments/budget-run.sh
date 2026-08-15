@@ -12,11 +12,11 @@
 # leaves the multi-agent structure. It does not replace the gate -- team vs solo
 # stays exactly as preregistered -- it decides which reading of it survives.
 #
-# Runs after scripts/served-run.sh. Same server, same configs, same seeds, so
+# Runs after scripts/experiments/served-run.sh. Same server, same configs, same seeds, so
 # the new arm is paired with the two already on disk rather than merely matched.
 #
-#   scripts/budget-run.sh              # all three tiers
-#   TIERS="medium" scripts/budget-run.sh
+#   scripts/experiments/budget-run.sh              # all three tiers
+#   TIERS="medium" scripts/experiments/budget-run.sh
 #
 # Resumes like every other stage: episodes already on disk are skipped, so this
 # is safe to re-run and a death costs only the unfinished episodes.
@@ -49,7 +49,7 @@ for tier in $TIERS; do
   # undersized slot or the wrong weights fails every tier identically, and
   # finding out on the third one wastes the first two.
   say "=== $i  preflight $tier ==="
-  if ! python -u scripts/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
+  if ! python -u scripts/ops/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
     say "PREFLIGHT FAILED for $tier -- stopping."
     exit 1
   fi
@@ -59,4 +59,4 @@ for tier in $TIERS; do
     --phases solo_budget --episodes 24 2>&1 | tee -a "$LOG"
 done
 
-say "C4 DONE -- python scripts/gate_report.py reads the new arm from the same corpus"
+say "C4 DONE -- python scripts/analysis/gate_report.py reads the new arm from the same corpus"

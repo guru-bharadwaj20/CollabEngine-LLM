@@ -161,11 +161,11 @@ The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving one mod
 **The in-process path cannot run the largest tier, and the reason is not a tuning knob.** A bf16 prefill materialises a logits distribution for every prompt position over a 151,936-entry vocabulary, at 1–1.5 MB per prompt token on top of 15.3 GiB of resident weights; `xhard` prompts start near 5,200 tokens. The tier runs instead against a llama.cpp server holding a 4-bit GGUF, where prefill is chunked into `-ub`-sized micro-batches and logits are materialised only for the sampled position — the vocabulary size stops mattering, which is the actual fix. Weights drop to ~4.6 GiB and the whole difficulty curve moves onto that instrument together, because a curve with one point measured elsewhere measures the instrument. See [`docs/LLAMACPP-SETUP.md`](docs/LLAMACPP-SETUP.md) for the memory arithmetic and [PREREG Amendment 2](docs/PREREG-xhard.md) for what the change costs.
 
 ```bash
-scripts/serve.sh --detach                                          # llama-server
-python scripts/preflight.py --config configs/llamacpp/xhard.yaml   # a minute
-scripts/served-run.sh          # all three tiers, preflight-gated, resumable
-scripts/budget-run.sh          # the C4 matched-budget arm (costs a team arm each)
-python scripts/gate_report.py  # every gate number in this README
+scripts/ops/serve.sh --detach                                          # llama-server
+python scripts/ops/preflight.py --config configs/llamacpp/xhard.yaml   # a minute
+scripts/experiments/served-run.sh          # all three tiers, preflight-gated, resumable
+scripts/experiments/budget-run.sh          # the C4 matched-budget arm (costs a team arm each)
+python scripts/analysis/gate_report.py  # every gate number in this README
 ```
 
 `preflight` is not a formality. Three corpora in this project were lost to conditions that were true before the first episode ran and detectable in seconds — an undersized slot, a server holding different weights, a card already full. It checks all three in about a minute. It is also where §3.12 lives: its slot check silently did nothing for every served run until the day it was found asking `/v1/props` of a server that serves `/props`.
@@ -182,7 +182,7 @@ The remedy is a hard cap rather than a better budget. `memory_fraction` calls `s
 
 The remaining inefficiency is structural: a chunk runs until its longest member stops, so ~40% of decode steps generate padding for finished sequences. Continuous batching is the fix and the main reason to prefer vLLM (~3–5× here) where a build exists.
 
-> On a shared machine, check *free VRAM* rather than your own processes before starting — `scripts/queue-judge.sh` does this and waits. Two 15 GiB models on one 24 GB card do not fail, they page. ([§3.9](docs/RESEARCH-LOG.md))
+> On a shared machine, check *free VRAM* rather than your own processes before starting — `scripts/ops/queue-judge.sh` does this and waits. Two 15 GiB models on one 24 GB card do not fail, they page. ([§3.9](docs/RESEARCH-LOG.md))
 
 ### The observational half
 
@@ -238,8 +238,8 @@ The random effect is not decoration. The same instance is played by the un-ablat
 | `analysis/` | `interaction`, `mixed`, `coding`, `convergent`, `integrity` (instrument failures vs team failures), `scoring` (three metrics, re-scorable offline) |
 | `runner/` | Bounded-concurrency execution with resume |
 | `transcripts/` | JSONL episode records, sharded for parallel writers |
-| `scripts/figures.py` | Regenerates every figure above from the corpus |
-| `scripts/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, before the night is spent |
+| `scripts/analysis/figures.py` | Regenerates every figure above from the corpus |
+| `scripts/ops/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, before the night is spent |
 | `docs/RESEARCH-LOG.md` | Full record: every failure, pivot and measurement, with what each cost |
 | `docs/PREREG-xhard.md` | A preregistered prediction, its two amendments, and why the tier had to change instrument to run at all |
 | `docs/LLAMACPP-SETUP.md` | Serving arithmetic: KV per token, the `--parallel` trap, and why `-ub` is the fix |

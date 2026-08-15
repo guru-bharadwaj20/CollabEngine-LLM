@@ -9,7 +9,7 @@
 # from `medium` to `hard` to `xhard` on this instrument, the instance size is
 # not biting and H1 is untestable on this run rather than false (H4).
 #
-#   python scripts/preflight.py --config configs/llamacpp/medium.yaml
+#   python scripts/ops/preflight.py --config configs/llamacpp/medium.yaml
 #   collabengine pipeline --config configs/llamacpp/medium.yaml \
 #                         --phases baseline,solo
 #

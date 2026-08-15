@@ -11,8 +11,8 @@ So this file is the one path. It applies `analysis.integrity`, scores through
 `analysis.scoring`, and prints the integrity audit **before** the means, so a
 censored arm cannot be read without seeing that it was censored.
 
-    python scripts/gate_report.py                     # every corpus it can find
-    python scripts/gate_report.py --run-dir runs/llama31-8b-q4-hard
+    python scripts/analysis/gate_report.py                     # every corpus it can find
+    python scripts/analysis/gate_report.py --run-dir runs/llama31-8b-q4-hard
 """
 
 from __future__ import annotations

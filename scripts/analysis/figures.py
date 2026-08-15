@@ -6,7 +6,7 @@ by this file, through the same integrity filter and the same scoring module the
 analysis uses. A figure that disagrees with the tables would otherwise be
 impossible to catch.
 
-    python scripts/figures.py [--run-dir runs/llama31-8b-q4-hard]
+    python scripts/analysis/figures.py [--run-dir runs/llama31-8b-q4-hard]
 
 The one exception is the throughput panel, whose numbers come from a batch-size
 sweep that needs the GPU; those are transcribed from RESEARCH-LOG 4.3 and

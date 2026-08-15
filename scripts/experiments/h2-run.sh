@@ -28,7 +28,7 @@ say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 say "H2 fresh-seed replication: live ablation for $AGENTS on seeds 1000-1149"
 
-if ! python -u scripts/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
+if ! python -u scripts/ops/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
   say "PREFLIGHT FAILED -- nothing after this runs clean"
   exit 1
 fi
