@@ -1,6 +1,6 @@
 """Phase 4: do transcript labels predict causal contribution?
 
-This is the question the project exists to answer, and the claim in PLAN.md 7
+This is the question the project exists to answer, and the claim in docs/PLAN.md 7
 turns on it:
 
 > Emergent role differentiation ... is behaviorally observable and statistically

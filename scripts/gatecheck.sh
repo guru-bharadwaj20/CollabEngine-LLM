@@ -3,7 +3,7 @@
 # well before stage 1 finishes and about ninety minutes before the ablation
 # grid starts.
 #
-# The pipeline runs stage 2 straight after stage 1 with no pause. PLAN.md makes
+# The pipeline runs stage 2 straight after stage 1 with no pause. docs/PLAN.md makes
 # a failed gate a stop condition, so without something watching, a corpus that
 # has already shown the team contributing nothing still costs nine hours of
 # ablation measuring its own noise floor.

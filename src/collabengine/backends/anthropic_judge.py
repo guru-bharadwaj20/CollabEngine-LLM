@@ -1,6 +1,6 @@
 """Frontier-model judge backend, for behavioral coding only.
 
-PLAN.md 4, Phase 2: *"Use a frontier API model as the judge -- a local 7-8B is
+docs/PLAN.md 4, Phase 2: *"Use a frontier API model as the judge -- a local 7-8B is
 too weak to code reliably. Two judges from different families, blind to
 condition."* This backend is the first of those two judges.
 

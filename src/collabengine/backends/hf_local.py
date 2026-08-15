@@ -1,6 +1,6 @@
 """In-process CUDA backend: `transformers` with dynamic micro-batching.
 
-PLAN.md 5 wanted vLLM behind an OpenAI-compatible endpoint. vLLM ships no
+docs/PLAN.md 5 wanted vLLM behind an OpenAI-compatible endpoint. vLLM ships no
 supported Windows build, and this study runs on a Windows box with an RTX 4500
 Ada, so the serving layer is provided here instead. `OpenAICompatBackend` stays
 exactly as it is for a WSL2 vLLM server or a rented Linux box; swapping is a

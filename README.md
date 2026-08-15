@@ -4,7 +4,7 @@
 
 Several instances of the *same* open model share a task and a channel. Nobody is told to plan, criticise, or verify. If roles appear, the question is whether they are functionally real or a pattern being read into transcripts — and that is settled by ablation, not by reading.
 
-[Research design and phases](PLAN.md) · [Full engineering and research log](docs/RESEARCH-LOG.md)
+[Research design and phases](docs/PLAN.md) · [Full engineering and research log](docs/RESEARCH-LOG.md)
 
 ---
 
@@ -88,7 +88,7 @@ Two matched-budget arms now exist, differing only in the brief the single agent 
 
 **The design rule this produces is worth more than the effect size.** A single-agent baseline needs a single-agent brief. Running `n=1` through a prompt that says "you are one of 1 participants" and "the others" measures the harness, not the model — and it does so in the direction that flatters the team.
 
-PLAN.md made this a stop condition, so the ablation grid was held back: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
+[PLAN.md](docs/PLAN.md) made this a stop condition, so the ablation grid was held back: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
 
 **The stop condition was cleared, the grid was piloted — and the pilot did not replicate.** The sequence is the result, so it is given in order.
 
@@ -194,7 +194,7 @@ collabengine kappa    runs/<name>/codes.local8b.jsonl runs/<name>/codes.gemini3.
 collabengine converge --config configs/local-gpu.yaml --codes runs/<name>/codes.local8b.jsonl
 ```
 
-PLAN.md specifies a frontier API judge, because a local 7–8B is not a reliable coder. Frontier judges are supported (`--judge anthropic`, `--judge gemini`), and a judge only ever reads finished transcripts — using one to *produce* agent turns would destroy the one-model control the design rests on.
+[PLAN.md](docs/PLAN.md) specifies a frontier API judge, because a local 7–8B is not a reliable coder. Frontier judges are supported (`--judge anthropic`, `--judge gemini`), and a judge only ever reads finished transcripts — using one to *produce* agent turns would destroy the one-model control the design rests on.
 
 Without a paid key the free tiers do not stretch to a corpus: Gemini's free quota is metered **per day**, at 20 requests per model — fewer than one episode. So the free path codes everything locally (replies are ~8 tokens; batched on the same card it is minutes) and spends the daily frontier quota on a *subsample*, reporting Cohen's κ between the two. That does not make the local judge as good as a paid one; it measures how good it is, which is what κ is for. A value far below the 0.78 of the prior-art paper means Phase 4's correlation is not trustworthy on those labels — a result, not a hidden weakness.
 

@@ -292,7 +292,7 @@ to be dropped to say so. Three clauses qualify how it must be read:
 > attributed drop is unexplained by head-count at *p* = 0.123 — under-powered,
 > and exactly the size that would matter. Whether the ablation instrument is
 > neutral is now a preregistered hypothesis in its own right (H3b,
-> `docs/PREREG-phase3.md`) and is logically prior to the grid.
+> `PREREG-phase3.md`) and is logically prior to the grid.
 - Run the full condition grid: baseline + per-agent ablation × both modes.
 - **Controls that make the result interpretable:**
   - **Capacity control** — an N−1 team that *never had* agent i, run from scratch. Separates "specialization" from "one fewer worker."

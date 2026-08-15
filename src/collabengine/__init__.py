@@ -6,7 +6,7 @@ verifying whether the division of labor they develop is functionally real.
 The central measurement is not a scalar performance drop when an agent is
 ablated -- that only demonstrates participation. It is the agent x task-component
 interaction: whether ablating an agent damages *its* components differentially.
-See PLAN.md.
+See docs/PLAN.md.
 """
 
 __version__ = "0.1.0"

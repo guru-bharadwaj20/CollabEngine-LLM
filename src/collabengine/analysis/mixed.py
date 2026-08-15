@@ -1,6 +1,6 @@
 """Mixed-effects test of the agent x component interaction.
 
-PLAN.md Phase 3 names this as the primary analysis: *"mixed-effects model with
+docs/PLAN.md Phase 3 names this as the primary analysis: *"mixed-effects model with
 episode as a random effect. The specialization claim lives or dies on this
 term, not on the main effect."*
 

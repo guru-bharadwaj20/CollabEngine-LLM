@@ -21,7 +21,7 @@ closed door.
 
 Two models on this key answer: `gemini-2.5-flash` and `gemini-3-flash-preview`.
 They have separate quotas, so the two-judge reliability run costs no extra
-wall clock. They are not two *families* though, which is what PLAN.md asks for
+wall clock. They are not two *families* though, which is what docs/PLAN.md asks for
 -- a kappa between two Google models is a weaker check than one across vendors,
 because correlated errors are likelier. Report it as such.
 """
