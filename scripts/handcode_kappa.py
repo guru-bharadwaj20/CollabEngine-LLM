@@ -5,7 +5,7 @@ a second model, and flags that both raters were Google models so their agreement
 is an upper bound. This is the check that flag was asking for: a human instead of
 a second model. It returns **kappa = 0.07** (RESEARCH-LOG 4.13).
 
-The human labels in `docs/handcode-sample.json` were assigned by reading the 40
+The human labels in `docs/data/handcode-sample.json` were assigned by reading the 40
 messages before any judge label for this corpus existed. This script supplies the
 other half and the agreement between them.
 
@@ -26,7 +26,7 @@ import asyncio
 import json
 from collections import Counter, defaultdict
 
-SAMPLE = "docs/handcode-sample.json"
+SAMPLE = "docs/data/handcode-sample.json"
 
 
 async def recode() -> None:

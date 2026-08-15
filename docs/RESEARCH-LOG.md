@@ -1830,7 +1830,7 @@ messages, it is two different tasks.
 is currently uninterpretable, so Phase 2 must not be re-run on it until the
 taxonomy's `organize` definition is disambiguated against a job-assignment task
 and the judge re-validated against a naive human rater. The sample, both label
-sets and the confusion matrix are committed at `docs/handcode-sample.json` so the
+sets and the confusion matrix are committed at `docs/data/handcode-sample.json` so the
 next attempt starts from data rather than from this paragraph.
 
 ### 4.13b Codebook v2 fixes the collision and does not fix the judge
@@ -1868,8 +1868,8 @@ stronger judge, a coarser taxonomy, or reporting Phase 2's differentiation resul
 with κ = 0.24 attached and letting the reader discount it accordingly — which on
 this evidence means discounting it to nothing.
 
-*Both label sets are kept: `docs/handcode-sample.v1.json` is the v1 coding and
-`docs/handcode-sample.json` the v2. The human column is identical in both, which
+*Both label sets are kept: `docs/data/handcode-sample.v1.json` is the v1 coding and
+`docs/data/handcode-sample.json` the v2. The human column is identical in both, which
 is what makes the comparison a measurement of the codebook rather than of me.*
 
 ---
