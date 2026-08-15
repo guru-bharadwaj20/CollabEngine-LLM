@@ -1,4 +1,4 @@
-# `medium` with the answer-bearing turn given its own budget.
+# `hard` with the answer-bearing turn given its own budget.
 #
 # RESEARCH-LOG 4.9-4.11: a single `max_tokens` is identical across arms and not
 # symmetric across them. Solo's last of three turns carries the whole answer;
@@ -15,18 +15,18 @@
 # The arithmetic, which must hold or the run is rejected before it starts:
 #
 #     max_model_len 15360 + answer_max_tokens 3072 = 18432 = tokens per slot
-#     worst measured `medium` prompt: well inside 15360 (14169 at xhard)
+#     worst measured `hard` prompt: well inside 15360 (14169 at xhard)
 #
 # The slot is unchanged at 18432, so the server does not restart and the card
 # does not need a byte more than the previous runs took.
 #
-# New run directory on purpose. The corpora in runs/llama31-8b-q4-medium were
+# New run directory on purpose. The corpora in runs/llama31-8b-q4-hard were
 # generated under the shared cap and stay exactly as they are; this instrument
 # is a different instrument and its results are not appended to theirs.
 #
-#   python scripts/preflight.py --config configs/llamacpp-medium-ans.yaml
-#   collabengine pipeline --config configs/llamacpp-medium-ans.yaml #                         --phases baseline,solo,solo_budget,solo_long
-name: llama31-8b-q4-medium-ans
+#   python scripts/preflight.py --config configs/llamacpp/hard-ans.yaml
+#   collabengine pipeline --config configs/llamacpp/hard-ans.yaml #                         --phases baseline,solo,solo_budget,solo_long
+name: llama31-8b-q4-hard-ans
 seed_start: 0
 n_episodes: 24
 out_dir: runs
@@ -48,7 +48,7 @@ backend:
 team:
   n_agents: 4
   rounds: 3
-  difficulty: medium
+  difficulty: hard
   symmetry: name_seed
   randomize_turn_order: true
   max_tokens: 1024

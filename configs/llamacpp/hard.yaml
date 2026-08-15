@@ -9,11 +9,11 @@
 #
 # See PREREG-xhard Amendment 2, written before any episode here was generated.
 #
-#   python scripts/preflight.py --config configs/llamacpp-hard.yaml
-#   collabengine pipeline --config configs/llamacpp-hard.yaml \
+#   python scripts/preflight.py --config configs/llamacpp/hard.yaml
+#   collabengine pipeline --config configs/llamacpp/hard.yaml \
 #                         --phases baseline,solo
 #
-# Everything below matches configs/llamacpp-xhard.yaml except `name` (so the
+# Everything below matches configs/llamacpp/xhard.yaml except `name` (so the
 # corpus lands in its own run_dir and cannot contaminate another tier) and
 # `difficulty`. Any other divergence makes the points on the curve
 # incomparable, which is the entire purpose of running this at all.

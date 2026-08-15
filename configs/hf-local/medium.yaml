@@ -12,9 +12,9 @@
 # damaged the team arm could reach it. Reusing it is what makes this 12
 # episodes instead of 24.
 #
-#   collabengine baseline --config configs/local-gpu-medium.yaml
+#   collabengine baseline --config configs/hf-local/medium.yaml
 #
-# Everything below matches configs/local-gpu.yaml except `name` (so the corpus
+# Everything below matches configs/hf-local/hard.yaml except `name` (so the corpus
 # lands in its own run_dir and cannot contaminate the hard corpus) and
 # `difficulty`. Any other divergence would make the two points on the curve
 # incomparable, which is the entire purpose of the exercise.

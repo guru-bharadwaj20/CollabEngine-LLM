@@ -7,9 +7,9 @@
 #     --gpu-memory-utilization 0.90
 #
 # Then:
-#   collabengine baseline --config configs/vllm-8b.yaml
-#   collabengine ablate   --config configs/vllm-8b.yaml
-#   collabengine analyze  --config configs/vllm-8b.yaml
+#   collabengine baseline --config configs/vllm/qwen3-8b.yaml
+#   collabengine ablate   --config configs/vllm/qwen3-8b.yaml
+#   collabengine analyze  --config configs/vllm/qwen3-8b.yaml
 #
 # One model serves every agent. That is not just convenient -- identical weights
 # across agents is the control that rules out model heterogeneity as the source

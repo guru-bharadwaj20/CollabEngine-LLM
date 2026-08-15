@@ -24,11 +24,11 @@ LOG=runs/overnight.log
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
 
 say "=== 1/2  hard -> 24 episodes per arm ==="
-python -u -m collabengine.cli pipeline --config configs/local-gpu.yaml \
+python -u -m collabengine.cli pipeline --config configs/hf-local/hard.yaml \
   --phases baseline,solo --episodes 24 2>&1 | tee -a "$LOG"
 
 say "=== 2/2  medium -> 24 episodes per arm ==="
-python -u -m collabengine.cli pipeline --config configs/local-gpu-medium.yaml \
+python -u -m collabengine.cli pipeline --config configs/hf-local/medium.yaml \
   --phases baseline,solo --episodes 24 2>&1 | tee -a "$LOG"
 
 say "ALL DONE"

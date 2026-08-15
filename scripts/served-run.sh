@@ -37,7 +37,7 @@ say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }
 i=0
 for tier in medium hard xhard; do
   i=$((i + 1))
-  CONFIG="configs/llamacpp-$tier.yaml"
+  CONFIG="configs/llamacpp/$tier.yaml"
 
   say "=== $i/3  preflight $tier ==="
   # Not a formality, and not skippable. Three corpora here were lost to

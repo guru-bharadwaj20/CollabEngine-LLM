@@ -7,7 +7,7 @@
 # project one full stage-1 run.
 set -u
 
-CONFIG=configs/local-gpu.yaml
+CONFIG=configs/hf-local/hard.yaml
 RUN_DIR=runs/qwen3-8b-local
 LOG=runs/followup.log
 GONE_LIMIT=${GONE_LIMIT:-5}   # consecutive misses (x60s) before believing it

@@ -34,7 +34,7 @@ async def recode() -> None:
     from collabengine.config import ExperimentConfig
     from collabengine.protocol import Message, Speaker
 
-    config = ExperimentConfig.load("configs/llamacpp-hard.yaml")
+    config = ExperimentConfig.load("configs/llamacpp/hard.yaml")
     backend = config.backend.build()
     rows = json.load(open(SAMPLE))
     stats = CodingStats()

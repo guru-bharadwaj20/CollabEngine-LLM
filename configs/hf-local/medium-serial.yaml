@@ -1,6 +1,6 @@
 # `medium`, run nearly serially — for regenerating episodes that OOMed.
 #
-# Identical to configs/local-gpu-medium.yaml except `max_concurrency`, which
+# Identical to configs/hf-local/medium.yaml except `max_concurrency`, which
 # drops from 24 to 2. That is the whole point of the file.
 #
 # Why it should work where the normal config does not. A long prefill needs
@@ -20,7 +20,7 @@
 # Use with resume, which re-runs only the episodes missing from the transcript:
 #
 #   1. remove the instrument-failure episodes from baseline.jsonl
-#   2. collabengine baseline --config configs/local-gpu-medium-serial.yaml
+#   2. collabengine baseline --config configs/hf-local/medium-serial.yaml
 #
 # Slower per episode and far slower in aggregate, which is why it is not the
 # default. It is the right trade only for the handful of episodes that fail.

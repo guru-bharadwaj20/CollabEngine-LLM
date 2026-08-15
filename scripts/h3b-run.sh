@@ -15,7 +15,7 @@
 set -uo pipefail
 
 LOG=runs/h3b-run.log
-CONFIG=configs/llamacpp-medium-h3b.yaml
+CONFIG=configs/llamacpp/medium-h3b.yaml
 EPISODES=${EPISODES:-150}
 AGENT=${AGENT:-A4}   # the only agent whose roster the capacity arm matches
 

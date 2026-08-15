@@ -69,11 +69,17 @@ def test_bad_symmetry_value_fails_at_load_not_at_run() -> None:
 
 
 def test_shipped_configs_are_valid(tmp_path) -> None:
-    """The example configs must actually load -- they are the documented path in."""
+    """Every shipped config must load -- they are the documented path in.
+
+    Globbed rather than listed. The list version named three of fourteen and
+    went stale the moment configs/ was reorganised by backend; a glob covers
+    the tier and control configs too, and cannot silently stop covering one.
+    """
     from pathlib import Path
 
-    for name in ("mock.yaml", "vllm-8b.yaml", "local-gpu.yaml"):
-        path = Path(__file__).parent.parent / "configs" / name
+    configs = sorted((Path(__file__).parent.parent / "configs").rglob("*.yaml"))
+    assert len(configs) >= 14, f"expected the shipped configs, found {configs}"
+    for path in configs:
         config = ExperimentConfig.load(path)
         assert config.team.n_agents >= 2
         assert config.n_episodes > 0

@@ -39,7 +39,7 @@
 set -uo pipefail
 
 LOG=runs/overnight-watch.log
-CONFIG=${CONFIG:-configs/llamacpp-medium-ans.yaml}
+CONFIG=${CONFIG:-configs/llamacpp/medium-ans.yaml}
 NEED_FREE=${NEED_FREE:-22000}      # MiB. The -ans server's resident set is ~21 GB.
 STABLE=${STABLE:-3}                # consecutive passing checks before acquiring
 POLL=${POLL:-120}                  # seconds between checks

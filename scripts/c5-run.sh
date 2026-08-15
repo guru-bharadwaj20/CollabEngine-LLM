@@ -24,7 +24,7 @@
 set -uo pipefail
 
 LOG=runs/c5-run.log
-CONFIG=configs/llamacpp-medium-h3b.yaml
+CONFIG=configs/llamacpp/medium-h3b.yaml
 EPISODES=${EPISODES:-150}
 
 mkdir -p runs

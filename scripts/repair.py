@@ -13,7 +13,7 @@ exhaustions are lost races against sibling batches holding memory, not a fixed
 ceiling -- a 10,221-token turn needs ~7 GiB of transient logits memory on top
 of 15.3 GiB of weights, which fits alone and does not fit in a crowd.
 
-    python scripts/repair.py --config configs/local-gpu-medium-serial.yaml
+    python scripts/repair.py --config configs/hf-local/medium-serial.yaml
 
 Always backs up the transcript before removing anything. Idempotent: an episode
 that fails again is left failed rather than retried forever, and the script

@@ -42,7 +42,7 @@ say "answer-budget re-measurement + C5 baseline on [$TIERS], phases: $PHASES"
 i=0
 for tier in $TIERS; do
   i=$((i + 1))
-  CONFIG="configs/llamacpp-$tier-ans.yaml"
+  CONFIG="configs/llamacpp/$tier-ans.yaml"
 
   if [ ! -f "$CONFIG" ]; then
     say "no $CONFIG -- skipping $tier"

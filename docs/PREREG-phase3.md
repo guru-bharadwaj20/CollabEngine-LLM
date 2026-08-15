@@ -50,7 +50,7 @@ the pilot's noise is worse than none.
 | | |
 |---|---|
 | Operating point | `medium`, the one tier where the team contributes anything (§4.16c) |
-| Instrument | answer-budget, `configs/llamacpp-medium-ans.yaml` geometry, unchanged |
+| Instrument | answer-budget, `configs/llamacpp/medium-ans.yaml` geometry, unchanged |
 | Seeds | **1000–1149**, disjoint from the pilot's 0–47 |
 | n | **150 episodes per arm** |
 | Arms | `baseline`; `live:A1..A4`; `frozen_replay:A1..A4`; `capacity`; `random_message` |
