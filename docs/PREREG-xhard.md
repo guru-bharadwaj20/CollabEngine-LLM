@@ -280,3 +280,55 @@ still post-hoc, and this one was right.
 
 *`xhard` is not yet analysed on this instrument. It is the third point, not a
 tiebreaker.*
+
+---
+
+## Final postscript — 2026-08-15. The falsification clause fired.
+
+All three tiers are measured on the answer-budget instrument, and `medium` has
+since been re-measured on a second, disjoint seed set. This document's own
+falsification condition has engaged, and it is recorded here rather than left to
+be inferred from the log.
+
+### The hypotheses, resolved
+
+| | outcome |
+|---|---|
+| **H1** (primary, trend: team−solo gap grows with instance size) | **FAILS.** Gate non-significant at all three tiers: `medium` +0.045 (*p* = 0.246), `hard` −0.018 (*p* = 0.578), `xhard` +0.069 (*p* = 0.263). No trend; one point negative. |
+| **H2** (`xhard`: team > solo) | **FAILS.** +0.069 at *p* = 0.263. |
+| **H3** (mechanism: propagation falls at `xhard` if division of labour is real) | **Not supported.** Propagation measured **0.589** on the real `medium` corpus — agents restate as aggressively as the mock, which is the duplication reading, not the division one (RESEARCH-LOG §4.18). |
+| **H4** (manipulation check: solo degrades with instance size) | **HOLDS.** solo 0.585 → 0.554 → 0.506 across `medium`, `hard`, `xhard`. The instance size bites. |
+
+### What that combination means, as written in advance
+
+> *"If H1 fails and H4 holds, the conclusion is that **no operating point in this
+> task family rewards collaboration at 8B**, across three sizes spanning a 2.25×
+> range in jobs."*
+
+**That is the outcome.** H1 failed, H4 held, and the conclusion follows as
+specified rather than as chosen afterwards.
+
+It is now stronger than this document anticipated in two ways it could not have
+foreseen. `medium` — the tier that looked most favourable — was re-measured on
+seeds 1000–1149 and the gate there is **−0.003 at *p* = 0.865**, with one, three
+and four agents scoring 0.579 / 0.574 / 0.576 across 899 episodes (§4.23). And
+the matched-budget contrast that had made `medium` the operating point survives
+only until answer-turn truncation is removed, at which point it is +0.003.
+
+### What this preregistration got right, and it is the part worth reusing
+
+Amendment 2 predicted that quantisation would bias *against* H1 and called that
+"the safe direction for a hypothesis this project is trying to falsify
+honestly". It also insisted on reporting the complete-case bracket beside every
+headline. **That bracket is what caught the token-cap artifact**: it said +0.024
+at *p* = 0.641 for `hard` where the preregistered analysis said *p* < 0.001, and
+the purpose-built instrument later returned −0.026.
+
+The same device caught the artifact twice more — at `medium` in §4.14, and in
+the C5 contrast in §4.23, where the surviving +0.060 becomes +0.003 once
+truncated answers are dropped. **Three positive findings, one diagnostic, three
+times right.** A preregistration that requires a sensitivity row beside every
+number earns its cost on the first occasion it fires, and this one fired three
+times.
+
+*No further episodes will be generated against this document.*

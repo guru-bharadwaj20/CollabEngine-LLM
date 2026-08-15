@@ -236,3 +236,60 @@ had been looked at):
 - Instrument failure above ~5% in any arm, which would mean regenerating before
   analysis rather than proceeding.
 - Nothing else. In particular, not the direction of any observed effect.
+
+---
+
+## Final postscript — 2026-08-15. Phase 3 is closed, and the reason is upstream of it.
+
+Written after H2 failed (§4.22) and after the operating point Phase 3 was built
+on was itself re-measured (§4.23). **No further episodes will be generated
+against this document.**
+
+### The hypotheses, resolved
+
+| | outcome |
+|---|---|
+| **H1** (agent × component interaction) | **Fails**, chi2 = 3.73, *p* = 0.928, with a residual matrix holding *less* structure than a true null would produce. Measured on the pilot corpus; not re-run, because H2 removed the main effect it would decompose. |
+| **H1e** (the bound) | **Not deliverable as designed.** The bound was to be stated around a non-zero main effect. With the main effect at +0.003 [−0.015, +0.021] there is nothing for an interaction to be an interaction *of*. |
+| **H2** (participation replicates on fresh seeds) | **FAILS.** +0.003 [−0.015, +0.021] over 595 episodes against the pilot's +0.055 [+0.023, +0.087]. No agent individually distinguishable from zero; A3 negative. |
+| **H3 / H4** (capacity and volume controls) | **Not run.** Both are drops from a baseline H2 showed will not carry them. |
+| **H3b** (procedural neutrality) | **Inconclusive and now moot.** +0.034 at *p* = 0.073, n=149 — could not exclude a difference up to +0.070. It mattered only if there was a drop to attribute. |
+| **H5** (fungibility) | **−0.005.** A difference between two zeros. |
+
+### The branch that fired, as written in advance
+
+> *"H1 fails, H2 fails → report the failure to replicate and stop."*
+
+Followed rather than renegotiated. The grid was halted the night H2 landed, with
+the card free and the remaining arms costed and ready — which is the only
+circumstance in which a stop rule is worth anything.
+
+### What the fresh-seed rule bought, stated plainly
+
+This document's central discipline was that the pilot corpus is
+hypothesis-generating and cannot test what it generated. That rule cost one
+extra run and it overturned the project's headline. The diagnosis is exact:
+**the three-agent arms reproduce across the two seed sets to within 0.002 over
+791 episodes, while the four-agent baseline moved 0.631 → 0.577.** Five arms
+reproduced; one did not; the one that did not was the reference every positive
+finding was measured against.
+
+Had Phase 3 been run on seeds 0–47 as originally scoped, it would have produced
+a 2,100-episode grid decomposing an effect that does not exist, and every cell
+of it would have been internally consistent.
+
+### The honest scope of the negative
+
+Phase 3 tested whether emergent roles are causally real *at an operating point
+where the team outperformed a single agent*. That operating point turned out not
+to exist at 8B on this task family. **So this is not evidence that emergent
+specialization is absent in multi-agent LLM systems generally** — it is evidence
+that this task, at this scale, does not produce the team advantage that
+specialization would have to explain. The distinction is the difference between
+a bounded null and an unsupported universal, and the write-up must keep it.
+
+### Not blockers, and named so they are not mistaken for excuses
+
+A 14B model (PLAN §6's stated response to "7–8B too weak") and the κ = 0.29
+role-label validation (§4.17) are **future work, not prerequisites**. Neither
+would change what was measured here; both would extend where it applies.
