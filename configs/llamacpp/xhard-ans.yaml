@@ -24,8 +24,8 @@
 # generated under the shared cap and stay exactly as they are; this instrument
 # is a different instrument and its results are not appended to theirs.
 #
-#   python scripts/preflight.py --config configs/llamacpp-xhard-ans.yaml
-#   collabengine pipeline --config configs/llamacpp-xhard-ans.yaml #                         --phases baseline,solo,solo_budget,solo_long
+#   python scripts/preflight.py --config configs/llamacpp/xhard-ans.yaml
+#   collabengine pipeline --config configs/llamacpp/xhard-ans.yaml #                         --phases baseline,solo,solo_budget,solo_long
 name: llama31-8b-q4-xhard-ans
 seed_start: 0
 n_episodes: 24

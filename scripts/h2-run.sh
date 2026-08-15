@@ -20,7 +20,7 @@
 set -uo pipefail
 
 LOG=runs/h2-run.log
-CONFIG=configs/llamacpp-medium-h3b.yaml
+CONFIG=configs/llamacpp/medium-h3b.yaml
 AGENTS=${AGENTS:-A1,A2,A3}
 
 mkdir -p runs

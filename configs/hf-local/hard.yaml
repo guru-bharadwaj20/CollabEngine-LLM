@@ -2,13 +2,13 @@
 #
 # vLLM has no supported Windows build, so generation happens in-process through
 # `transformers` on CUDA with dynamic micro-batching. Nothing above the backend
-# knows the difference; `configs/vllm-8b.yaml` is the same experiment against a
+# knows the difference; `configs/vllm/qwen3-8b.yaml` is the same experiment against a
 # WSL2 or remote vLLM server.
 #
-#   collabengine calibrate --config configs/local-gpu.yaml   # Phase 1
-#   collabengine baseline  --config configs/local-gpu.yaml   # Phase 2
-#   collabengine ablate    --config configs/local-gpu.yaml   # Phase 3
-#   collabengine analyze   --config configs/local-gpu.yaml
+#   collabengine calibrate --config configs/hf-local/hard.yaml   # Phase 1
+#   collabengine baseline  --config configs/hf-local/hard.yaml   # Phase 2
+#   collabengine ablate    --config configs/hf-local/hard.yaml   # Phase 3
+#   collabengine analyze   --config configs/hf-local/hard.yaml
 #
 # One model serves every agent. That is the control that rules out model
 # heterogeneity as the source of any differentiation observed.
@@ -106,7 +106,7 @@ team:
   # operating point where an ablation study can run.
   #
   # Medium is being re-measured on the fixed harness via
-  # configs/local-gpu-medium.yaml. Early read: `fraction` still shows nothing
+  # configs/hf-local/medium.yaml. Early read: `fraction` still shows nothing
   # (+0.028, p=0.56) but whole-instance feasibility shows 0.667 vs 0.250. If
   # that survives a full 12-episode arm, the operating point should move back
   # to medium and this comment should say so.

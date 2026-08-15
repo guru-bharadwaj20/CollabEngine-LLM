@@ -10,7 +10,7 @@
 #   scripts/serve.sh              # foreground, logs to runs/llama-server.log
 #   scripts/serve.sh --detach     # background, prints the pid
 #
-# Then always: python scripts/preflight.py --config configs/llamacpp-<tier>.yaml
+# Then always: python scripts/preflight.py --config configs/llamacpp/<tier>.yaml
 set -uo pipefail
 
 BIN=${BIN:-vendor/llamacpp/llama-server.exe}

@@ -38,7 +38,7 @@ say "C4: solo_budget on [$TIERS]. Each tier is one team-arm's worth of card time
 i=0
 for tier in $TIERS; do
   i=$((i + 1))
-  CONFIG="configs/llamacpp-$tier.yaml"
+  CONFIG="configs/llamacpp/$tier.yaml"
 
   if [ ! -f "$CONFIG" ]; then
     say "no $CONFIG -- skipping $tier"

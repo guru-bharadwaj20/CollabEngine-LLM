@@ -150,19 +150,19 @@ A pipeline that reports specialisation in the null world is manufacturing its re
 ## Run against a real model
 
 ```bash
-collabengine pipeline --config configs/local-gpu.yaml --auto-difficulty
-collabengine analyze  --config configs/local-gpu.yaml
+collabengine pipeline --config configs/hf-local/hard.yaml --auto-difficulty
+collabengine analyze  --config configs/hf-local/hard.yaml
 ```
 
 `pipeline` calibrates, picks the operating point, then runs baseline, the symmetry sweep, the fixed-order control and the ablation grid in one process — weights load once, the phases share a work queue so the batcher never drains, and no phase waits on a human to read a table. The individual steps (`calibrate`, `baseline`, `ablate`) still exist on their own. Runs resume, and resume is covered by a test asserting planned and recorded episode ids match, because they once did not and every restart silently re-ran the entire grid.
 
-The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving one model to every agent. Two backends exist: an in-process `transformers` path that supplies its own token-budget batching (vLLM has no supported Windows build), and an OpenAI-compatible client pointed at a local server. **The results above come from the served path**; `configs/vllm-8b.yaml` reaches vLLM on WSL2 or a rented Linux box with only `backend.kind` changed.
+The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving one model to every agent. Two backends exist: an in-process `transformers` path that supplies its own token-budget batching (vLLM has no supported Windows build), and an OpenAI-compatible client pointed at a local server. **The results above come from the served path**; `configs/vllm/qwen3-8b.yaml` reaches vLLM on WSL2 or a rented Linux box with only `backend.kind` changed.
 
 **The in-process path cannot run the largest tier, and the reason is not a tuning knob.** A bf16 prefill materialises a logits distribution for every prompt position over a 151,936-entry vocabulary, at 1–1.5 MB per prompt token on top of 15.3 GiB of resident weights; `xhard` prompts start near 5,200 tokens. The tier runs instead against a llama.cpp server holding a 4-bit GGUF, where prefill is chunked into `-ub`-sized micro-batches and logits are materialised only for the sampled position — the vocabulary size stops mattering, which is the actual fix. Weights drop to ~4.6 GiB and the whole difficulty curve moves onto that instrument together, because a curve with one point measured elsewhere measures the instrument. See [`docs/LLAMACPP-SETUP.md`](docs/LLAMACPP-SETUP.md) for the memory arithmetic and [PREREG Amendment 2](docs/PREREG-xhard.md) for what the change costs.
 
 ```bash
 scripts/serve.sh --detach                                          # llama-server
-python scripts/preflight.py --config configs/llamacpp-xhard.yaml   # a minute
+python scripts/preflight.py --config configs/llamacpp/xhard.yaml   # a minute
 scripts/served-run.sh          # all three tiers, preflight-gated, resumable
 scripts/budget-run.sh          # the C4 matched-budget arm (costs a team arm each)
 python scripts/gate_report.py  # every gate number in this README
@@ -187,11 +187,11 @@ The remaining inefficiency is structural: a chunk runs until its longest member 
 ### The observational half
 
 ```bash
-collabengine code     --config configs/local-gpu.yaml --judge self --judge-name local8b
-collabengine code     --config configs/local-gpu.yaml --judge gemini --judge-name gemini3 \
+collabengine code     --config configs/hf-local/hard.yaml --judge self --judge-name local8b
+collabengine code     --config configs/hf-local/hard.yaml --judge gemini --judge-name gemini3 \
                       --judge-model gemini-3-flash-preview --condition baseline --limit 1
 collabengine kappa    runs/<name>/codes.local8b.jsonl runs/<name>/codes.gemini3.jsonl
-collabengine converge --config configs/local-gpu.yaml --codes runs/<name>/codes.local8b.jsonl
+collabengine converge --config configs/hf-local/hard.yaml --codes runs/<name>/codes.local8b.jsonl
 ```
 
 [PLAN.md](docs/PLAN.md) specifies a frontier API judge, because a local 7–8B is not a reliable coder. Frontier judges are supported (`--judge anthropic`, `--judge gemini`), and a judge only ever reads finished transcripts — using one to *produce* agent turns would destroy the one-model control the design rests on.

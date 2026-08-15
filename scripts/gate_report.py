@@ -50,9 +50,9 @@ SEED = 20260810
 #: longer existed at all after the move to the served instrument. The config is
 #: the one place the run directory is already declared.
 TIER_CONFIGS = {
-    "medium": "configs/llamacpp-medium.yaml",
-    "hard": "configs/llamacpp-hard.yaml",
-    "xhard": "configs/llamacpp-xhard.yaml",
+    "medium": "configs/llamacpp/medium.yaml",
+    "hard": "configs/llamacpp/hard.yaml",
+    "xhard": "configs/llamacpp/xhard.yaml",
 }
 
 

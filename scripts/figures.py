@@ -338,7 +338,7 @@ def fig_curve(_unused, out: Path) -> bool:
     """
     tiers = []
     for tier in ("medium", "hard", "xhard"):
-        cfg = f"configs/llamacpp-{tier}.yaml"
+        cfg = f"configs/llamacpp/{tier}.yaml"
         if not Path(cfg).exists():
             continue
         run_dir = _run_dir(cfg)
@@ -453,7 +453,7 @@ def _drop_cut(run_dir: Path, name: str = "baseline.jsonl") -> dict[str, list[flo
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run-dir", default=str(_run_dir("configs/llamacpp-hard.yaml")))
+    ap.add_argument("--run-dir", default=str(_run_dir("configs/llamacpp/hard.yaml")))
     ap.add_argument("--out-dir", default="docs/figures")
     args = ap.parse_args()
 

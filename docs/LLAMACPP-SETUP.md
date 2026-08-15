@@ -112,7 +112,7 @@ arithmetic above, confirmed by the server rather than by us.
 Then, always:
 
 ```
-python scripts/preflight.py --config configs/llamacpp-xhard.yaml
+python scripts/preflight.py --config configs/llamacpp/xhard.yaml
 ```
 
 ## LM Studio

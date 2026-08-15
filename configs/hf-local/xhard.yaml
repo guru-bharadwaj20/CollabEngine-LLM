@@ -5,7 +5,7 @@
 # medium to hard) while four agents do not (0.874 -> 0.871), so the lines
 # should cross above `hard`.
 #
-#   collabengine pipeline --config configs/local-gpu-xhard.yaml \
+#   collabengine pipeline --config configs/hf-local/xhard.yaml \
 #                         --phases baseline,solo
 #
 # Only two arms. The symmetry sweep and the fixed-order control are not part of

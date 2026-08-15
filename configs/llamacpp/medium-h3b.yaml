@@ -1,7 +1,7 @@
 # H3b -- is the ablation instrument neutral?
 #
 # PREREG-phase3 Amendment 1. Everything about this instrument is identical to
-# configs/llamacpp-medium-ans.yaml except the seeds and n. It has to be: the
+# configs/llamacpp/medium-ans.yaml except the seeds and n. It has to be: the
 # question is whether two ways of running the SAME three agents give the same
 # answer, so any other difference would be the thing being measured.
 #
@@ -25,7 +25,7 @@
 # pooled with the corpus that generated the hypothesis. New run directory for
 # the same reason.
 #
-#   python scripts/preflight.py --config configs/llamacpp-medium-h3b.yaml
+#   python scripts/preflight.py --config configs/llamacpp/medium-h3b.yaml
 #   bash scripts/h3b-run.sh
 name: llama31-8b-q4-medium-h3b
 seed_start: 1000

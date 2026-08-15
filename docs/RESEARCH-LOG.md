@@ -786,7 +786,7 @@ comparison, so it was unsupported when made — and §4.1b then failed the gate 
 ### 4.1d `medium` re-measured — it fails too, and the bias ran the other way
 
 The hole left by the §4.1 retraction, filled. 12 fresh team episodes on the
-fixed harness (`configs/local-gpu-medium.yaml`, identical to the `hard` config
+fixed harness (`configs/hf-local/medium.yaml`, identical to the `hard` config
 but for `name` and `difficulty`), against the original medium solo arm, which
 needed no regenerating: a solo episode is 3 turns peaking near 5700 tokens, so
 neither the 8192 truncation nor the 0.90 cap that destroyed the old team arm
@@ -2896,7 +2896,7 @@ difference between them is a result.
 | Client | `max_concurrency` 7, matched to `--parallel` |
 | Arms | 4 per tier: `baseline` 4×3, `solo` 1×3, `solo_budget` 1×12 under `TEAM_BRIEF`, `solo_long` 1×12 under `SOLO_BRIEF` |
 | Cost | 96 episodes per tier; `medium` 63 min, `hard` 176 min |
-| Config | `configs/llamacpp-{tier}-ans.yaml`; runner `scripts/answer-run.sh` |
+| Config | `configs/llamacpp/{tier}-ans.yaml`; runner `scripts/answer-run.sh` |
 
 **Why the per-turn cap is recorded per turn.** It is no longer constant within an
 episode, so a `length` finish reason means nothing without the number it ran
@@ -3284,14 +3284,14 @@ because every test went through that subclass (§3.3).
 
 | Config | Operating point |
 |---|---|
-| `configs/local-gpu.yaml` | `hard` — 24 jobs, 6 workers. Measured; fails the gate (§4.1b) |
-| `configs/local-gpu-medium.yaml` | `medium` — 16 jobs, 5 workers. Measured; fails the gate (§4.1d). The largest instance this card evaluates without censoring the team arm (§4.6) |
-| `configs/local-gpu-xhard.yaml` | `xhard` — 36 jobs, 8 workers. **Not runnable on 24 GB at bf16** (§3.10); kept because the preregistration that motivated it is part of the record |
-| `configs/llamacpp-medium.yaml` | `medium` on the served Q4 instrument (§3.11). Measured; fails the gate, and its apparent gap reverses under the answer-turn control (§4.9) |
-| `configs/llamacpp-hard.yaml` | `hard`, same. Regenerated because H1 is a trend and H4 a comparison, and neither survives a change of instrument at one point only. Measured; *passes* the gate at *d* = 1.09 and the pass is the token cap (§4.10) |
-| `configs/llamacpp-xhard.yaml` | `xhard`, same — the tier bf16 could not reach, which it reached in 69.6 minutes. Measured; passes at *p* = 0.020, controlled gap −0.056 (§4.11) |
-| `configs/llamacpp-medium-ans.yaml` | `medium` on the answer-budget instrument — `answer_max_tokens` 3072, `max_model_len` 15,360 so the slot stays 18,432, `max_concurrency` 7. Measured at n=24 and n=48; gate not significant at either (§4.14, §4.16b) |
-| `configs/llamacpp-hard-ans.yaml` | `hard`, same. **The tier that decides §4.10.** Measured; the *d* = 1.09 pass becomes −0.026 at *p* = 0.500 (§4.15) |
-| `configs/llamacpp-xhard-ans.yaml` | `xhard`, same |
-| `configs/llamacpp-medium-h3b.yaml` | `medium`, identical to `-ans` except seeds 1000–1149 and n=150. Identical on purpose: H3b asks whether two ways of running the *same* three agents agree, so any other difference would be the thing measured (§4.20) |
-| `configs/vllm-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |
+| `configs/hf-local/hard.yaml` | `hard` — 24 jobs, 6 workers. Measured; fails the gate (§4.1b) |
+| `configs/hf-local/medium.yaml` | `medium` — 16 jobs, 5 workers. Measured; fails the gate (§4.1d). The largest instance this card evaluates without censoring the team arm (§4.6) |
+| `configs/hf-local/xhard.yaml` | `xhard` — 36 jobs, 8 workers. **Not runnable on 24 GB at bf16** (§3.10); kept because the preregistration that motivated it is part of the record |
+| `configs/llamacpp/medium.yaml` | `medium` on the served Q4 instrument (§3.11). Measured; fails the gate, and its apparent gap reverses under the answer-turn control (§4.9) |
+| `configs/llamacpp/hard.yaml` | `hard`, same. Regenerated because H1 is a trend and H4 a comparison, and neither survives a change of instrument at one point only. Measured; *passes* the gate at *d* = 1.09 and the pass is the token cap (§4.10) |
+| `configs/llamacpp/xhard.yaml` | `xhard`, same — the tier bf16 could not reach, which it reached in 69.6 minutes. Measured; passes at *p* = 0.020, controlled gap −0.056 (§4.11) |
+| `configs/llamacpp/medium-ans.yaml` | `medium` on the answer-budget instrument — `answer_max_tokens` 3072, `max_model_len` 15,360 so the slot stays 18,432, `max_concurrency` 7. Measured at n=24 and n=48; gate not significant at either (§4.14, §4.16b) |
+| `configs/llamacpp/hard-ans.yaml` | `hard`, same. **The tier that decides §4.10.** Measured; the *d* = 1.09 pass becomes −0.026 at *p* = 0.500 (§4.15) |
+| `configs/llamacpp/xhard-ans.yaml` | `xhard`, same |
+| `configs/llamacpp/medium-h3b.yaml` | `medium`, identical to `-ans` except seeds 1000–1149 and n=150. Identical on purpose: H3b asks whether two ways of running the *same* three agents agree, so any other difference would be the thing measured (§4.20) |
+| `configs/vllm/qwen3-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |

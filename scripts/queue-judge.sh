@@ -22,7 +22,7 @@
 # reclaim the card is not ours to do.
 set -u
 
-CONFIG=configs/local-gpu.yaml
+CONFIG=configs/hf-local/hard.yaml
 RUN_DIR=runs/qwen3-8b-local
 LOG=runs/queue-judge.log
 NEED_MIB=${NEED_MIB:-18000}   # free VRAM before Qwen3-8B is worth starting

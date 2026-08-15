@@ -21,7 +21,7 @@ increasing order of cost:
 3. Does a real request of that size actually come back? Asked last because it
    is the only one that costs GPU time, and answered with one request.
 
-    python scripts/preflight.py --config configs/llamacpp-xhard.yaml
+    python scripts/preflight.py --config configs/llamacpp/xhard.yaml
 
 Exit status is 0 when the run may proceed, 1 when it must not, 2 on a usage or
 config error. Chain it: `python scripts/preflight.py --config C && collabengine

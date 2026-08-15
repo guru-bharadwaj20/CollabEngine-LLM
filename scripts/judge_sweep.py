@@ -154,7 +154,7 @@ def report() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", action="store_true")
-    parser.add_argument("--config", default="configs/llamacpp-hard-ans.yaml")
+    parser.add_argument("--config", default="configs/llamacpp/hard-ans.yaml")
     args = parser.parse_args()
     if not args.report:
         asyncio.run(sweep(args.config))

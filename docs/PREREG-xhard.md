@@ -129,7 +129,7 @@ a different model family at a different precision. Specifically:
 
 * **H1** is a trend across {medium, hard, xhard}. A trend whose third point came
   from a different instrument measures the instrument. All three points must be
-  re-measured, hence `configs/llamacpp-medium.yaml`, `-hard.yaml`, `-xhard.yaml`
+  re-measured, hence `configs/llamacpp/medium.yaml`, `-hard.yaml`, `-xhard.yaml`
   at n=24 per arm.
 * **H4** is stated against the literal value 0.842. On the new instrument it is
   restated as *solo at `xhard` < solo at `hard`, both measured here*. The
