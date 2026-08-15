@@ -16,7 +16,7 @@
 # tokens, which needs ~7-10 GiB of transient logits memory on top of 15.3 GiB
 # of weights; the largest are close to the card's limit even alone.
 #
-#   1. remove the instrument-failure episodes (scripts/repair.py does this)
+#   1. remove the instrument-failure episodes (scripts/experiments/repair.py does this)
 #   2. collabengine baseline --config configs/hf-local/hard-serial.yaml
 #
 # Only the `baseline` condition is regenerable this way. `fixed_order:hard:3`

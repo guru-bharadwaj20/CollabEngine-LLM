@@ -21,7 +21,7 @@
 # Order is medium, hard, xhard: cheapest first, and every tier resumes, so a
 # death costs only its unfinished episodes and the earlier tiers still report.
 #
-# Start the server first (scripts/serve.sh). The slot is unchanged at 18,432 --
+# Start the server first (scripts/ops/serve.sh). The slot is unchanged at 18,432 --
 # this instrument moves budget from the prompt to the answer rather than asking
 # the card for more.
 set -uo pipefail
@@ -53,7 +53,7 @@ for tier in $TIERS; do
   # differently (max_model_len 15360 + answer 3072 = 18432), so an arithmetic
   # slip shows up as rejected answer turns in exactly the arm being fixed.
   say "=== $i  preflight $tier ==="
-  if ! python -u scripts/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
+  if ! python -u scripts/ops/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
     say "PREFLIGHT FAILED for $tier -- stopping. Nothing after this runs clean."
     exit 1
   fi
@@ -63,8 +63,8 @@ for tier in $TIERS; do
     --phases "$PHASES" --episodes "$EPISODES" 2>&1 | tee -a "$LOG"
 
   say "=== $i  $tier done -- gate below ==="
-  python -u scripts/gate_report.py --run-dir "runs/llama31-8b-q4-$tier-ans" \
+  python -u scripts/analysis/gate_report.py --run-dir "runs/llama31-8b-q4-$tier-ans" \
     2>&1 | tee -a "$LOG"
 done
 
-say "ALL DONE -- python scripts/gate_report.py, then scripts/figures.py"
+say "ALL DONE -- python scripts/analysis/gate_report.py, then scripts/analysis/figures.py"

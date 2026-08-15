@@ -32,7 +32,7 @@ say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 say "C5 + gate re-measurement on fresh seeds 1000-$((1000 + EPISODES - 1))"
 
-if ! python -u scripts/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
+if ! python -u scripts/ops/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
   say "PREFLIGHT FAILED"
   exit 1
 fi
@@ -44,4 +44,4 @@ if ! python -u -m collabengine.cli pipeline --config "$CONFIG" \
   exit 1
 fi
 
-say "ALL DONE -- python scripts/gate_report.py --run-dir runs/llama31-8b-q4-medium-h3b"
+say "ALL DONE -- python scripts/analysis/gate_report.py --run-dir runs/llama31-8b-q4-medium-h3b"

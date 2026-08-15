@@ -42,7 +42,7 @@ one token of KV cache at f16 costs
 
 Against a 24 GiB card: 4.6 (weights) + 9.0 (KV) + ~0.6 (compute buffers at
 `-ub 512`) ≈ **14.2 GiB**, leaving room for the shared-card reality of §3.9 and
-for the local judge that `scripts/queue-judge.sh` waits to start.
+for the local judge that `scripts/ops/queue-judge.sh` waits to start.
 
 The slot is larger than the measured worst case (14,474 tokens at `xhard`) by
 about 4,000. That margin is deliberate: the brief's token count is estimated
@@ -67,7 +67,7 @@ bounded by its slot, not by `-c`. So
 
 The middle row is the shape of the mistake: raising concurrency to fill the card
 quietly shrinks the window until the longest prompts — the final-round turns
-that submit the answer — stop fitting. `scripts/preflight.py` reads the real
+that submit the answer — stop fitting. `scripts/ops/preflight.py` reads the real
 per-slot figure from `/props` and refuses the run.
 
 That sentence was false when it was first written here, and the way it was false
@@ -85,7 +85,7 @@ geometry is not being checked and the live probe is all that stands behind it.
 
 ## Launch
 
-Use `scripts/serve.sh`, which is this command plus a refusal to start a second
+Use `scripts/ops/serve.sh`, which is this command plus a refusal to start a second
 server on a port something else is already serving. The command itself:
 
 ```
@@ -112,7 +112,7 @@ arithmetic above, confirmed by the server rather than by us.
 Then, always:
 
 ```
-python scripts/preflight.py --config configs/llamacpp/xhard.yaml
+python scripts/ops/preflight.py --config configs/llamacpp/xhard.yaml
 ```
 
 ## LM Studio
@@ -139,4 +139,4 @@ guarantee of bit-identical output across runs: with continuous batching, what
 else is resident in the batch can change the arithmetic. Reproducibility here
 rests on where it has always rested — instances are deterministic in
 `(seed, difficulty)`, so any corpus can be re-scored offline without generating
-anything (`scripts/rescore.py`).
+anything (`scripts/analysis/rescore.py`).

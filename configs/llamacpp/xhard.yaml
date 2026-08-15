@@ -10,13 +10,13 @@
 # logits for the position it samples from.
 #
 # Start the server first -- see docs/LLAMACPP-SETUP.md for the arithmetic behind
-# every number, and run scripts/preflight.py before spending a night:
+# every number, and run scripts/ops/preflight.py before spending a night:
 #
 #   llama-server -m models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf \
 #       --host 127.0.0.1 --port 8000 \
 #       -ngl 99 -c 73728 --parallel 4 -b 2048 -ub 512 --flash-attn
 #
-#   python scripts/preflight.py --config configs/llamacpp/xhard.yaml
+#   python scripts/ops/preflight.py --config configs/llamacpp/xhard.yaml
 #   collabengine pipeline --config configs/llamacpp/xhard.yaml \
 #                         --phases baseline,solo
 #
@@ -60,7 +60,7 @@ backend:
   #
   # The worst case is 14,474 tokens: the `xhard` brief at ~2,810, eleven prior
   # turns at the 1024-token cap for 11,264, and 400 for banners and the
-  # answer-format block. `scripts/preflight.py` prints that sum and, on a
+  # answer-format block. `scripts/ops/preflight.py` prints that sum and, on a
   # llama.cpp server, measures the brief exactly instead of estimating it.
   #
   # 17408 rather than 15360 because the brief figure above is an *estimate*, at

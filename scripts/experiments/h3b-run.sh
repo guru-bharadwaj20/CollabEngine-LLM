@@ -11,7 +11,7 @@
 # baseline episodes and there are none at these seeds yet.
 #
 # Everything resumes on plan id, so a death costs only the unfinished episodes.
-# Start the server first, or let scripts/overnight-watch.sh do it.
+# Start the server first, or let scripts/ops/overnight-watch.sh do it.
 set -uo pipefail
 
 LOG=runs/h3b-run.log
@@ -24,7 +24,7 @@ say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 say "H3b on $CONFIG, $EPISODES episodes, ablating $AGENT"
 
-if ! python -u scripts/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
+if ! python -u scripts/ops/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
   say "PREFLIGHT FAILED -- nothing after this runs clean"
   exit 1
 fi

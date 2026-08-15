@@ -7,7 +7,7 @@
 # administrators, and no lock is possible -- so nothing here may evict anything
 # and a single free reading is not evidence the card is free. It is evidence of
 # one moment, and the moment between two phases of somebody else's job looks
-# exactly like an idle card. scripts/queue-judge.sh already established the
+# exactly like an idle card. scripts/ops/queue-judge.sh already established the
 # house pattern (N GiB free, stable across three checks); this follows it.
 #
 # It signals exactly one process: the llama-server it started itself, by the
@@ -34,7 +34,7 @@
 # it on ALL DONE. An idle server holding 21 GB overnight is an eviction of the
 # other accounts by another name.
 #
-#   nohup bash scripts/overnight-watch.sh >/dev/null 2>&1 &
+#   nohup bash scripts/ops/overnight-watch.sh >/dev/null 2>&1 &
 #   tail -f runs/overnight-watch.log
 set -uo pipefail
 
@@ -99,7 +99,7 @@ done
 
 say "ACQUIRED ${f} MiB free, stable across ${STABLE} checks"
 
-bash scripts/serve.sh --detach >>"$LOG" 2>&1
+bash scripts/ops/serve.sh --detach >>"$LOG" 2>&1
 for _ in $(seq 1 60); do
   curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1 && break
   sleep 5
@@ -112,7 +112,7 @@ SERVER_PID=$(tasklist //FI "IMAGENAME eq llama-server.exe" //NH //FO CSV 2>/dev/
   | head -1 | cut -d, -f2 | tr -d '"')
 say "SERVER-UP win pid ${SERVER_PID:-unknown}, $((CTX / PARALLEL)) tokens/slot"
 
-if ! python -u scripts/preflight.py --config "$CONFIG" >>"$LOG" 2>&1; then
+if ! python -u scripts/ops/preflight.py --config "$CONFIG" >>"$LOG" 2>&1; then
   say "FAILED preflight rejected the run -- nothing after this would be clean"
   exit 1
 fi

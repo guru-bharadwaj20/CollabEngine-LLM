@@ -28,8 +28,8 @@
 #   3. Client first, then server -- always. Killing the server under a live
 #      client is what wrote 137 errored turns across 22 episodes in 3.13.
 #
-#   scripts/guard.sh            # foreground
-#   scripts/guard.sh --detach   # background, prints the pid
+#   scripts/ops/guard.sh            # foreground
+#   scripts/ops/guard.sh --detach   # background, prints the pid
 set -uo pipefail
 
 PORT=${PORT:-8000}
@@ -45,7 +45,10 @@ STRIKES=${STRIKES:-3}
 POLL=${POLL:-15}
 LOG=runs/guard.log
 LOCK=runs/.guard.lock
-REPO=$(cd "$(dirname "$0")/.." && pwd)
+# Two levels up, not one: this file lives in scripts/ops/, and everything it
+# runs -- serve.sh, answer-run.sh, the runs/ paths -- is written relative to the
+# repo root.
+REPO=$(cd "$(dirname "$0")/../.." && pwd)
 
 mkdir -p runs
 say() { echo "[$(date +%F' '%H:%M:%S)] $*" | tee -a "$LOG"; }
@@ -137,7 +140,7 @@ free_mib() {
 # Four independent conditions have to hold before a pid is eligible, because
 # the obvious filter is wrong in both directions and was caught being wrong:
 # matching '*CollabEngine-LLM*' in the command line MISSED the real runner --
-# it is invoked as `bash scripts/answer-run.sh`, a relative path that never
+# it is invoked as `bash scripts/experiments/answer-run.sh`, a relative path that never
 # names the repo -- while MATCHING three of Claude Code's own shells and the
 # probe process doing the matching. A selector that misses its target and hits
 # bystanders is the 3.13 cleanup bug with a different mask on.
@@ -156,7 +159,7 @@ client_pids() {
       Where-Object { \$_.Name -in @('python.exe','bash.exe') -and
                      \$_.CommandLine -and
                      (\$_.CommandLine -like '*collabengine.cli*' -or
-                      \$_.CommandLine -like '*scripts/answer-run.sh*' -or
+                      \$_.CommandLine -like '*scripts/experiments/answer-run.sh*' -or
                       \$_.CommandLine -like '*scripts\\answer-run.sh*') -and
                      \$_.CommandLine -notlike '*.claude*' -and
                      \$_.CommandLine -notlike '*guard.sh*' -and
@@ -234,7 +237,7 @@ wait_for_card() {
 start_server() {
   say "starting server (-c $CTX --parallel $PARALLEL)"
   ( cd "$REPO" && PORT="$PORT" PARALLEL="$PARALLEL" CTX="$CTX" \
-      bash scripts/serve.sh --detach ) >>"$LOG" 2>&1
+      bash scripts/ops/serve.sh --detach ) >>"$LOG" 2>&1
   local waited=0
   while [ "$waited" -lt 300 ]; do
     if healthy; then
@@ -254,7 +257,7 @@ start_server() {
 
 start_client() {
   say "resuming the run (completed episodes are skipped)"
-  ( cd "$REPO" && nohup bash scripts/answer-run.sh >>runs/answer-nohup.log 2>&1 & )
+  ( cd "$REPO" && nohup bash scripts/experiments/answer-run.sh >>runs/answer-nohup.log 2>&1 & )
   sleep 5
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The whole difficulty curve, on the served 4-bit instrument.
 #
-# Replaces scripts/overnight.sh, whose header explains at length why `xhard`
+# Replaces scripts/experiments/overnight.sh, whose header explains at length why `xhard`
 # could not be in it. It can be here: llama.cpp prefills in micro-batches and
 # materialises logits only for the sampled position, so the per-prompt-token
 # allocation that made the tier infeasible at bf16 does not exist
@@ -45,7 +45,7 @@ for tier in medium hard xhard; do
   # queue rather than the tier, because every failure this checks for -- an
   # undersized slot, the wrong weights, a dead server -- is global to the
   # server and would fail the next tier identically, only eight hours later.
-  if ! python -u scripts/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
+  if ! python -u scripts/ops/preflight.py --config "$CONFIG" 2>&1 | tee -a "$LOG"; then
     say "PREFLIGHT FAILED for $tier -- stopping. Nothing after this would run clean."
     exit 1
   fi
@@ -55,4 +55,4 @@ for tier in medium hard xhard; do
     --phases baseline,solo --episodes 24 2>&1 | tee -a "$LOG"
 done
 
-say "ALL DONE -- now: scripts/gatecheck.sh, then scripts/followup.sh per tier"
+say "ALL DONE -- now: scripts/analysis/gatecheck.sh, then scripts/ops/followup.sh per tier"

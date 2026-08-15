@@ -48,7 +48,7 @@ class BackendConfig:
     Two backends read it two different ways, and the difference is the point.
     `hf` truncates to it -- silently, from the left, which has biased an arm
     once already. A served backend cannot truncate on our behalf, so here it is
-    an *assertion*: `scripts/preflight.py` checks the server's slot is at least
+    an *assertion*: `scripts/ops/preflight.py` checks the server's slot is at least
     this large plus `team.max_tokens`, and refuses the run otherwise. Overflow
     then arrives as a labelled error instead of a quietly shortened brief."""
     enable_thinking: bool = False

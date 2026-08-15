@@ -16,8 +16,8 @@ that. It corrects for chance agreement given the marginals, not for the
 granularity of the question being asked. Read it as "a coarser Phase 2 is
 available at this reliability", never as "the judge improved".
 
-    python scripts/judge_sweep.py                 # code, then report
-    python scripts/judge_sweep.py --report        # report saved labels
+    python scripts/analysis/judge_sweep.py                 # code, then report
+    python scripts/analysis/judge_sweep.py --report        # report saved labels
 """
 
 from __future__ import annotations

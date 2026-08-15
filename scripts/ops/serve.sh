@@ -7,10 +7,10 @@
 # runs here at all. Changing either without redoing the arithmetic in the setup
 # doc is how this project loses its fourth corpus.
 #
-#   scripts/serve.sh              # foreground, logs to runs/llama-server.log
-#   scripts/serve.sh --detach     # background, prints the pid
+#   scripts/ops/serve.sh              # foreground, logs to runs/llama-server.log
+#   scripts/ops/serve.sh --detach     # background, prints the pid
 #
-# Then always: python scripts/preflight.py --config configs/llamacpp/<tier>.yaml
+# Then always: python scripts/ops/preflight.py --config configs/llamacpp/<tier>.yaml
 set -uo pipefail
 
 BIN=${BIN:-vendor/llamacpp/llama-server.exe}

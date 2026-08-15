@@ -15,8 +15,8 @@ and hand-rolled parsing, and one reply came back as raw JSON that a naive split(
 turned into a label; `parse_action` already falls back to OTHER for that. A kappa
 measured against a judge nobody runs is not the judge's kappa.
 
-    python scripts/handcode_kappa.py            # re-code with the judge, then report
-    python scripts/handcode_kappa.py --report   # report from the saved labels
+    python scripts/analysis/handcode_kappa.py            # re-code with the judge, then report
+    python scripts/analysis/handcode_kappa.py --report   # report from the saved labels
 """
 
 from __future__ import annotations

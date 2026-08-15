@@ -3,7 +3,7 @@
 ### Measurement artifacts in single-agent versus multi-agent LLM comparisons
 
 **Draft — 2026-08-15.** Every number is reproducible from the released corpus via
-`scripts/gate_report.py`; section references are to `docs/RESEARCH-LOG.md`.
+`scripts/analysis/gate_report.py`; section references are to `docs/RESEARCH-LOG.md`.
 
 ---
 

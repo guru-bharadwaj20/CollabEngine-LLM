@@ -25,8 +25,8 @@
 # pooled with the corpus that generated the hypothesis. New run directory for
 # the same reason.
 #
-#   python scripts/preflight.py --config configs/llamacpp/medium-h3b.yaml
-#   bash scripts/h3b-run.sh
+#   python scripts/ops/preflight.py --config configs/llamacpp/medium-h3b.yaml
+#   bash scripts/experiments/h3b-run.sh
 name: llama31-8b-q4-medium-h3b
 seed_start: 1000
 n_episodes: 150

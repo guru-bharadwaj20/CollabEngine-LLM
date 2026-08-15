@@ -23,7 +23,7 @@
 # the geometry the -ans configs need, preflights, and resumes the run. Every
 # stage resumes from disk, so the ~11 episodes already generated are kept.
 #
-#   scripts/resume-when-free.sh &
+#   scripts/ops/resume-when-free.sh &
 set -uo pipefail
 
 NEED_MIB=${NEED_MIB:-16000}     # weights 4.6 + KV 9.0 + buffers, with margin
@@ -62,7 +62,7 @@ done
 # which is the one configuration that looks like it works and runs at CPU speed.
 if ! curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
   say "starting llama-server"
-  scripts/serve.sh --detach 2>&1 | tee -a "$LOG"
+  scripts/ops/serve.sh --detach 2>&1 | tee -a "$LOG"
   for _ in $(seq 1 60); do
     curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1 && break
     sleep 5
@@ -75,4 +75,4 @@ if ! curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
 fi
 
 say "server healthy; resuming the answer-budget run"
-exec bash scripts/answer-run.sh
+exec bash scripts/experiments/answer-run.sh

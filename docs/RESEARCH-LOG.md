@@ -332,7 +332,7 @@ special case of "the danger is 15.3 GiB not fitting in what's left", and the
 narrower model had been encoded into the tooling as though it were the general
 one.
 
-`scripts/queue-judge.sh` replaces the process check with a free-VRAM check:
+`scripts/ops/queue-judge.sh` replaces the process check with a free-VRAM check:
 ≥18 GiB, stable across three 60-second samples, naming the compute PIDs that
 hold the card while it waits.
 
@@ -513,14 +513,14 @@ both are the served forms of failures already in this log.
    identical-weights control was enforced by nothing but the launch command.
    `preflight` now compares the served model id against the config.
 
-`scripts/preflight.py` runs both checks plus a live request at the worst-case
+`scripts/ops/preflight.py` runs both checks plus a live request at the worst-case
 size, in about a minute, before any stage starts. Three corpora in this project
 were lost to conditions that were true before the first episode ran and
 detectable in seconds. That is the whole argument for it.
 
 ### 3.12 The preflight guard was open, and said so in the server's voice
 
-§3.11 ends by arguing that `scripts/preflight.py` is worth its minute because
+§3.11 ends by arguing that `scripts/ops/preflight.py` is worth its minute because
 "three corpora in this project were lost to conditions that were true before the
 first episode ran and detectable in seconds". The slot check it names first had
 never run.
@@ -572,7 +572,7 @@ depended on machinery §3.6 and §4.1 already paid for.
 
 The answer-budget run was thrashing against a foreign process holding most of the
 card (§3.4's failure mode, diagnosed in the commit that armed
-`scripts/resume-when-free.sh`). I stopped our `llama-server` to resize it — and
+`scripts/ops/resume-when-free.sh`). I stopped our `llama-server` to resize it — and
 believed I had stopped the pipeline first. I had not. `pkill -f` matched nothing,
 because under MSYS `ps -W` prints the **MSYS pid first and the Windows pid
 fourth**, and every signal I sent went to a pid that Windows does not know. The
@@ -598,7 +598,7 @@ Three things caught it, in the order they fire:
 already on disk. The 22 broken episodes would have been skipped forever — present,
 excluded from every mean, and never regenerated. The corpus would have silently
 capped at 74 usable episodes out of 96 with nothing on screen to say why. That is
-the precise hazard `scripts/repair.py` exists for and the reason its dry run was
+the precise hazard `scripts/experiments/repair.py` exists for and the reason its dry run was
 worth building: **an instrument failure left on disk is not a gap, it is a
 permanent hole.**
 
@@ -666,7 +666,7 @@ intact.
 
 *Left: every usable episode, four arms, `fraction` metric. Right: the team−solo
 gap under each metric with its 95% bootstrap interval. Regenerate with
-`python scripts/figures.py`.*
+`python scripts/analysis/figures.py`.*
 
 The measurement was taken twice. The first pass ran on 9 team episodes because
 three had died on long-context OOM; since that failure mode selects for long
@@ -852,7 +852,7 @@ task and the model scale, not of a badly chosen difficulty.
 ### 4.1e Final Phase 1 result, n=24 per arm
 
 Both operating points, doubled, repaired, and read from a single tool
-(`scripts/gate_report.py`). Team arms are 23 of 24 at each point — one episode
+(`scripts/analysis/gate_report.py`). Team arms are 23 of 24 at each point — one episode
 each remains unrecoverable — so censoring is **4%**, against the 21% that made
 the first n=24 `hard` read untrustworthy.
 
@@ -915,7 +915,7 @@ fraction-of-constraints-satisfied cannot discriminate, since extra constraints
 add to numerator and denominator together.
 
 Instances are deterministic in `(seed, difficulty)`, so this was testable
-against solutions already on disk at **zero GPU cost** (`scripts/rescore.py`).
+against solutions already on disk at **zero GPU cost** (`scripts/analysis/rescore.py`).
 Three metrics, same transcripts:
 
 | medium, n=12 each | solo | team | gap | Cohen's *d* |
@@ -2459,7 +2459,7 @@ pilot-derived effect sizes instead of guesses.
 
 ### 4.20 The frozen_replay pass and the controls: no compensation, and a control that does not control
 
-Run overnight by `scripts/overnight-watch.sh`, which took the card at 00:04
+Run overnight by `scripts/ops/overnight-watch.sh`, which took the card at 00:04
 after three consecutive checks showed it free, and handed it back at 01:26.
 `frozen_replay` 192 episodes in 64 min at 3.0/min; `capacity` 48 and
 `random_message` 192 in 17 min. **0 failed, 0 skipped, across all 432.**
@@ -2860,7 +2860,7 @@ every component.
 | Team | 4 agents × 3 rounds, temperature 0.8, top_p 0.95, `max_tokens` 1024 |
 | Batching | token-budgeted, length-sorted, 30000 padded tokens, `memory_fraction` 0.95 |
 | Difficulty | `hard` — 24 jobs, 6 workers, 6 exclusions, 5 synthesis constraints, capacity slack 1.1, value floor 0.72 |
-| Figures | `python scripts/figures.py` regenerates all three from the corpus |
+| Figures | `python scripts/analysis/figures.py` regenerates all three from the corpus |
 
 **The served instrument, which produced every result from §4.9 onward.** The
 table above describes the bf16 path and is retained because §4.1–4.8 were
@@ -2875,7 +2875,7 @@ measured on it. It is superseded, and its corpora no longer exist.
 | Team | 4 agents × 3 rounds; `solo` 1 × 3; `solo_budget` 1 × 12. Temperature 0.8, top_p 0.95, `max_tokens` 1024 throughout |
 | Tiers | `medium` 16 jobs / 5 workers, `hard` 24 / 6, `xhard` 36 / 8. `max_model_len` held at 17,408 across all three so the instrument does not vary along the curve |
 | Cost | 144 episodes in 113 minutes wall clock; 560k output tokens; 55–136 tok/s aggregate depending on tier |
-| Reporting | `python scripts/gate_report.py` produces every gate number; `python scripts/figures.py` every figure |
+| Reporting | `python scripts/analysis/gate_report.py` produces every gate number; `python scripts/analysis/figures.py` every figure |
 
 **Read any gate number from this instrument beside its answer-turn truncation
 count.** That is not a caveat about precision, it is the difference between a
@@ -2896,7 +2896,7 @@ difference between them is a result.
 | Client | `max_concurrency` 7, matched to `--parallel` |
 | Arms | 4 per tier: `baseline` 4×3, `solo` 1×3, `solo_budget` 1×12 under `TEAM_BRIEF`, `solo_long` 1×12 under `SOLO_BRIEF` |
 | Cost | 96 episodes per tier; `medium` 63 min, `hard` 176 min |
-| Config | `configs/llamacpp/{tier}-ans.yaml`; runner `scripts/answer-run.sh` |
+| Config | `configs/llamacpp/{tier}-ans.yaml`; runner `scripts/experiments/answer-run.sh` |
 
 **Why the per-turn cap is recorded per turn.** It is no longer constant within an
 episode, so a `length` finish reason means nothing without the number it ran
@@ -3262,23 +3262,23 @@ because every test went through that subclass (§3.3).
 
 | Script | Role |
 |---|---|
-| `scripts/gate_report.py` | **The one path to a gate number.** Prints the integrity audit above the means, then the headline, the answer-turn sensitivity (§4.10), C4 and C5 through one shared function, and the C5 − C4 brief contrast (§4.15). Reads run directories from the configs, because hardcoding them has been wrong three times |
-| `scripts/figures.py` | Regenerates every README figure from the corpus, through the same integrity filter and scoring module the analysis uses. Refuses to plot a tier still generating |
-| `scripts/rescore.py` | Offline re-scoring of archived corpora under alternative metrics — no GPU, since instances are deterministic in `(seed, difficulty)` |
-| `scripts/serve.sh` | Starts llama-server with the geometry `LLAMACPP-SETUP.md` derives; prints tokens-per-slot and refuses to race a server already on the port |
-| `scripts/served-run.sh` | The whole difficulty curve on the served instrument — three tiers, preflight-gated, resumable (§4.9–4.11) |
-| `scripts/budget-run.sh` | The C4 matched-budget arm across the three tiers (§4.12). Off by default in the pipeline: it costs what the team arm costs |
-| `scripts/answer-run.sh` | The answer-budget re-measurement and the C5 baseline together — four arms × three tiers, preflight-gated, resumable (§4.14–4.15). Both in one run because they share every other setting, and measuring C5 on a different instrument from the gate it informs is §4.1c's mistake |
-| `scripts/h3b-run.sh` | The one roster-matched pair at n=150 — `live:A4` against `capacity:3`, baseline first because `ablate` derives its plans from recorded episodes. Tests whether the ablation instrument is neutral (§4.20, PREREG-phase3 H3b) at an eighth the cost of the grid it gates |
-| `scripts/overnight-watch.sh` | Waits for a wall-clock time, then takes the card only on 22 GB free **stable across three checks** — a single free reading is one moment, and the gap between two phases of somebody else's job looks exactly like an idle card. Signals only the `llama-server` it started, by the Windows pid it looks up afterwards, because `serve.sh --detach` prints an MSYS pid and killing by it is how the wrong process dies here. Releases the card on ALL DONE |
-| `scripts/guard.sh` | Restarts the server and resumes the run if it dies, on a box where four of the local accounts are administrators and no process can be made unkillable. Waits for the card rather than competing for it, signals only processes owned by the current user with a command line rooted in this repo, and releases the card on `ALL DONE`. `--list-clients` dry-runs the selector (lesson 16) |
-| `scripts/handcode_kappa.py` | κ between the served judge and the human coding, with a bootstrap CI and a refusal to compare labels from two codebook versions (§4.13, §4.13b) |
-| `scripts/repair.py` | Regenerates instrument failures at low concurrency. Refuses to touch conditions the regeneration pass would not rewrite, after a dry run showed it would have deleted a `fixed_order` episode |
-| `scripts/gatecheck.sh` | Evaluates the Phase 1 gate as soon as the episodes exist; refuses a verdict below 5 usable episodes per arm |
-| `scripts/queue-judge.sh` | Waits for ≥18 GiB free, stable across three checks, before starting a second model on the shared card |
-| `scripts/followup.sh` | Chains analyze → code → κ → converge once a pipeline finishes |
-| `scripts/overnight.sh` | The n=24 extensions at `hard` and `medium`, on the superseded bf16 instrument |
-| `scripts/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, in a minute, before the night is spent (§3.11). Its slot check silently did nothing until §3.12 |
+| `scripts/analysis/gate_report.py` | **The one path to a gate number.** Prints the integrity audit above the means, then the headline, the answer-turn sensitivity (§4.10), C4 and C5 through one shared function, and the C5 − C4 brief contrast (§4.15). Reads run directories from the configs, because hardcoding them has been wrong three times |
+| `scripts/analysis/figures.py` | Regenerates every README figure from the corpus, through the same integrity filter and scoring module the analysis uses. Refuses to plot a tier still generating |
+| `scripts/analysis/rescore.py` | Offline re-scoring of archived corpora under alternative metrics — no GPU, since instances are deterministic in `(seed, difficulty)` |
+| `scripts/ops/serve.sh` | Starts llama-server with the geometry `LLAMACPP-SETUP.md` derives; prints tokens-per-slot and refuses to race a server already on the port |
+| `scripts/experiments/served-run.sh` | The whole difficulty curve on the served instrument — three tiers, preflight-gated, resumable (§4.9–4.11) |
+| `scripts/experiments/budget-run.sh` | The C4 matched-budget arm across the three tiers (§4.12). Off by default in the pipeline: it costs what the team arm costs |
+| `scripts/experiments/answer-run.sh` | The answer-budget re-measurement and the C5 baseline together — four arms × three tiers, preflight-gated, resumable (§4.14–4.15). Both in one run because they share every other setting, and measuring C5 on a different instrument from the gate it informs is §4.1c's mistake |
+| `scripts/experiments/h3b-run.sh` | The one roster-matched pair at n=150 — `live:A4` against `capacity:3`, baseline first because `ablate` derives its plans from recorded episodes. Tests whether the ablation instrument is neutral (§4.20, PREREG-phase3 H3b) at an eighth the cost of the grid it gates |
+| `scripts/ops/overnight-watch.sh` | Waits for a wall-clock time, then takes the card only on 22 GB free **stable across three checks** — a single free reading is one moment, and the gap between two phases of somebody else's job looks exactly like an idle card. Signals only the `llama-server` it started, by the Windows pid it looks up afterwards, because `serve.sh --detach` prints an MSYS pid and killing by it is how the wrong process dies here. Releases the card on ALL DONE |
+| `scripts/ops/guard.sh` | Restarts the server and resumes the run if it dies, on a box where four of the local accounts are administrators and no process can be made unkillable. Waits for the card rather than competing for it, signals only processes owned by the current user with a command line rooted in this repo, and releases the card on `ALL DONE`. `--list-clients` dry-runs the selector (lesson 16) |
+| `scripts/analysis/handcode_kappa.py` | κ between the served judge and the human coding, with a bootstrap CI and a refusal to compare labels from two codebook versions (§4.13, §4.13b) |
+| `scripts/experiments/repair.py` | Regenerates instrument failures at low concurrency. Refuses to touch conditions the regeneration pass would not rewrite, after a dry run showed it would have deleted a `fixed_order` episode |
+| `scripts/analysis/gatecheck.sh` | Evaluates the Phase 1 gate as soon as the episodes exist; refuses a verdict below 5 usable episodes per arm |
+| `scripts/ops/queue-judge.sh` | Waits for ≥18 GiB free, stable across three checks, before starting a second model on the shared card |
+| `scripts/ops/followup.sh` | Chains analyze → code → κ → converge once a pipeline finishes |
+| `scripts/experiments/overnight.sh` | The n=24 extensions at `hard` and `medium`, on the superseded bf16 instrument |
+| `scripts/ops/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, in a minute, before the night is spent (§3.11). Its slot check silently did nothing until §3.12 |
 
 ### Appendix D — Configs
 
