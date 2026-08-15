@@ -1,6 +1,6 @@
 """Command line entry point.
 
-Subcommands map onto the phases in PLAN.md:
+Subcommands map onto the phases in docs/PLAN.md:
 
   calibrate  Phase 1 -- find the difficulty band where the task is hard enough
              to reward collaboration but not so hard the model floors out
@@ -270,7 +270,7 @@ def _recommend(rows: list[tuple[str, float, float]]) -> None:
         print(
             "\nNo preset sits off both the floor and the ceiling. Redesign the "
             "task before Phase 2 -- everything downstream depends on this band "
-            "existing (PLAN.md 4, Phase 1).",
+            "existing (docs/PLAN.md 4, Phase 1).",
             file=sys.stderr,
         )
         return
@@ -858,7 +858,7 @@ async def _choose_difficulty(config: ExperimentConfig, backend, episodes: int):
     if not usable:
         print(
             "\nNo preset sits off both the floor and the ceiling. Redesign the "
-            "task before Phase 2 (PLAN.md 4, Phase 1).",
+            "task before Phase 2 (docs/PLAN.md 4, Phase 1).",
             file=sys.stderr,
         )
         return None
@@ -1091,7 +1091,7 @@ def _solo_long_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
 def _fixed_order_plans(config: ExperimentConfig, backend) -> list[RunPlan]:
     """The C2 control: with speaking order frozen, do roles track slot or identity?
 
-    PLAN.md calls this the highest-information-per-GPU-hour test in the project,
+    docs/PLAN.md calls this the highest-information-per-GPU-hour test in the project,
     because a positional world scores 0.50 against a 0.25 baseline under a fixed
     order -- close enough to be mistaken for real specialization.
     """
@@ -1137,7 +1137,7 @@ def cmd_code(args: argparse.Namespace) -> int:
     """Code a recorded corpus into per-message action labels.
 
     The judge is chosen separately from the agents' backend and defaults to a
-    frontier model, because PLAN.md Phase 2 is explicit that a local 7-8B is not
+    frontier model, because docs/PLAN.md Phase 2 is explicit that a local 7-8B is not
     an adequate judge. `--judge self` reuses the config's backend anyway, which
     is the right call for a smoke test and the wrong one for a reported number.
     """
@@ -1237,7 +1237,7 @@ def _build_judge(args: argparse.Namespace, config: ExperimentConfig):
     """Returns (backend, warning). A None backend means refuse to run."""
     if args.judge == "self":
         return config.backend.build(), (
-            "judge: reusing the experiment backend. PLAN.md Phase 2 rates a "
+            "judge: reusing the experiment backend. docs/PLAN.md Phase 2 rates a "
             "local 7-8B as an inadequate judge -- smoke tests only."
         )
     if args.judge == "mock":
@@ -1380,7 +1380,7 @@ def cmd_kappa(args: argparse.Namespace) -> int:
     if len(shared) < 100:
         print(
             f"\n  {len(shared)} messages is far too few to characterise a judge. "
-            "PLAN.md asks for a ~500-message validation subsample; this is a "
+            "docs/PLAN.md asks for a ~500-message validation subsample; this is a "
             "smoke test of the coding path, and the interval above shows how "
             "little it constrains. Do not report it as a reliability figure.",
             file=sys.stderr,
