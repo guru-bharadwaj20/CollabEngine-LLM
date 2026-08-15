@@ -2938,6 +2938,28 @@ validity requirement, not a style preference.
 hint that division of labor is expected. `tests/test_render.py` asserts on every
 preset that `ground_truth` and `planted_errors` never reach agent-visible text.
 
+### Repository layout changed on 2026-08-15
+
+Every path in this log was rewritten that day, so the commands above are the
+ones that work now, **not** the ones that were typed at the time. Nothing about
+what was run changed — only where the files sit. Anyone reading this log against
+`git log` before `15098b1` should apply:
+
+| Then | Now |
+|---|---|
+| `PLAN.md` | `docs/PLAN.md` |
+| `docs/*.json` | `docs/data/*.json` |
+| `configs/local-gpu.yaml` | `configs/hf-local/hard.yaml` (`-serial` and the tiers likewise) |
+| `configs/llamacpp-{tier}.yaml` | `configs/llamacpp/{tier}.yaml` |
+| `configs/vllm-8b.yaml` | `configs/vllm/qwen3-8b.yaml` |
+| `scripts/{run scripts, repair.py}` | `scripts/experiments/` |
+| `scripts/{serve,guard,preflight,…}` | `scripts/ops/` |
+| `scripts/{gate_report,figures,…}` | `scripts/analysis/` |
+
+Run directories under `runs/` are **unchanged**. They are named from each
+config's `name:` field, which was deliberately not touched: renaming them would
+have orphaned every corpus on disk and every run-directory citation in this log.
+
 ---
 
 ## 7. What remains
@@ -3278,7 +3300,12 @@ because every test went through that subclass (§3.3).
 | `scripts/ops/queue-judge.sh` | Waits for ≥18 GiB free, stable across three checks, before starting a second model on the shared card |
 | `scripts/ops/followup.sh` | Chains analyze → code → κ → converge once a pipeline finishes |
 | `scripts/experiments/overnight.sh` | The n=24 extensions at `hard` and `medium`, on the superseded bf16 instrument |
+| `scripts/experiments/h2-run.sh` | H2 on fresh seeds 1000–1149 — A1, A2 and A3 `live` to join the A4 arm already recorded, so H2 pools across four agents without blending the pilot and confirmatory baselines (§4.22) |
+| `scripts/experiments/c5-run.sh` | The C5 re-measurement on fresh seeds: `solo` and `solo_long` both, because re-running only the matched-budget contrast would re-measure the comparison that flatters the team (§4.23) |
 | `scripts/ops/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, in a minute, before the night is spent (§3.11). Its slot check silently did nothing until §3.12 |
+| `scripts/ops/resume-when-free.sh` | Brings the answer-budget run back up unattended after a foreign process is cleared off the card — waits for headroom, restarts the server at the `-ans` geometry, preflights, resumes from disk (§4.14) |
+| `scripts/ops/fetch_14b.py` | Downloads the Qwen2.5-14B Q4 shards for the step-up the plan reserves for "7–8B too weak" (PLAN §6). Not yet used for a measurement |
+| `scripts/analysis/judge_sweep.py` | Four codebooks against the same 40 human labels — 160 classifications, everything held but the system prompt, so the difference between the κs is the codebook (§4.17) |
 
 ### Appendix D — Configs
 
@@ -3294,4 +3321,7 @@ because every test went through that subclass (§3.3).
 | `configs/llamacpp/hard-ans.yaml` | `hard`, same. **The tier that decides §4.10.** Measured; the *d* = 1.09 pass becomes −0.026 at *p* = 0.500 (§4.15) |
 | `configs/llamacpp/xhard-ans.yaml` | `xhard`, same |
 | `configs/llamacpp/medium-h3b.yaml` | `medium`, identical to `-ans` except seeds 1000–1149 and n=150. Identical on purpose: H3b asks whether two ways of running the *same* three agents agree, so any other difference would be the thing measured (§4.20) |
+| `configs/hf-local/hard-serial.yaml` | `hard` at `max_concurrency` 2 — the regeneration config for episodes lost to OOM, where a long prefill has the card to itself (§4.6) |
+| `configs/hf-local/medium-serial.yaml` | `medium`, the same, and identical to `medium.yaml` in everything but concurrency |
 | `configs/vllm/qwen3-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |
+| `configs/mock.yaml` | No GPU and no server. Runs the whole pipeline against the deterministic mock, which is what makes `selftest` and the harness tests free |
