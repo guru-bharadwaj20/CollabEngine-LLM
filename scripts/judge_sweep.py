@@ -28,8 +28,8 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-SAMPLE = Path("docs/handcode-sample.json")
-OUT = Path("docs/judge-sweep.json")
+SAMPLE = Path("docs/data/handcode-sample.json")
+OUT = Path("docs/data/judge-sweep.json")
 #: Two slots. The card may be busy with a real run; this is 160 short requests
 #: and finishing four minutes sooner is not worth perturbing an experiment.
 CONCURRENCY = 2
