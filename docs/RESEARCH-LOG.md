@@ -2964,6 +2964,28 @@ have orphaned every corpus on disk and every run-directory citation in this log.
 
 ## 7. What remains
 
+> **Superseded as the working list, 2026-08-20.** This section is the record of
+> what was open *at each point in the science*, and it is kept in that form. The
+> standing list of what remains before a top-venue submission — scope, statistics,
+> related work, writing and the reproducibility package, each with a status and a
+> cost — now lives in [`Final Sweep.md`](../Final%20Sweep.md) at the repo root.
+>
+> Two things that sweep found are corrections to this document rather than future
+> work, and are recorded here so they are not discovered again:
+>
+> 1. **The paper claims the transcripts are released and they are not.**
+>    `PAPER-DRAFT.md` §2 says "all transcripts released"; `.gitignore` excludes
+>    `runs/` and every `*.jsonl`, and `api.github.com/repos/guru-bharadwaj20/CollabEngine-LLM`
+>    returned **404** on 2026-08-20 against a 200 for a control repo. The remote
+>    is private or absent. Three reproducibility claims rest on that sentence and
+>    none of them currently holds.
+> 2. **Every "no effect" in this project is asserted without an equivalence
+>    test.** The bootstrap intervals are the right instinct and the wrong
+>    instrument: failing to reject H0 is not evidence for it. The nulls are the
+>    paper's core result, so this is a gap in the central claim rather than a
+>    reporting nicety. TOST bounds, and the smallest δ at which equivalence
+>    holds, are what §4.22's and §4.23's sentences were reaching for.
+
 ~~1. **Does `hard` clear the Phase 1 gate?**~~ **Answered: no** (§4.1b). All
 three metrics non-significant on near-equal arms.
 

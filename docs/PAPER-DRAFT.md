@@ -307,7 +307,12 @@ For anyone comparing single-agent and multi-agent LLM systems:
 
 ## 9. Future work
 
-Named explicitly as extensions, none of which blocks the result above.
+Named explicitly as extensions, none of which blocks the result above. The three
+below are the ones that change what the paper can claim; the full sweep of what
+a top-venue submission still needs — second task family, second model family,
+equivalence testing, multiplicity correction, related work, and the
+reproducibility package — is tracked with per-item status in
+[`Final Sweep.md`](../Final%20Sweep.md).
 
 **A 14B model.** The pre-registered response to "7–8B may be too weak to
 collaborate meaningfully." A 14B fits the same 24 GB card at 4-bit. If a team

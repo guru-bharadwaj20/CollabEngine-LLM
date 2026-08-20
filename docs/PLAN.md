@@ -310,6 +310,15 @@ The question that makes the paper matter: **does the transcript-derived role lab
 - Preregister Phases 3–4 hypotheses **before** running them (OSF). Cheap, and it is what makes the interaction test credible rather than post-hoc.
 - Release: harness, task generator, all transcripts, analysis notebooks. The transcript corpus alone has standalone value.
 
+> **The phase list ends here; the submission does not.** Phases 0–5 describe the
+> experiment, and the experiment reached its answer. What a NeurIPS/ICML/ICLR-class
+> venue additionally requires — a second task family, a second model family, the
+> 14B this document's own §6 reserves for "7–8B too weak", a precision control,
+> multiplicity correction, equivalence testing, a priori power, a real related-work
+> section, and a reproducibility package that is actually cloneable — is inventoried
+> item by item with status and cost in [`Final Sweep.md`](../Final%20Sweep.md).
+> None of it revisits the science; all of it is breadth and packaging.
+
 **Total: ~8 weeks part-time, $0 of GPU (local card), $0 of judge API** — the judge is the local model, validated against a free-tier frontier subsample rather than paid for outright. See the Phase 2 note for what that costs in confidence.
 
 ---
