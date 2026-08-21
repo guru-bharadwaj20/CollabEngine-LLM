@@ -145,9 +145,12 @@ The variance claim is worth one more line, because it came back. On the served `
 ## Install
 
 ```bash
-pip install -e ".[dev,analysis]"
-pytest -q          # 353 tests, seconds, no GPU
+pip install -r requirements.lock.txt      # the exact stack the corpus came from
+pip install -e ".[dev,analysis]" --no-deps
+pytest -q          # 379 tests, seconds, no GPU
 ```
+
+`pyproject.toml` keeps `>=` floors, which is right for a library and wrong for a result; [`requirements.lock.txt`](requirements.lock.txt) is what a reproduction should install. The serving build, the weight checksums and what is deliberately *not* pinned are in [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md); `scripts/ops/env_stamp.py` writes all of it into `env.json` beside every run. A container is in [`Dockerfile`](Dockerfile) — it reproduces the analysis exactly and the generation approximately, and says so in its own header.
 
 Python 3.10+. `dev` brings the test suite, `analysis` brings pandas and statsmodels for the mixed-effects test; the module that needs them imports lazily and says so if they are missing.
 
