@@ -1,0 +1,49 @@
+# The scale step-up: Qwen2.5-14B-Instruct at Q4_K_M.
+#
+# Final Sweep 1.3, and PLAN section 6's own registered response to "7-8B may be
+# too weak to collaborate meaningfully". This is the highest-upside arm in the
+# sweep: if a team advantage appears here and not at 8B, the project's negative
+# result becomes a capability-threshold finding with the artifact controls as
+# its enabling apparatus.
+#
+# **Preregistered before it ran** -- docs/PREREG-14b.md names the threshold that
+# would count as a capability effect and the equivalence bound that would count
+# as a replication of the null. The most publication-favourable arm in the study
+# is exactly the one that must not be read post hoc.
+#
+# **Three slots, not four.** Qwen2.5-14B is 48 layers x 8 KV heads x 128, so KV
+# costs 192 KiB per token against Llama-8B's 128 KiB, and the weights are 8.9
+# GiB against 4.6. Four slots would want ~22.4 GiB on a shared 24 GiB card;
+# three is ~19.6. Per-slot context is unchanged at 18,432.
+#
+# Sharded GGUF: llama.cpp opens shard 1 and finds the rest beside it.
+#
+#   scripts/ops/serve.sh --model qwen-14b --detach
+name: qwen25-14b-q4-medium
+seed_start: 1000
+n_episodes: 150
+out_dir: runs
+
+max_concurrency: 7
+
+backend:
+  kind: openai
+  model: models/qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf
+  base_url: http://127.0.0.1:8000/v1
+  max_concurrency: 7
+  timeout_s: 900
+  max_retries: 4
+  verify_model: true
+  max_model_len: 15360
+  enable_thinking: false
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: medium
+  symmetry: name_seed
+  randomize_turn_order: true
+  max_tokens: 1024
+  answer_max_tokens: 3072
+  temperature: 0.8
+  top_p: 0.95
