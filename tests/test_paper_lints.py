@@ -125,3 +125,71 @@ def test_reference_entries_themselves_do_not_count_as_citations(bp):
     doc = _doc_with(bp, ["No citations in this body at all."])
     with pytest.raises(AssertionError):
         bp.check_citations(doc, n_refs=1)
+
+
+# ---------------------------------------------------------------------------
+# the paper is not the research log
+# ---------------------------------------------------------------------------
+
+
+def _prose(bp, *lines):
+    from docx import Document
+
+    doc = Document()
+    for line in lines:
+        doc.add_paragraph(line)
+    return doc
+
+
+def test_a_research_log_reference_in_the_body_is_refused(bp):
+    doc = _prose(bp, "The cap artifact is documented in RESEARCH-LOG 4.14.")
+    with pytest.raises(AssertionError) as exc:
+        bp.check_register(doc)
+    assert "research-log reference" in str(exc.value)
+
+
+def test_first_person_singular_is_refused(bp):
+    doc = _prose(bp, "I coded 40 messages by reading them.")
+    with pytest.raises(AssertionError) as exc:
+        bp.check_register(doc)
+    assert "first person singular" in str(exc.value)
+
+
+def test_a_calendar_date_in_prose_is_refused(bp):
+    doc = _prose(bp, "Re-measured on 2026-08-13, the gap is negative.")
+    with pytest.raises(AssertionError):
+        bp.check_register(doc)
+
+
+def test_a_diary_marker_is_refused(bp):
+    doc = _prose(bp, "The run finished overnight and the arms disagree.")
+    with pytest.raises(AssertionError):
+        bp.check_register(doc)
+
+
+def test_the_papers_own_section_numbers_are_not_flagged(bp):
+    """A lint that cannot tell a self-reference from a log reference gets
+    switched off within a week, so it does not try to."""
+    bp.check_register(_prose(bp, "Read together with the asymmetry of section 4.2 (\u00a74.2)."))
+
+
+def test_ordinary_academic_prose_passes(bp):
+    bp.check_register(_prose(
+        bp,
+        "We report the artifact mechanism and a bounded negative result.",
+        "Effects larger than 0.032 are excluded [1].",
+        "Multi-agent LLM systems consume more generation than a single agent.",
+    ))
+
+
+def test_the_first_person_check_is_strict_and_that_is_deliberate(bp):
+    """A standalone capital I fires even when it is not first person.
+
+    Written down because it was found by this suite rather than in review: the
+    sentence "the word AI contains a capital I" trips the lint. In academic
+    prose a bare `I` is first person essentially always, so the rule stays
+    strict and the false positive is accepted rather than weakened into a
+    heuristic that lets the real thing through.
+    """
+    with pytest.raises(AssertionError):
+        bp.check_register(_prose(bp, "The word AI contains a capital I here."))

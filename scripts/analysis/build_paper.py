@@ -1178,6 +1178,52 @@ def check_citations(doc, n_refs: int) -> None:
     print(f"citations: {len(cited)} of {n_refs} references cited, none dangling")
 
 
+#: Register markers that belong to the research log and not to the paper.
+#: `§4.3` is deliberately absent -- the paper has its own section 4.3, and a
+#: lint that cannot tell a self-reference from a log reference would be
+#: switched off within a week.
+_LOG_REGISTER = (
+    (r"RESEARCH-LOG", "a research-log reference"),
+    (r"\bI\b", "first person singular"),
+    (r"\b20\d\d-\d\d-\d\d\b", "a calendar date"),
+    (r"\b(today|yesterday|this morning|last night|overnight)\b", "a diary marker"),
+)
+
+
+def check_register(doc) -> None:
+    """The paper is not the log, and the boundary is kept by the build.
+
+    Two documents here could each be mistaken for the submission, and the thing
+    that separates them is register: the paper says "we" and cites `[1]`, the
+    log says "I" and cites `§4.19` and is organised by date. Creep in either
+    direction destroys the split -- see docs/SUPPLEMENTARY.md.
+
+    Checked on rendered prose rather than on the source, so a marker inside a
+    code comment (where it is exactly right) does not fire.
+
+    The first-person rule is strict: a bare capital `I` fires even where it is
+    not first person ("a capital I"). In academic prose that is first person
+    essentially always, so the false positive is accepted rather than weakened
+    into a heuristic that lets the real thing through.
+    """
+    import re
+
+    problems: list[str] = []
+    for par in doc.paragraphs:
+        text = par.text.strip()
+        if not text or text == "References":
+            continue
+        for pattern, what in _LOG_REGISTER:
+            if re.search(pattern, text):
+                problems.append(f"{what}: {text[:70]!r}")
+                break
+    if problems:
+        raise AssertionError(
+            "research-log register in the paper body:\n  " + "\n  ".join(problems[:6])
+        )
+    print(f"register: {len(doc.paragraphs)} paragraphs, no log-register markers")
+
+
 def append_appendix(doc) -> None:
     """Technical appendix. 'There is no page limit for the technical
     appendices', and nothing here is load-bearing for the main claims -- the
@@ -1285,6 +1331,7 @@ def main() -> None:
     doc = build(Path(args.out), args.author, args.affiliation, args.email,
                 args.anonymous, Path(args.fig_dir))
     check_citations(doc, doc.n_references)
+    check_register(doc)
     append_appendix(doc)
     from checklist import append_checklist          # noqa: E402
     append_checklist(doc, para, heading, bullet, runs)
