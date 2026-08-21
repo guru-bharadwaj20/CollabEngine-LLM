@@ -332,3 +332,27 @@ number earns its cost on the first occasion it fires, and this one fired three
 times.
 
 *No further episodes will be generated against this document.*
+
+---
+
+## Postscript — a-priori power, 2026-08-20
+
+Recorded late, and the lateness is the point. §66 of this document estimated a
+minimum detectable difference of "roughly 0.12 at 80% power" for a per-point
+test at *n* = 24 and used it to justify *not* testing each point separately.
+That estimate was right — `power_report.py` gives **0.121** — and it was the
+only place in the project where an arm was sized before it ran.
+
+| tier arm | *n* per arm | MDE at 80% power | gap measured |
+|---|---|---|---|
+| gate, per tier | 24 | 0.121 | +0.059 / −0.026 / +0.069 |
+| `medium`/`hard` extension | 48 | 0.086 | +0.045 |
+
+**Both rows are below their own MDE, and both correctly reported nulls.** That
+is what an underpowered arm should do. The failure mode this project actually
+suffered was the opposite one — reading a *positive* off such an arm — and it
+happened in `PREREG-phase3`, not here.
+
+The gate's nulls are converted into bounds in `PREREG-equivalence.md` rather
+than into more episodes: at 0.05 the margin needs 142 per arm, and at the 0.005
+actually observed it needs ~14,000.
