@@ -64,7 +64,8 @@ LOCK=runs/queue-all.lock
 STOP_SERVER=${STOP_SERVER:-1}
 STABLE=${STABLE:-3}            # consecutive clear checks (x60s) before believing it
 SKIP_TIER2=${SKIP_TIER2:-0}
-PY=${PY:-python}
+# PY comes from _python.sh, which refuses the Microsoft Store stub. See its header.
+. scripts/ops/_python.sh
 
 mkdir -p runs
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }

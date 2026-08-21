@@ -55,7 +55,8 @@ LOG=runs/queue-judge-14b.log
 DATA=docs/data
 NEED_MIB=${NEED_MIB:-20500}   # qwen-14b preset: 8.9 GiB weights + 3 x 18,432 KV
 STABLE=${STABLE:-3}           # consecutive clear checks (x60s) before believing it
-PY=${PY:-python}
+# PY comes from _python.sh, which refuses the Microsoft Store stub. See its header.
+. scripts/ops/_python.sh
 
 mkdir -p runs
 say() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$LOG"; }

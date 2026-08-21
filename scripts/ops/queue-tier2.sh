@@ -55,7 +55,8 @@ WATCH_LOG=${WATCH_LOG:-runs/rebuild-corpus.log}
 STOP_SERVER=${STOP_SERVER:-1}
 GONE_LIMIT=${GONE_LIMIT:-5}    # consecutive misses (x60s) before believing it
 STABLE=${STABLE:-3}            # consecutive clear checks (x60s) before believing it
-PY=${PY:-python}
+# PY comes from _python.sh, which refuses the Microsoft Store stub. See its header.
+. scripts/ops/_python.sh
 
 # The sweep's geometry, from docs/PREREG-cap-sweep.md section 2. Every rung is
 # served at the LARGEST rung's slot or the 6144 rung silently rejects its answer
