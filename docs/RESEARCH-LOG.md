@@ -3446,6 +3446,52 @@ corpus that would settle it was deleted.
 
 ---
 
+### 4.25 The 14B judge: capacity is not what κ = 0.29 was short of
+
+**2026-08-22.** Final Sweep 7.3 offered three resolutions for the κ = 0.29
+behavioural judge and one of them was free: the Qwen2.5-14B is on disk for
+§1.3 anyway, so the 40-message hand-coded validation set can be re-coded by it
+in about ninety seconds. §4.17 predicted a capacity limit. That prediction is
+**not supported.**
+
+Four codebooks, the same 40 messages, the same human codes:
+
+| codebook | 8B κ | 14B κ |
+|---|---|---|
+| v2 control | 0.219 | **0.262** |
+| v4 boundaries | 0.230 | 0.174 |
+| v5 boundaries+examples | **0.288** | 0.230 |
+
+The best 8B result is better than the best 14B result. Seventy-five per cent
+more parameters moves nothing: two codebooks get worse, one gets better, and
+the spread across all six numbers is smaller than the confidence interval on
+any one of them. Whatever the ceiling is, it is not the one more capacity
+lifts — at least not between these two scales.
+
+**`v3 coarse` is excluded, and the reason matters more than the exclusion.**
+It scored κ = 0.000 at 0% raw agreement on both models, which is not a
+plausible measurement of anything. It emits `check / meta / solve` while the
+human codes are `propose / verify / compute / search / organize / other`: the
+two label spaces do not intersect, so agreement is zero by construction and
+identical on every model. Reporting that as a judge failure would have been an
+instrument error of exactly the kind this log exists to catch, and it would
+have made the 14B look worse than it is. Either map v3 onto the human taxonomy
+before comparing it, or do not compare it.
+
+**What this settles, and what it does not.** It removes the cheapest excuse for
+keeping Phase 2 in the body: the instrument is not one scale away from working.
+It does not establish that a frontier judge would fail too — 8B to 14B is a
+small step and the free check could only ever rule capacity out at that step,
+not in general. The remaining resolutions are Final Sweep 7.3's first (a paid
+frontier judge with a human-validated subsample) and third (demote Phase 2 to
+the appendix and stop letting a κ = 0.29 instrument anchor the paper's
+credibility). **The third is now the recommended one**, because the ablation-side
+nulls do not depend on Phase 2 and the free evidence points away from a cheap
+fix. That is decision (c) in `docs/ADVISOR-BRIEF.md` and it is still the
+author's.
+
+---
+
 ## 9. State as of 2026-08-21
 
 The Final Sweep's fifteen Tier-1 items are addressed. What that does and does not
