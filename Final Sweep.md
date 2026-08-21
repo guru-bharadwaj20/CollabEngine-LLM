@@ -35,7 +35,7 @@ not a 14B result. Partial states are described in the notes, never in the mark.
 | 1.11 | Standard section structure | ❌ | Sections 1–11 + References + Appendix + checklist exist; **Broader Impact and Reproducibility are checklist answers only, not body sections** |
 | 1.12 | Page-limit compliance | ❌ | Nothing measures or enforces a page count; venue not yet fixed |
 | 1.13 | Public repo, actually cloneable | ❌ | `api.github.com/repos/guru-bharadwaj20/CollabEngine-LLM` → **404**. The remote is private or absent |
-| 1.14 | Pinned environment | ❌ | `pyproject.toml` declares floors (`numpy>=1.26`); no lockfile, no container, `torch`/`transformers` undeclared by design |
+| 1.14 | Pinned environment | ✅ | `requirements.lock.txt` (52 packages), `Dockerfile`, `docs/ENVIRONMENT.md` with the llama.cpp build `b10369 (6e62ba538)` and a sha256 for every GGUF, and `scripts/ops/env_stamp.py` writing all four layers into `env.json` per run |
 | 1.15 | README reproduces the headline end-to-end | ❌ | `gate_report.py` reproduces every gate number **from a corpus that `.gitignore` excludes**. A clone cannot run it |
 
 ### Tier 2 — materially raises the odds
