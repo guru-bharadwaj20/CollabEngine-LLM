@@ -1,0 +1,40 @@
+# Precision ladder, top rung: the same Llama-3.1-8B unquantised.
+#
+# Final Sweep 1.4, and the reference the other two rungs are read against. See
+# medium-q8.yaml for the design; the only thing that differs here is the weights
+# and the number of slots they leave room for.
+#
+# **Two slots, not four.** f16 weights are 15.0 GiB resident against Q4_K_M's
+# 4.6, so at 18,432 tokens per slot (2.25 GiB of KV each) four slots would want
+# ~24.0 GiB on a 24 GiB card that is shared. Two slots is ~20.1 GiB. Per-slot
+# context is unchanged, which is the thing that must not vary; what changes is
+# throughput, which is not a measurement. `scripts/ops/serve.sh --model f16`
+# already encodes this -- do not raise --parallel by hand.
+name: llama31-8b-f16-medium
+seed_start: 1000
+n_episodes: 150
+out_dir: runs
+
+max_concurrency: 7
+
+backend:
+  kind: openai
+  model: models/Meta-Llama-3.1-8B-Instruct.f16.gguf
+  base_url: http://127.0.0.1:8000/v1
+  max_concurrency: 7
+  timeout_s: 900
+  max_retries: 4
+  verify_model: true
+  max_model_len: 15360
+  enable_thinking: false
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: medium
+  symmetry: name_seed
+  randomize_turn_order: true
+  max_tokens: 1024
+  answer_max_tokens: 3072
+  temperature: 0.8
+  top_p: 0.95
