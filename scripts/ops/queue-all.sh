@@ -166,15 +166,21 @@ serve_preset() {
 # sentinel this script writes, because the question worth asking on resume is
 # "are the episodes on disk", not "did a previous invocation think it finished".
 run_arm() {
-  local label=$1 config=$2 preset=$3 need=$4 name=$5 kind=$6
+  local label=$1 config=$2 preset=$3 need=$4 name=$5 kind=$6 episodes=${7:-}
   local dir="runs/${name}"
+  local ep_arg=()
+  # Only the pilot passes this. Its config carries n_episodes 24 because that is
+  # where it was first measured, and PREREG-phase3 sizes the paper's pilot
+  # column from seeds 0-47. Overriding on the command line keeps the config
+  # honest about what it originally ran.
+  [ -n "$episodes" ] && ep_arg=(--episodes "$episodes")
 
   if [ "$kind" = "grid" ] && [ -s "${dir}/ablation.jsonl" ]; then
     say "=== ${label}: skipped, ${dir}/ablation.jsonl already exists ==="
     return 0
   fi
   if [ "$kind" = "gate" ] && [ -s "${dir}/baseline.jsonl" ] && \
-     [ "$(wc -l < "${dir}/baseline.jsonl")" -ge 450 ]; then
+     [ "$(wc -l < "${dir}/baseline.jsonl")" -ge "${COMPLETE_AT:-450}" ]; then
     say "=== ${label}: skipped, ${dir}/baseline.jsonl is complete ==="
     return 0
   fi
@@ -194,7 +200,7 @@ run_arm() {
   fi
 
   if ! $PY -u -m collabengine.cli pipeline --config "$config" \
-       --phases baseline,solo,solo_long 2>&1 | tee -a "$LOG"; then
+       "${ep_arg[@]}" --phases baseline,solo,solo_long 2>&1 | tee -a "$LOG"; then
     say "${label}: the headline arms failed; completed episodes are on disk"
     return 1
   fi
@@ -202,7 +208,7 @@ run_arm() {
 
   if [ "$kind" = "grid" ]; then
     if ! $PY -u -m collabengine.cli ablate --config "$config" \
-         --modes live --agents A1,A2,A3,A4 2>&1 | tee -a "$LOG"; then
+         "${ep_arg[@]}" --modes live --agents A1,A2,A3,A4 2>&1 | tee -a "$LOG"; then
       say "${label}: ablation failed; the gate above is still good"
       return 1
     fi
@@ -211,6 +217,37 @@ run_arm() {
   say "=== ${label}: COMPLETE ==="
   return 0
 }
+
+# ---------------------------------------------------------------------------
+# Stage P. The pilot corpus, which the paper cannot build without.
+# ---------------------------------------------------------------------------
+# `runs/llama31-8b-q4-medium-ans` is gone. It was never released -- there is no
+# corpus-v1 release on the repository, verified 404 -- and `runs/` is
+# gitignored, so the rebuild that restored the fresh-seed corpus did not restore
+# this one. build_paper.py reads it at line 319 for every pilot quantity in the
+# paper: the +0.055 participation effect, the fungibility bound, and the whole
+# pilot column of the central table. The build raises FileNotFoundError before
+# it renders a single section.
+#
+# **This runs first, ahead of three card-nights of sweep, because it is an hour
+# and it is the difference between a paper that builds and one that does not.**
+#
+# **It is a re-measurement, not the original, and that must not be blurred.**
+# Sampling is at temperature 0.8 and llama.cpp's continuous batching is not
+# bit-reproducible, so the restored numbers will not equal the recorded ones.
+# The originals survive in the prose: +0.055 for the participation effect and
+# -0.005 [-0.056, +0.046] for fungibility, in PAPER-DRAFT sections 4 and 6, and
+# the seed range 0-47 in PREREG-phase3. Compare the two afterwards. If they
+# agree the pilot's role as hypothesis-generating is unaffected; if they do not,
+# the disagreement is itself a measurement result and belongs in the log.
+#
+# Seeds 0-47 rather than the config's own n_episodes 24: 24 is where the pilot
+# was first measured, 48 is what PREREG-phase3 sizes the paper's pilot column
+# from, and the paper quotes n = 48.
+say "=== P/7 pilot corpus (seeds 0-47) -- the paper does not build without it ==="
+COMPLETE_AT=48 run_arm "P/7 pilot (medium-ans)" configs/llamacpp/medium-ans.yaml \
+        q4 15000 llama31-8b-q4-medium-ans grid 48 \
+  || say "the pilot failed; build_paper.py will still raise on runs/...-ans"
 
 # ---------------------------------------------------------------------------
 # Stage 0. Tier 2: the 14B judge check, then the dose-response sweep.
