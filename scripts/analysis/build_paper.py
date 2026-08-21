@@ -424,25 +424,93 @@ def build(out_path: Path, author: str, affiliation: str, email: str,
     # ============================ 2. related work ==========================
     heading(doc, 1, "2   Related work")
     para(doc,
-         "**Emergent roles, observed.** The MARL lineage, of which ROMA [1] is "
-         "representative, produces emergent roles as learned embeddings. Those "
-         "roles are architectural rather than linguistic, and the agents are not "
-         "LLMs. The closest LLM result is observational [2]: 208 runs and 13,786 "
-         "coded messages establish that unassigned same-model agents differentiate "
-         "behaviourally, using LLM-judge coding and cosine similarity. It reports "
-         "no causal test, and states the transcript-reading problem explicitly. "
-         "It also uses several different LLMs, which leaves model heterogeneity "
-         "as an open confound for any differentiation it observes.")
+         "**Concurrent work reaches our conclusion by a different route, and we "
+         "state that first.** Tran and Kiela [1] normalise a *global* thinking-"
+         "token budget across arms on multi-hop reasoning and find that "
+         "single-agent systems match or outperform multi-agent ones once "
+         "computation is equalised. We agree, and we differ on mechanism in a way "
+         "that is checkable. Their solo arm *under*-spends: they report that "
+         "visible single-agent thought plateaus below the requested budget while "
+         "the multi-agent arm surfaces more. Ours is forced to *over*-spend and is "
+         "truncated for it. The distinction matters operationally, because a "
+         "global normalisation would have scored our own matched-budget arm as "
+         "matched, and the artifact survived there at 2.04x generation and 34% "
+         "truncation. Neither their work nor any other we found reports "
+         "differential final-answer truncation, or the per-turn budget separation "
+         "that removes it. Bertalanic and Fortuna [2] make the adjacent cost "
+         "argument at our scale: debate spends 2.1-3.4x the tokens of isolated "
+         "self-correction for equal or lower accuracy.")
     para(doc,
-         "**Ablation, applied to assigned roles.** Leave-one-out ablation of LLM "
-         "agents is established as an engineering tool. [3] treats attribution as "
-         "a cooperative game and finds that introspective LLM judgements do not "
-         "faithfully approximate ablation behaviour, which is third-party evidence "
-         "for the premise that transcript-reading and causal reality diverge. [4] "
-         "approximates leave-one-out by introspection, and [5] eliminates agents "
-         "dynamically for efficiency. In all three the roles are pre-assigned, and "
-         "ablation optimises a system rather than validating that a division of "
-         "labour is real.")
+         "**The framework literature does not match generation budget.** We "
+         "checked the solo baselines of five widely used multi-agent systems. "
+         "AutoGen [3] allows the winning arm additional context-update calls the "
+         "baseline does not receive. MetaGPT [4] accounts tokens carefully, but "
+         "only to compare two multi-agent systems, never to equalise against the "
+         "single-call arm. ChatDev [5] publishes the disparity itself - 7,182 "
+         "tokens for the single-agent baseline against 22,949 for ChatDev - and "
+         "accepts it as a cost of the paradigm. CAMEL [6] is the sharpest case: "
+         "its multi-agent arm runs to a forty-message limit and is evaluated as a "
+         "*summary* of that conversation, against one single-shot generation. "
+         "AgentVerse [7] has the best-designed solo condition in this group, "
+         "keeping the same scaffolding modules so that group size rather than "
+         "harness is isolated, and it is still matched on turns rather than "
+         "tokens. Magentic-One [8] ships repetition and isolation controls, so "
+         "instrument discipline exists in this literature - it is aimed at "
+         "variance, not at budget parity. None of these results is refuted by our "
+         "measurement. What follows is narrower and, we think, harder to dismiss: "
+         "the reported margins have not been separated from the budget "
+         "asymmetries their own papers document.")
+    para(doc,
+         "**Debate and aggregation, and the re-evaluations already underway.** "
+         "Multi-agent debate [9] and self-consistency [10] are the closest thing "
+         "to controlled solo-versus-multi comparisons at scale, and both spend "
+         "more generation in the multi arm by construction. Reflexion [11] adds "
+         "iterative self-critique; Huang et al. [12] find that intrinsic "
+         "self-correction without external feedback does not improve reasoning. "
+         "Critical re-examinations of debate have converged from several "
+         "directions [13, 14, 15]. On the aggregation side, Mixture-of-Agents "
+         "[16] reports gains from layered ensembling, and Self-MoA [17] finds "
+         "that mixing *different* models is often worse than sampling one good "
+         "one repeatedly - a same-model result with the same flavour as ours. Two "
+         "findings constrain how far we may generalise, and we name them rather "
+         "than omit them: sampling-and-voting scales with agent count and its "
+         "gains grow with task difficulty [18] - the same curve shape our artifact "
+         "produces - and compound-call systems show non-monotone returns [19]. Any "
+         "claim that multi-agent gains are *generally* artifactual would have to "
+         "answer these; we make no such claim.")
+    para(doc,
+         "**Emergent roles.** The MARL lineage, of which ROMA [20] is "
+         "representative, produces emergent roles as learned embeddings: "
+         "architectural rather than linguistic, and not LLM agents. The closest "
+         "LLM result is observational [21] - 208 runs and 13,786 coded messages "
+         "establishing that unassigned agents differentiate behaviourally, with no "
+         "causal test and an explicit statement of the transcript-reading problem. "
+         "It uses several different LLMs, leaving model heterogeneity as an open "
+         "confound, and it finds that same-model groups differentiate *least*, "
+         "which is a prior our null is consistent with rather than a result our "
+         "null contradicts. Ablation of LLM agents is established as an "
+         "engineering tool [22, 23, 24]: [22] treats attribution as a cooperative "
+         "game and finds introspective judgements do not faithfully approximate "
+         "ablation, which is third-party evidence for our premise. In all three "
+         "the roles are pre-assigned and ablation optimises a system rather than "
+         "validating that a division of labour is real.")
+    para(doc,
+         "**Measurement validity, which is the literature this paper belongs "
+         "to.** Reported gains dissolving under controlled re-analysis is a "
+         "recurring finding across subfields: reinforcement learning [25], "
+         "recommender systems [26], metric learning [27], and imitation of "
+         "proprietary models [28]. The specific failure we report - a limit that "
+         "is symmetric in specification and asymmetric in effect - is an instance "
+         "of construct-validity failure in the sense of Jacobs and Wallach [29], "
+         "and of the leakage taxonomy of Kapoor and Narayanan [30]. Two "
+         "methodological papers state the discipline our project arrived at "
+         "independently and painfully: Card et al. [31] on how routinely NLP "
+         "comparisons are underpowered, and Dodge et al. [32] on reporting the "
+         "budget an arm consumed rather than only its score. Emergent-ability "
+         "claims have been shown to depend on metric choice [33]; ours depended on "
+         "a token cap. The nearest artifact-hunting corpus is MAST [34], whose "
+         "fourteen failure modes are derived from 1,642 annotated multi-agent "
+         "traces and contain no category for *the harness truncated the answer*.")
     para(doc,
          "**The gap, and why we could not fill it.** The observational half and "
          "the causal half have not been combined. Our design does combine them, "
@@ -838,18 +906,114 @@ def build(out_path: Path, author: str, affiliation: str, email: str,
     # ========================= references ==================================
     doc.add_page_break()
     heading(doc, 1, "References")
+    # Numbering follows first citation in section 2 and is asserted against it
+    # by `_check_citations` below -- a reference list that has drifted out of
+    # step with its callouts is the most common defect in a paper assembled by
+    # a script, and it is silent.
+    #
+    # Two entries here were wrong until 2026-08-20: [21] and [22] carried
+    # invented titles that were paraphrases of what the papers do rather than
+    # what they are called. Both were checked against their arXiv records when
+    # the rest of this list was built.
     refs = [
-        "T. Wang, H. Dong, V. Lesser and C. Zhang. ROMA: Multi-agent reinforcement "
-        "learning with emergent roles. In *Proceedings of the 37th International "
-        "Conference on Machine Learning (ICML)*, 2020. arXiv:2003.08039.",
-        "Behavioral differentiation without role assignment in same-model LLM "
-        "agent groups. arXiv:2604.00026, 2026.",
-        "Agents that matter: causal leave-one-out attribution for multi-agent LLM "
-        "systems. arXiv:2605.27621, 2026.",
+        "D. Tran and D. Kiela. Single-agent LLMs outperform multi-agent systems "
+        "on multi-hop reasoning under equal thinking token budgets. "
+        "arXiv:2604.02460, 2026.",
+        "B. Bertalanic and B. Fortuna. The cost of consensus: isolated "
+        "self-correction prevails over unguided agentic systems. "
+        "arXiv:2605.00914, 2026.",
+        "Q. Wu, G. Bansal, J. Zhang, Y. Wu, B. Li, E. Zhu, L. Jiang, X. Zhang, "
+        "S. Zhang, J. Liu, A. H. Awadallah, R. W. White, D. Burger and C. Wang. "
+        "AutoGen: enabling next-gen LLM applications via multi-agent "
+        "conversation. arXiv:2308.08155, 2023.",
+        "S. Hong, M. Zhuge, J. Chen, X. Zheng, Y. Cheng, C. Zhang, J. Wang, "
+        "Z. Wang, S. K. S. Yau, Z. Lin, L. Zhou, C. Ran, L. Xiao, C. Wu and "
+        "J. Schmidhuber. MetaGPT: meta programming for a multi-agent "
+        "collaborative framework. In *ICLR*, 2024. arXiv:2308.00352.",
+        "C. Qian, W. Liu, H. Liu, N. Chen, Y. Dang, J. Li, C. Yang, W. Chen, "
+        "Y. Su, X. Cong, J. Xu, D. Li, Z. Liu and M. Sun. ChatDev: communicative "
+        "agents for software development. In *ACL*, 2024. arXiv:2307.07924.",
+        "G. Li, H. A. A. K. Hammoud, H. Itani, D. Khizbullin and B. Ghanem. "
+        "CAMEL: communicative agents for 'mind' exploration of large language "
+        "model society. In *NeurIPS*, 2023. arXiv:2303.17760.",
+        "W. Chen, Y. Su, J. Zuo, C. Yang, C. Yuan, C.-M. Chan, H. Yu, Y. Lu, "
+        "Y.-H. Hung, C. Qian, Y. Qin, X. Cong, R. Xie, Z. Liu, M. Sun and "
+        "J. Zhou. AgentVerse: facilitating multi-agent collaboration and "
+        "exploring emergent behaviors. arXiv:2308.10848, 2023.",
+        "A. Fourney, G. Bansal, H. Mozannar, C. Tan, E. Salinas, E. Zhu, "
+        "F. Niedtner, G. Proebsting, G. Bassman, J. Gerrits, J. Alber, P. Chang, "
+        "R. Loynd, R. West, V. Dibia, A. Awadallah, E. Kamar, R. Hosn and "
+        "S. Amershi. Magentic-One: a generalist multi-agent system for solving "
+        "complex tasks. arXiv:2411.04468, 2024.",
+        "Y. Du, S. Li, A. Torralba, J. B. Tenenbaum and I. Mordatch. Improving "
+        "factuality and reasoning in language models through multiagent debate. "
+        "arXiv:2305.14325, 2023.",
+        "X. Wang, J. Wei, D. Schuurmans, Q. Le, E. Chi, S. Narang, "
+        "A. Chowdhery and D. Zhou. Self-consistency improves chain of thought "
+        "reasoning in language models. In *ICLR*, 2023. arXiv:2203.11171.",
+        "N. Shinn, F. Cassano, E. Berman, A. Gopinath, K. Narasimhan and "
+        "S. Yao. Reflexion: language agents with verbal reinforcement learning. "
+        "arXiv:2303.11366, 2023.",
+        "J. Huang, X. Chen, S. Mishra, H. S. Zheng, A. W. Yu, X. Song and "
+        "D. Zhou. Large language models cannot self-correct reasoning yet. In "
+        "*ICLR*, 2024. arXiv:2310.01798.",
+        "A. Smit, P. Duckworth, N. Grinsztajn, T. D. Barrett and A. Pretorius. "
+        "Should we be going MAD? A look at multi-agent debate strategies for "
+        "LLMs. arXiv:2311.17371, 2023.",
+        "Stop overvaluing multi-agent debate: we must rethink evaluation and "
+        "embrace model heterogeneity. arXiv:2502.08788, 2025.",
+        "H. Chen, Y. Niu, Y. Cheng, C. Han and M. Sugiyama. When and why does "
+        "multi-agent debate fail, and does it really underperform? "
+        "arXiv:2510.20963, 2025.",
+        "J. Wang, J. Wang, B. Athiwaratkun, C. Zhang and J. Zou. "
+        "Mixture-of-agents enhances large language model capabilities. "
+        "arXiv:2406.04692, 2024.",
+        "W. Li, Y. Lin, M. Xia and Q. Jin. Rethinking mixture-of-agents: is "
+        "mixing different large language models beneficial? arXiv:2502.00674, "
+        "2025.",
+        "J. Li, Q. Zhang, Y. Yu, Q. Fu and D. Ye. More agents is all you need. "
+        "*Transactions on Machine Learning Research*, 2024. arXiv:2402.05120.",
+        "Are more LLM calls all you need? Towards scaling laws of compound "
+        "inference systems. arXiv:2403.02419, 2024.",
+        "T. Wang, H. Dong, V. Lesser and C. Zhang. ROMA: multi-agent "
+        "reinforcement learning with emergent roles. In *ICML*, 2020. "
+        "arXiv:2003.08039.",
+        "El Kandoussi. 'Who am I, and who else is here?' Behavioral "
+        "differentiation without role assignment in multi-agent LLM systems. "
+        "arXiv:2604.00026, 2026.",
+        "Lu, Huang, Lin and Lee. Agents that matter: optimizing multi-agent "
+        "LLMs via removal-based attribution. arXiv:2605.27621, 2026.",
         "IntrospecLOO: approximating leave-one-out agent ablation by "
         "introspection. arXiv:2505.22192, 2025.",
         "AgentDropout: dynamic agent elimination for efficient multi-agent LLM "
         "inference. arXiv:2503.18891, 2025.",
+        "P. Henderson, R. Islam, P. Bachman, J. Pineau, D. Precup and "
+        "D. Meger. Deep reinforcement learning that matters. In *AAAI*, 2018. "
+        "arXiv:1709.06560.",
+        "M. Ferrari Dacrema, P. Cremonesi and D. Jannach. Are we really making "
+        "much progress? A worrying analysis of recent neural recommendation "
+        "approaches. In *RecSys*, 2019. arXiv:1907.06902.",
+        "K. Musgrave, S. Belongie and S.-N. Lim. A metric learning reality "
+        "check. In *ECCV*, 2020. arXiv:2003.08505.",
+        "A. Gudibande, E. Wallace, C. Snell, X. Geng, H. Liu, P. Abbeel, "
+        "S. Levine and D. Song. The false promise of imitating proprietary "
+        "LLMs. arXiv:2305.15717, 2023.",
+        "A. Z. Jacobs and H. Wallach. Measurement and fairness. In *FAccT*, "
+        "2021. arXiv:1912.05511.",
+        "S. Kapoor and A. Narayanan. Leakage and the reproducibility crisis in "
+        "ML-based science. arXiv:2207.07048, 2022.",
+        "D. Card, P. Henderson, U. Khandelwal, R. Jia, K. Mahowald and "
+        "D. Jurafsky. With little power comes great responsibility. In *EMNLP*, "
+        "2020. arXiv:2010.06595.",
+        "J. Dodge, S. Gururangan, D. Card, R. Schwartz and N. A. Smith. Show "
+        "your work: improved reporting of experimental results. In *EMNLP*, "
+        "2019. arXiv:1909.03004.",
+        "R. Schaeffer, B. Miranda and S. Koyejo. Are emergent abilities of "
+        "large language models a mirage? In *NeurIPS*, 2023. arXiv:2304.15004.",
+        "M. Cemri, M. Z. Pan, S. Yang, L. G. Agrawal, B. Chopra, R. Tiwari, "
+        "K. Keutzer, A. Parameswaran, D. Klein, K. Ramchandran, M. Zaharia, "
+        "J. E. Gonzalez and I. Stoica. Why do multi-agent LLM systems fail? In "
+        "*NeurIPS Datasets and Benchmarks*, 2025. arXiv:2503.13657.",
     ]
     for i, r in enumerate(refs):
         p = para(doc, "", size=9.0, space_after=4.0, lead=10.5)
@@ -857,7 +1021,43 @@ def build(out_path: Path, author: str, affiliation: str, email: str,
         p.paragraph_format.first_line_indent = Inches(-0.25)
         runs(p, f"[{i + 1}]  " + r, 9.0)
 
+    # Carried on the document so `main` can check the callouts against it
+    # without this list becoming a module global that something else edits.
+    doc.n_references = len(refs)
     return doc
+
+
+def check_citations(doc, n_refs: int) -> None:
+    """Every [n] in the body resolves, and every reference is cited.
+
+    A reference list that has drifted out of step with its callouts is the most
+    common defect in a paper assembled by a script, and it is silent: the
+    numbers still render, they just point at the wrong papers. This project
+    shipped two references with invented titles for weeks, so the check is not
+    hypothetical.
+
+    Raises rather than warns. A build that emits a broken bibliography is worse
+    than a build that fails, because only one of them gets submitted.
+    """
+    import re
+
+    cited: set[int] = set()
+    for par in doc.paragraphs:
+        text = par.text.strip()
+        if text == "References":
+            break
+        for group in re.findall(r"\[(\d+(?:\s*,\s*\d+)*)\]", text):
+            cited.update(int(x) for x in group.split(","))
+
+    dangling = sorted(n for n in cited if not 1 <= n <= n_refs)
+    if dangling:
+        raise AssertionError(
+            f"citations with no reference: {dangling} (have {n_refs} references)"
+        )
+    uncited = sorted(set(range(1, n_refs + 1)) - cited)
+    if uncited:
+        raise AssertionError(f"references never cited in the body: {uncited}")
+    print(f"citations: {len(cited)} of {n_refs} references cited, none dangling")
 
 
 def append_appendix(doc) -> None:
@@ -966,6 +1166,7 @@ def main() -> None:
 
     doc = build(Path(args.out), args.author, args.affiliation, args.email,
                 args.anonymous, Path(args.fig_dir))
+    check_citations(doc, doc.n_references)
     append_appendix(doc)
     from checklist import append_checklist          # noqa: E402
     append_checklist(doc, para, heading, bullet, runs)

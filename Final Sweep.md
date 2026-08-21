@@ -30,7 +30,7 @@ not a 14B result. Partial states are described in the notes, never in the mark.
 | 1.6 | Equivalence testing (TOST) | ✅ | `inference.tost` + `smallest_equivalence_bound`; margin registered in `PREREG-equivalence.md` before use. **The headline null now excludes effects larger than 0.032**; fungibility does not clear the margin and is corrected to a bound |
 | 1.7 | A priori power analysis | ✅ | `scripts/analysis/power_report.py` sizes every arm run and every arm proposed. **The ablation pilot's MDE was 0.086 against the +0.055 it reported** — the withdrawn finding was unresolvable by construction, and one pre-run line would have said so |
 | 1.8 | Effect-size CIs in main tables | ✅ | 10,000-draw percentile bootstrap in `scripts/analysis/gate_report.py:133`; used for headline contrasts. Note: not yet carried into *every* paper table |
-| 1.9 | Related work beyond two papers | ❌ | Five references total in `scripts/analysis/build_paper.py:844-852`; no multi-agent frameworks, no debate, no MoA, no measurement-validity literature |
+| 1.9 | Related work beyond two papers | ✅ | 41 verified citations in `docs/RELATED.md`, 34 in the paper across all five clusters, plus a `check_citations` build assertion. **Found a near-scoop** (arXiv:2604.02460) and **two invented titles in the old bibliography** |
 | 1.10 | Academic prose, not log register | ✅ | `build_paper.py` emits the submission in standard register; the log survives as the transparency artifact |
 | 1.11 | Standard section structure | ❌ | Sections 1–11 + References + Appendix + checklist exist; **Broader Impact and Reproducibility are checklist answers only, not body sections** |
 | 1.12 | Page-limit compliance | ❌ | Nothing measures or enforces a page count; venue not yet fixed |
