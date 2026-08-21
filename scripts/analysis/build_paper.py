@@ -9,9 +9,19 @@ integrity modules the tables and figures use -- so a stale number in the paper
 is a failure of this script rather than a transcription slip.
 
     python scripts/analysis/build_paper.py [--out CollabEngine-NeurIPS2026.docx]
+    python scripts/analysis/build_paper.py --anonymous   # -> paper-anonymous.docx
 
 `--author` / `--affiliation` / `--email` set the title block. Defaults are the
 preprint form; pass `--anonymous` for the double-blind submission form.
+
+`--anonymous` is not a byline switch. It removes every identifier the reviewer
+could resolve back to the authors: the byline, the affiliation, the contact
+address, the acknowledgements, the output filename (which is named after the
+public repository), the docx author property, and the code-availability link,
+which is replaced by a release-upon-acceptance statement rather than deleted --
+see `check_anonymous` below for what is removed, what is deliberately kept, and
+why the removal is checked on the rendered document instead of trusted to the
+code that writes it.
 """
 
 from __future__ import annotations
@@ -329,9 +339,28 @@ def numbers() -> dict:
 
 # --- the document -----------------------------------------------------------
 def build(out_path: Path, author: str, affiliation: str, email: str,
-          anonymous: bool, fig_dir: Path) -> None:
+          anonymous: bool, fig_dir: Path, acknowledgements: str = "") -> None:
+    """Assemble the document.
+
+    `anonymous` is threaded through rather than applied as a scrub afterwards,
+    because the double-blind form of a section is usually different prose and
+    not the same prose with words removed: §13's availability statement has to
+    say what happens to the code instead of pointing at it, and the title block
+    has to occupy the same vertical space so the layout does not shift between
+    the two builds. `acknowledgements` is accepted in both forms and emitted in
+    neither when `anonymous` -- suppressing it here rather than asking the
+    caller not to pass it means the anonymous build cannot leak one by
+    accident.
+    """
     N = numbers()
     doc = Document()
+
+    # The docx author property survives export and is visible in any reader's
+    # file inspector, and python-docx's own default ("python-docx") is not a
+    # name we want on the preprint either.
+    doc.core_properties.author = "Anonymous Author(s)" if anonymous else author
+    doc.core_properties.last_modified_by = "" if anonymous else author
+    doc.core_properties.comments = ""
 
     s = doc.sections[0]
     s.page_width, s.page_height = Inches(8.5), Inches(11)   # US Letter
@@ -1020,6 +1049,27 @@ def build(out_path: Path, author: str, affiliation: str, email: str,
          "sample size permits. Preregistrations, their amendments and their "
          "postscripts are released with the code, including the ones that "
          "record where we were wrong.")
+    para(doc,
+         "**Where to get it.** The harness, the configurations, the analysis "
+         "scripts and this paper's own build script are in the project "
+         "repository; the transcript corpus, which is too large to commit, is "
+         "attached to a tagged release that the corpus fetcher in the repository "
+         "resolves by default. "
+         + ("Both are withheld from this submission to preserve double-blind "
+            "review: the repository and its release artifacts carry the authors' "
+            "identity, and we have not mirrored them anonymously rather than "
+            "claim a mirror we do not maintain. Code, configurations and the "
+            "full corpus will be released publicly upon acceptance, in the "
+            "layout the build scripts already expect."
+            if anonymous else
+            f"Both are public at `{REPO_URL}`."))
+
+    # Acknowledgements name people and institutions, which is exactly what a
+    # double-blind submission must not do, so the anonymous form drops the
+    # section rather than anonymising its contents.
+    if acknowledgements and not anonymous:
+        heading(doc, 1, "Acknowledgements")
+        para(doc, acknowledgements)
 
     # ========================= references ==================================
     doc.add_page_break()
@@ -1224,6 +1274,121 @@ def check_register(doc) -> None:
     print(f"register: {len(doc.paragraphs)} paragraphs, no log-register markers")
 
 
+#: The public home of the code and the corpus. Named once, because the
+#: preprint's availability statement and the anonymity lint have to agree about
+#: what the URL is -- a lint that greps for a URL the paper no longer prints is
+#: a lint that has quietly stopped working.
+REPO_URL = "https://github.com/guru-bharadwaj20/CollabEngine-LLM"
+
+#: Identifiers that must never survive `--anonymous`, beyond the byline values
+#: the caller passes in. These are literal substrings matched case-insensitively
+#: unless the entry is marked word-bounded, which the short acronyms are: `CCBD`
+#: inside an ordinary word is a false positive waiting to switch the lint off.
+#:
+#: Most of these do not appear in the document today. They are listed anyway,
+#: because the failure this guards against is someone adding an affiliation to
+#: the checklist or a repository link to §13 six weeks from now and the
+#: anonymous build continuing to succeed.
+_ANON_FORBIDDEN: tuple[tuple[str, str, bool], ...] = (
+    ("guru-bharadwaj20", "the GitHub handle", False),
+    ("github.com", "a GitHub link", False),
+    ("CollabEngine", "the repository name", False),
+    ("CCBD", "the lab", True),
+    ("CDSAML", "the lab", True),
+    ("PES University", "the university", False),
+    ("PESU", "the university", True),
+    ("Acknowledgements", "an acknowledgements section", False),
+    ("Acknowledgments", "an acknowledgements section", False),
+)
+
+
+def _rendered_text(doc):
+    """Every string a reviewer can read, with a label for where it came from.
+
+    `check_citations` and `check_register` walk `doc.paragraphs`, which is the
+    body only. That is enough for those two, and not enough here: the byline is
+    a body paragraph but the compute description is a table cell, the preprint
+    notice is a footer, and the whole answered checklist arrives as tables and
+    paragraphs appended by a module this script only calls. An anonymity check
+    that misses any of those is worse than none, because it is believed.
+    """
+    for par in doc.paragraphs:
+        yield "body", par.text
+    for i, tbl in enumerate(doc.tables):
+        for row in tbl.rows:
+            for cell in row.cells:
+                for par in cell.paragraphs:
+                    yield f"table {i + 1}", par.text
+    for sec in doc.sections:
+        for part, where in ((sec.header, "header"), (sec.footer, "footer"),
+                            (sec.first_page_header, "first-page header"),
+                            (sec.first_page_footer, "first-page footer")):
+            for par in part.paragraphs:
+                yield where, par.text
+
+
+def check_anonymous(doc, author: str, affiliation: str, email: str) -> None:
+    """Nothing in the rendered document identifies the authors.
+
+    Checked on the document rather than on the source that wrote it, for the
+    same reason the register check is: the paper is assembled from several
+    modules, one of which (`checklist.py`) this script does not own and must not
+    edit, and a conditional in `build` proves only that `build` behaves. What
+    the reviewer sees is the docx, so the docx is what gets read.
+
+    What this refuses: the author name and its surname alone, the contact
+    address and its local part, the affiliation string, the GitHub handle, any
+    `github.com` link, the repository name, the lab and university names, and an
+    acknowledgements heading. What it deliberately allows through:
+
+    * **The GPU model.** "one 24 GB RTX 4500 Ada" is a hardware specification,
+      not an address. It names no machine, no lab and no institution, and the
+      conference asks for exactly this level of compute detail. A description
+      that named a workstation or a cluster inside a named lab would be a leak;
+      a card model sold to anyone is not, and blurring it would cost the
+      reviewer a real reproducibility fact for no anonymity gain.
+    * **`neurips.cc` links inside the checklist**, which are the conference's
+      own boilerplate and identify nobody. The `github.com` rule is written to
+      fire only on GitHub for this reason.
+
+    Raises rather than warns, and reports every leak it found rather than the
+    first: a build that emits an identifying submission is worse than a build
+    that fails, and fixing leaks one per run is how the second one gets
+    submitted anyway.
+    """
+    import re
+
+    needles: list[tuple[str, str, bool]] = list(_ANON_FORBIDDEN)
+    if author:
+        needles.append((author, "the author name", False))
+        surname = author.split()[-1]
+        if len(surname) > 3:
+            needles.append((surname, "the author surname", True))
+    if affiliation:
+        needles.append((affiliation, "the affiliation", False))
+    if email:
+        needles.append((email, "the contact address", False))
+        local = email.split("@")[0]
+        if len(local) > 3:
+            needles.append((local, "the address local part", False))
+
+    leaks: list[str] = []
+    for where, text in _rendered_text(doc):
+        if not text.strip():
+            continue
+        for needle, what, bounded in needles:
+            pattern = (rf"\b{re.escape(needle)}\b" if bounded
+                       else re.escape(needle))
+            if re.search(pattern, text, re.I):
+                leaks.append(f"{what} ({needle!r}) in {where}: {text[:60]!r}")
+    if leaks:
+        raise AssertionError(
+            "identifying material in the anonymous build:\n  "
+            + "\n  ".join(leaks[:8])
+        )
+    print(f"anonymity: {len(needles)} identifiers checked, none present")
+
+
 def append_appendix(doc) -> None:
     """Technical appendix. 'There is no page limit for the technical
     appendices', and nothing here is load-bearing for the main claims -- the
@@ -1320,23 +1485,39 @@ def append_appendix(doc) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="CollabEngine-NeurIPS2026.docx")
+    # No default for --out: the preprint's filename is named after the public
+    # repository, so an anonymous build that inherited it would ship the
+    # identity in the one field the submission system does not strip.
+    ap.add_argument("--out")
     ap.add_argument("--author", default="Guru R Bharadwaj")
     ap.add_argument("--affiliation", default="Independent Researcher")
     ap.add_argument("--email", default="gururb20@gmail.com")
+    ap.add_argument("--acknowledgements", default="",
+                    help="emitted in the preprint form only; the anonymous "
+                         "build drops it whatever it says")
     ap.add_argument("--anonymous", action="store_true")
     ap.add_argument("--fig-dir", default="docs/figures/paper")
     args = ap.parse_args()
 
-    doc = build(Path(args.out), args.author, args.affiliation, args.email,
-                args.anonymous, Path(args.fig_dir))
+    out = args.out or ("paper-anonymous.docx" if args.anonymous
+                       else "CollabEngine-NeurIPS2026.docx")
+    # The title block keeps its geometry under --anonymous but carries none of
+    # these values; they are still passed so `check_anonymous` can be told what
+    # to look for rather than guessing from module defaults.
+    doc = build(Path(out), args.author, args.affiliation, args.email,
+                args.anonymous, Path(args.fig_dir), args.acknowledgements)
     check_citations(doc, doc.n_references)
     check_register(doc)
     append_appendix(doc)
     from checklist import append_checklist          # noqa: E402
     append_checklist(doc, para, heading, bullet, runs)
-    doc.save(args.out)
-    print(f"wrote {args.out}")
+    # Last, so that everything any module appended is in the document being
+    # read -- the appendix and the checklist are exactly where an identifier
+    # would arrive without this script noticing.
+    if args.anonymous:
+        check_anonymous(doc, args.author, args.affiliation, args.email)
+    doc.save(out)
+    print(f"wrote {out}")
 
 
 if __name__ == "__main__":
