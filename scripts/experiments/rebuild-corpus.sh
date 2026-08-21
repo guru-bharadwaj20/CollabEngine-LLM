@@ -28,7 +28,8 @@ set -uo pipefail
 
 LOG=runs/rebuild-corpus.log
 CONFIG=${CONFIG:-configs/llamacpp/medium-h3b.yaml}
-PY=${PY:-python}
+# PY comes from _python.sh, which refuses the Microsoft Store stub. See its header.
+. scripts/ops/_python.sh
 
 mkdir -p runs
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }

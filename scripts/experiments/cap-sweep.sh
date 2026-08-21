@@ -61,7 +61,8 @@ PHASES=${PHASES:-"baseline,solo"}
 # re-runs nothing. 100 is what PREREG-cap-sweep registered and what
 # power_report.py sized; changing it after the fact is an amendment, not a knob.
 EPISODES=${EPISODES:-100}
-PY=${PY:-python}
+# PY comes from _python.sh, which refuses the Microsoft Store stub. See its header.
+. scripts/ops/_python.sh
 
 # The geometry every rung must be served at. Not the default preset: the 6144
 # rung needs 21,504 tokens in a slot and would otherwise have its answer turns
