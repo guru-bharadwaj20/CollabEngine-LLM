@@ -497,6 +497,17 @@ def main() -> None:
         print("no corpora found; has anything run yet?")
         return
 
+    if not any(Path(p).exists() for _, p, _ in sources):
+        # The failure a fresh clone hits, answered where it happens rather than
+        # in a README section nobody reads at the moment they need it.
+        print("no episodes on disk. The corpus is a release asset, not a git "
+              "object:\n"
+              "    python scripts/ops/fetch_corpus.py\n"
+              "or regenerate it, which re-measures rather than reproduces:\n"
+              "    scripts/ops/serve.sh --detach\n"
+              "    bash scripts/experiments/rebuild-corpus.sh")
+        return
+
     results = {}
     paths = {}
     for label, team_p, solo_p in sources:

@@ -3347,3 +3347,99 @@ because every test went through that subclass (§3.3).
 | `configs/hf-local/medium-serial.yaml` | `medium`, the same, and identical to `medium.yaml` in everything but concurrency |
 | `configs/vllm/qwen3-8b.yaml` | Same experiment against a WSL2 or remote vLLM server; only `backend.kind` differs |
 | `configs/mock.yaml` | No GPU and no server. Runs the whole pipeline against the deterministic mock, which is what makes `selftest` and the harness tests free |
+
+---
+
+### 4.24 The corpus rebuilt from scratch, and a fourth arm-asymmetric artifact
+
+**2026-08-21.** `runs/` had been cleaned and every `*.jsonl` is gitignored, so
+no corpus existed on disk and `build_paper.py` — which reads its numbers from
+episodes — could not build at all. The instrument was reassembled from nothing:
+llama.cpp `b10369 (6e62ba538)` from the release asset, weights re-fetched,
+`n_slots = 4, n_ctx_slot = 18432` confirmed by the server, preflight clean.
+Seeds 1000–1149, `medium`, the same four-arm design.
+
+**This is a re-measurement, not a reproduction, and one input genuinely
+changed.** All Llama GGUFs now come from a single uploader so that the Q4_K_M
+instrument and the Q8_0 / f16 rungs of the precision ladder share one
+conversion (§ENVIRONMENT). The previous Q4_K_M was a different upload of the
+same quantisation.
+
+#### What the gate says if you read it
+
+| metric | solo | team | gap | *d* | perm *p* | 95% CI |
+|---|---|---|---|---|---|---|
+| `fraction` | 0.525 | 0.606 | **+0.081** | +0.43 | **<0.001** | [+0.038, +0.126] |
+| `strict` | 0.183 | 0.187 | +0.003 | +0.02 | 0.849 | [−0.031, +0.039] |
+| `feasible` | 0.000 | 0.007 | +0.007 | +0.12 | 1.000 | [+0.000, +0.020] |
+
+**A team advantage at *p* < 0.001, against a published value of −0.003 at
+*p* = 0.865.** Read naively this is a failure to replicate the project's central
+negative result.
+
+#### What it is
+
+| | episodes | malformed | mean `fraction` |
+|---|---|---|---|
+| solo | 149 | **25 (16.8%)** | 0.525 |
+| team | 150 | **0 (0.0%)** | 0.606 |
+| **solo, well-formed only** | **124** | — | **0.631** |
+| **team, well-formed only** | **150** | — | **0.606** |
+
+A malformed episode scores exactly 0.000 and is counted. Twenty-five zeros in
+one arm and none in the other move that arm's mean by 0.106, which is more than
+the entire gap. **Among episodes where both arms actually produced a parseable
+answer, the single agent leads the team by 0.025.** The published null
+reproduces; the naive reading does not.
+
+#### The three ways a solo answer failed to parse
+
+Read directly from the transcripts:
+
+1. `solo:medium:1007` — `finish_reason = stop`, 1,164 characters, still
+   reasoning about capacity violations when it stopped. It never reached an
+   answer block.
+2. `solo:medium:1013` — `finish_reason = stop`, and **it emitted a complete
+   assignment** (`J1 -> W2`, `J2 -> W4`, … all sixteen jobs) in prose rather
+   than in the required block. **A produced answer, scored zero by the parser.**
+3. `solo:medium:1016` — `finish_reason = length`, 9,865 characters of a
+   degenerate repetition loop ("is not an option. Let's assign it to …").
+
+Only the third is a model failure in any interesting sense. The second is the
+harness scoring a solved instance as a total loss, and the team arm is
+structurally protected from it: `TEAM_BRIEF` tells the agent the group's last
+message is what gets scored, so the final turn is written *as* a submission.
+
+#### Why this is the fourth instance, not a new problem
+
+The pattern is the project's own: **a limit or convention that is identical in
+specification lands on one arm only, and in the direction that flatters the
+team.** Previously it was the per-turn token cap (§4.10, §4.14), then the
+matched-budget arm's truncation (§4.23). Here it is the answer-format parser.
+
+**The integrity filter does not catch it.** `is_instrument_failure` excluded
+**1** of the 149 solo episodes, and the truncation sensitivity row drops **7**.
+Neither is the 25. The filter treats an unparseable answer as a team failure —
+a real zero — rather than an instrument failure, which is precisely the
+criticism §4.1e already makes of it in a different guise.
+
+**Not obviously a regression from the weight change.** §4.23 reports 22
+malformed of 150 in the published `solo_long` arm, so a ~15% malformed rate in a
+single-agent arm appears to be a standing property of this instrument rather
+than something the new conversion introduced. That cannot be settled here: the
+corpus that would settle it was deleted.
+
+#### What follows
+
+1. **The headline stands, and its support is now stronger**, because it survives
+   an independent re-measurement on a different weight upload — but only when
+   the malformed asymmetry is handled. Stated without that handling, this corpus
+   would have been the project's fourth false positive.
+2. **`malformed` belongs beside every mean**, on the same footing as
+   `cut@end`. `gate_report` already prints it; nothing in the analysis path
+   *acts* on it.
+3. **Whether a prose answer should be parsed is an instrument question, not a
+   scoring convenience.** Fixing the parser changes the instrument and must
+   happen in a run where it is the only thing that changes — §4.1c's rule.
+4. This is a Tier-1 finding for the paper's own thesis: the artifact class
+   reproduces in a fourth form, found by the diagnostics the paper recommends.
