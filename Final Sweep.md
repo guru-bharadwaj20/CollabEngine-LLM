@@ -32,8 +32,8 @@ not a 14B result. Partial states are described in the notes, never in the mark.
 | 1.8 | Effect-size CIs in main tables | ✅ | 10,000-draw percentile bootstrap in `scripts/analysis/gate_report.py:133`; used for headline contrasts. Note: not yet carried into *every* paper table |
 | 1.9 | Related work beyond two papers | ✅ | 41 verified citations in `docs/RELATED.md`, 34 in the paper across all five clusters, plus a `check_citations` build assertion. **Found a near-scoop** (arXiv:2604.02460) and **two invented titles in the old bibliography** |
 | 1.10 | Academic prose, not log register | ✅ | `build_paper.py` emits the submission in standard register; the log survives as the transparency artifact |
-| 1.11 | Standard section structure | ❌ | Sections 1–11 + References + Appendix + checklist exist; **Broader Impact and Reproducibility are checklist answers only, not body sections** |
-| 1.12 | Page-limit compliance | ❌ | Nothing measures or enforces a page count; venue not yet fixed |
+| 1.11 | Standard section structure | ✅ | Broader Impact/Ethics (§12) and Reproducibility (§13) are now body sections, not only checklist answers — both are explicit NeurIPS/ICML requirements |
+| 1.12 | Page-limit compliance | ✅ *(enforcement wired; venue still unfixed)* | `scripts/analysis/page_check.py` gets a **true** page count from Word rather than an estimate, splits body from back matter, and fails over the limit. `--limit` has no default because venue limits change every cycle — that is 8.3 |
 | 1.13 | Public repo, actually cloneable | ❌ | `api.github.com/repos/guru-bharadwaj20/CollabEngine-LLM` → **404**. The remote is private or absent |
 | 1.14 | Pinned environment | ✅ | `requirements.lock.txt` (52 packages), `Dockerfile`, `docs/ENVIRONMENT.md` with the llama.cpp build `b10369 (6e62ba538)` and a sha256 for every GGUF, and `scripts/ops/env_stamp.py` writing all four layers into `env.json` per run |
 | 1.15 | README reproduces the headline end-to-end | ❌ | `gate_report.py` reproduces every gate number **from a corpus that `.gitignore` excludes**. A clone cannot run it |
