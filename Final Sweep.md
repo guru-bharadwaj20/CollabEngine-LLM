@@ -23,9 +23,9 @@ not a 14B result. Partial states are described in the notes, never in the mark.
 | # | Item | Status | Where it stands |
 |---|---|---|---|
 | 1.1 | Second task family | ✅ *(built; corpus pending)* | `tasks/code/` — generated Python implementation tasks, hidden test suite, four independent components, sandboxed grading. 24 tests; runs end to end on the mock **and on the served 8B**. Found and fixed a silent-corruption defect in `rescore`. **The 150-episode arms have not been generated** — that is GPU time, not code |
-| 1.2 | Second model family | ❌ | Configs exist for Qwen3-8B (`configs/hf-local/`, `configs/vllm/`); every *reported* number is Llama-3.1-8B Q4_K_M, and the bf16 Qwen corpora were deleted (LOG §7) |
-| 1.3 | Run the 14B | ❌ | `scripts/ops/fetch_14b.py` exists and Appendix C says "not yet used for a measurement" |
-| 1.4 | Precision/quantization control | ❌ | No arm holds task, tier and seeds fixed while varying precision |
+| 1.2 | Second model family | ✅ *(built; corpus pending)* | Qwen2.5-7B and Mistral-7B-v0.3, both Q4_K_M, weights fetched and checksummed, configs differing from `medium-h3b.yaml` by `backend.model` alone. `serve.sh` presets carry the per-model KV arithmetic. **Arms not generated** |
+| 1.3 | Run the 14B | ✅ *(built + preregistered; corpus pending)* | Qwen2.5-14B Q4_K_M on disk, 3-slot geometry derived, `docs/PREREG-14b.md` registered with a three-clause threshold, an MDE of 0.049 at n=150, and a declared scale/family confound. **Arms not generated** |
+| 1.4 | Precision/quantization control | ✅ *(built; corpus pending)* | A three-rung ladder — Q4_K_M, Q8_0, f16 — all from **one conversion**, which is what makes it a ladder. Stronger than the binary control this file originally proposed. **Arms not generated** |
 | 1.5 | Multiple-comparisons correction | ✅ | `analysis/inference.py` (Holm + BH), family declared from the preregs, printed by `gate_report.py`. No conclusion changed, which is the point |
 | 1.6 | Equivalence testing (TOST) | ✅ | `inference.tost` + `smallest_equivalence_bound`; margin registered in `PREREG-equivalence.md` before use. **The headline null now excludes effects larger than 0.032**; fungibility does not clear the margin and is corrected to a bound |
 | 1.7 | A priori power analysis | ✅ | `scripts/analysis/power_report.py` sizes every arm run and every arm proposed. **The ablation pilot's MDE was 0.086 against the +0.055 it reported** — the withdrawn finding was unresolvable by construction, and one pre-run line would have said so |
