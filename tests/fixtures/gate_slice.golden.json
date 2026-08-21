@@ -1,0 +1,28 @@
+{
+  "arms": {
+    "baseline": {
+      "mean": {
+        "feasible": 0.0,
+        "fraction": 0.5909375,
+        "strict": 0.1346875
+      },
+      "n": 20
+    },
+    "solo": {
+      "mean": {
+        "feasible": 0.0,
+        "fraction": 0.5250296195033037,
+        "strict": 0.15836295283663704
+      },
+      "n": 20
+    }
+  },
+  "equivalence_bound_fraction": 0.16074740559228723,
+  "gap": {
+    "feasible": 0.0,
+    "fraction": 0.06590788049669627,
+    "strict": -0.02367545283663705
+  },
+  "source": "runs\\llama31-8b-q4-medium-h3b",
+  "task_family": "scheduling"
+}
