@@ -276,6 +276,42 @@ The random effect is not decoration. The same instance is played by the un-ablat
 
 ---
 
+## `collabengine audit` — run the diagnostic on someone else's transcripts
+
+Everything above is about one harness. The artifact it found is not.
+
+Any comparison that gives a team and a solo baseline the same per-turn token cap, the same turn count, and the same answer format inherits the same failure mode: the cap is identical in specification and unequal in effect, because it binds as a function of how much an arm writes — and how much an arm writes is usually the behaviour under study. Here that produced a spurious team advantage three times over, and a fourth time through the answer parser, where 25 of 149 solo episodes scored 0.000 on text the model had actually produced against 0 of 150 team episodes ([RESEARCH-LOG §4.24](docs/RESEARCH-LOG.md)).
+
+`audit` is that accounting, packaged for transcripts this project did not generate. It needs no config, no GPU, and no part of this corpus.
+
+```bash
+collabengine audit path/to/transcripts.jsonl
+collabengine audit path/to/transcripts.jsonl --threshold 2.0 --json
+```
+
+```
+arm                   eps  turns   chars/ep   tok/ep   trunc  cut@end  malformed
+--------------------------------------------------------------------------------
+solo                   12    144     24,000    6,000       3        3          3
+team                   12    144     12,000    3,000       0        0          0
+
+verbosity ratio: 2.00x  (solo over team, generated characters per episode)
+FLAG: above the 1.50x threshold. If both arms ran under the same per-turn
+generation cap, that cap did not fall on them equally -- it binds on solo first,
+and the truncation and parse failures that follow are charged to solo's score
+rather than to the instrument.
+```
+
+It reports, per arm: generated characters per episode (and tokens where the corpus carries them), the ratio between arms, truncated turns, **answer-turn cuts** — episodes whose final, answer-bearing turn hit the cap — and unparseable answers. The flag fires above a ratio threshold of 1.5 by default, chosen because it sits below the 1.87 at which the artifact was measured to distort a headline here.
+
+**The input schema is small and documented in [docs/AUDIT-SCHEMA.md](docs/AUDIT-SCHEMA.md).** Three required fields — an `arm` label, a list of `turns`, and each turn's generated `text` — get you the verbosity ratio. `finish_reason`, `tokens` and `answer_parsed` each buy one further quantity. JSONL, JSON, or a directory of either.
+
+**A missing field is never read as a zero.** An arm that does not record `finish_reason` on every generated turn gets `n/a` in the truncation columns and a line naming what could not be computed, rather than a clean-looking `0`. Reporting the least instrumented system as the cleanest one is the exact mistake this tool exists to catch.
+
+**A clean audit is a result.** When the arms generate within the threshold of each other the report says so explicitly, bounded by its own sensitivity, and exits 0 — the same exit code as a flagged corpus. The tool reports whether the audit ran, not what it found; making a finding an error would give anyone auditing their own system a reason not to run it.
+
+---
+
 ## Layout
 
 ```

@@ -9,6 +9,10 @@ Subcommands map onto the phases in docs/PLAN.md:
   analyze    Phase 3/4 -- interaction report from recorded transcripts
   selftest   validate the measurement instrument against known-ground-truth
              mock worlds; no GPU required
+
+One subcommand is not a phase. `audit` points this project's truncation and
+verbosity accounting at somebody else's transcripts, in the minimal schema of
+docs/AUDIT-SCHEMA.md, and needs nothing from this repo's config or corpus.
 """
 
 from __future__ import annotations
@@ -44,6 +48,11 @@ from collabengine.analysis import (
     convergent_validity,
     kappa_interval,
     summarize,
+)
+from collabengine.analysis.audit import (
+    DEFAULT_RATIO_THRESHOLD,
+    SchemaError,
+    audit_path,
 )
 from collabengine.analysis.coding import CodingStats, JudgeUnavailable
 from collabengine.analysis.integrity import audit, is_instrument_failure
@@ -190,6 +199,47 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("selftest", help="validate the instrument on mock worlds")
     p.add_argument("--episodes", type=int, default=30)
 
+    p = sub.add_parser(
+        "audit",
+        help="verbosity and truncation audit of foreign agent transcripts",
+        description=(
+            "Read transcripts from another multi-agent system in the minimal "
+            "schema of docs/AUDIT-SCHEMA.md and report per-arm generation "
+            "volume, the ratio between arms, truncation and answer-turn cuts, "
+            "and unparseable-answer counts. Needs no config and no GPU."
+        ),
+    )
+    p.add_argument(
+        "transcripts",
+        type=Path,
+        help=".jsonl file, .json file, or a directory of either",
+    )
+    p.add_argument(
+        "--threshold",
+        type=float,
+        default=DEFAULT_RATIO_THRESHOLD,
+        help=(
+            "verbosity ratio above which the artifact flag is raised "
+            f"(default {DEFAULT_RATIO_THRESHOLD}, below the 1.87 at which the "
+            "artifact was measured here -- RESEARCH-LOG 4.23)"
+        ),
+    )
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "stop on the first record that does not meet the schema instead of "
+            "skipping it. Use this while writing the converter; a silent skip "
+            "rate is how a whole arm goes missing"
+        ),
+    )
+    p.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="emit the report as JSON instead of the table",
+    )
+
     args = parser.parse_args(argv)
     return {
         "calibrate": cmd_calibrate,
@@ -201,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         "kappa": cmd_kappa,
         "converge": cmd_converge,
         "selftest": cmd_selftest,
+        "audit": cmd_audit,
     }[args.command](args)
 
 
@@ -1503,6 +1554,41 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         "null should be near zero. Anything else means the instrument is\n"
         "manufacturing structure and must be fixed before spending GPU time."
     )
+    return 0
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    """Run this project's arm-asymmetry accounting on a foreign corpus.
+
+    The exit code says whether the audit ran, not what it found. A flagged
+    corpus and a clean one both exit 0, because "the artifact is not present in
+    this system" is a result the tool exists to be able to state (Final Sweep
+    7.1) and an exit code that punished it would push users toward not reporting
+    it. Only a corpus that could not be read at all is an error.
+    """
+    try:
+        report = audit_path(
+            args.transcripts, threshold=args.threshold, strict=args.strict
+        )
+    except SchemaError as exc:
+        print(f"{exc}\n\nThe schema is documented in docs/AUDIT-SCHEMA.md.",
+              file=sys.stderr)
+        return 2
+
+    if not report.records_read:
+        print(
+            f"no records read from {args.transcripts} "
+            f"({report.records_skipped} skipped). See docs/AUDIT-SCHEMA.md for "
+            f"the fields a record must carry.",
+            file=sys.stderr,
+        )
+        return 2
+
+    if args.as_json:
+        print(json.dumps(report.to_dict(), indent=2))
+        return 0
+
+    print("\n".join(report.lines()))
     return 0
 
 
