@@ -54,6 +54,7 @@ not a 14B result. Partial states are described in the notes, never in the mark.
 | 3.1 | Advisor / CCBD-CDSAML sign-off | ❌ | Not started |
 | 3.2 | Anonymize per double-blind policy | ❌ | `build_paper.py --anonymous` exists and has never been exercised; repo link and affiliation are still in the docx |
 | 3.3 | Decide venue and check the real deadline | ❌ | The docx is titled NeurIPS 2026 by default and no deadline has been checked |
+| 3.4 | **Retitle the paper** | ❌ | *New, 2026-08-21.* "Three Positives and a Cap" is now wrong on both halves: §5.1 makes it four, and the fourth is an answer-format convention rather than a cap. The generalisation covering all four is **symmetric by specification, asymmetric in effect**. An author decision, flagged in the draft rather than made unilaterally |
 
 **Six ✅ out of twenty-two — and two of the six are qualified.** That is not a
 bad position: the ✅s are the expensive ones (a working instrument, an honest

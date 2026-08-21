@@ -50,7 +50,7 @@ COPY scripts/ scripts/
 COPY tests/ tests/
 COPY docs/ docs/
 
-# The suite is the acceptance test for the image: 379 tests, seconds, no GPU and
+# The suite is the acceptance test for the image: 439 tests, seconds, no GPU and
 # no corpus. If it does not pass here, nothing this image reports can be
 # trusted, and finding that out at build time costs nothing.
 RUN python -m pytest -q
