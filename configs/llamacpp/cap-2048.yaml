@@ -1,0 +1,74 @@
+# Dose-response rung: `medium`, both arms, answer budget = 2048 tokens.
+#
+# One of five configs that differ from each other in exactly one line
+# (`answer_max_tokens`). Registered in docs/PREREG-cap-sweep.md before any of
+# them ran. Final Sweep 7.4: the token-cap artifact is currently characterised
+# on/off at a single cap, which supports "we found a bug" and not "we
+# characterise when the bug appears and how large it gets".
+#
+# Derived from configs/llamacpp/medium-ans.yaml. Everything that is not the cap
+# is held: same task, same tier, same model, same quantisation, same 4x3 team,
+# same temperature, same `max_model_len`.
+#
+# **`max_model_len` is held at 15360 across all five rungs, and that is the
+# whole design.** The -ans instrument spends a fixed 18,432-token slot as
+# 15360 + 3072, so raising the cap inside a fixed slot would shrink the prompt
+# window at the same time -- and a sweep in which the prompt window also moves
+# measures two things and separates neither. Here the prompt window is a
+# constant and the slot grows with the cap instead:
+#
+#     max_model_len 15360 + answer_max_tokens 2048 = 17408 tokens per slot
+#     worst measured `medium` prompt: ~13,000, inside 15360 at every rung
+#
+# **Consequence for serving, and it is not optional.** Every rung must be served
+# at the LARGEST rung's slot, or the 6144 rung silently rejects its answer turns:
+#
+#     CTX=64512 PARALLEL=3 scripts/ops/serve.sh --detach     # 3 x 21504
+#
+# Three slots, not four, because the sweep runs on a shared card: 3 x 21504
+# tokens of KV at 128 KiB/token is ~7.9 GiB against the weights' 4.6, i.e. ~12.5
+# GiB total -- less than the default q4 preset's ~13.6 GiB, so the sweep is a
+# smaller neighbour than the instrument it extends. Four slots would want
+# ~15.1 GiB (RESEARCH-LOG 3.4: this card does not raise OOM, it pages).
+# scripts/experiments/cap-sweep.sh starts the server this way and preflights
+# every rung before it spends anything.
+#
+# Seeds 2000-2099, disjoint from the pilot (0-47) and from the fresh-seed
+# confirmatory corpus (1000-1149). The SAME 100 seeds at every rung on purpose:
+# the curve is read across caps on identical instances, so the instance draw
+# cannot be what moves it.
+#
+#   python scripts/ops/preflight.py --config configs/llamacpp/cap-2048.yaml
+#   bash scripts/experiments/cap-sweep.sh
+name: llama31-8b-q4-cap2048
+seed_start: 2000
+n_episodes: 100
+out_dir: runs
+
+# 7 in flight against 3 slots, as configs/llamacpp/medium-14b.yaml runs: the
+# server queues the excess. Concurrency is throughput, not geometry.
+max_concurrency: 7
+
+backend:
+  kind: openai
+  model: models/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf
+  base_url: http://127.0.0.1:8000/v1
+  max_concurrency: 7
+  timeout_s: 900
+  max_retries: 4
+  verify_model: true
+  # Held at the -ans value at every rung. This is the constant of the sweep.
+  max_model_len: 15360
+  enable_thinking: false
+
+team:
+  n_agents: 4
+  rounds: 3
+  difficulty: medium
+  symmetry: name_seed
+  randomize_turn_order: true
+  max_tokens: 1024
+  # THE ONLY LINE THAT VARIES ACROSS THE FIVE RUNGS.
+  answer_max_tokens: 2048
+  temperature: 0.8
+  top_p: 0.95
