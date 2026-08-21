@@ -53,8 +53,8 @@ not a 14B result. Partial states are described in the notes, never in the mark.
 |---|---|---|---|
 | 3.1 | Advisor / CCBD-CDSAML sign-off | ✅ *(packet written; meeting not held)* | `docs/ADVISOR-BRIEF.md` — the claim in one paragraph, a four-document reading order, the four objections a reviewer will raise with where each answer lives, and **the four decisions that actually need a second opinion**. The κ = 0.29 objection is listed as the one with no good answer yet |
 | 3.2 | Anonymize per double-blind policy | ❌ | `build_paper.py --anonymous` exists and has never been exercised; repo link and affiliation are still in the docx |
-| 3.3 | Decide venue and check the real deadline | ❌ | The docx is titled NeurIPS 2026 by default and no deadline has been checked |
-| 3.4 | **Retitle the paper** | ❌ | *New, 2026-08-21.* "Three Positives and a Cap" is now wrong on both halves: §5.1 makes it four, and the fourth is an answer-format convention rather than a cap. The generalisation covering all four is **symmetric by specification, asymmetric in effect**. An author decision, flagged in the draft rather than made unilaterally |
+| 3.3 | Decide venue and check the real deadline | ✅ *(dates verified; the choice is the author's)* | `docs/VENUE.md`. **NeurIPS 2026 closed on 6 May 2026** — the docx is named after a deadline three months past. Reachable: a NeurIPS evaluation workshop on **29 Aug (eight days)**, non-archival; **ICLR 2027 on 25 Sep**, the only archival main-conference deadline left this cycle. Five unconfirmable facts are labelled unverified rather than guessed |
+| 3.4 | **Retitle the paper** | ✅ *(candidates built; the choice is the author's)* | `docs/TITLE-OPTIONS.md` — six candidates with promise and risk each, recommending *Symmetric by Specification, Asymmetric in Effect* over the existing subtitle. *New, 2026-08-21.* "Three Positives and a Cap" is now wrong on both halves: §5.1 makes it four, and the fourth is an answer-format convention rather than a cap. The generalisation covering all four is **symmetric by specification, asymmetric in effect**. An author decision, flagged in the draft rather than made unilaterally |
 
 **Six ✅ out of twenty-two — and two of the six are qualified.** That is not a
 bad position: the ✅s are the expensive ones (a working instrument, an honest
@@ -574,9 +574,37 @@ GPU-hardware description if it identifies the lab, and the acknowledgements.
 Add a test that builds with `--anonymous` and greps the output for the author
 name, the email, and the GitHub handle — the same lint-not-habit rule as §3.4.
 
-### 8.3 Venue and deadline ❌ — *do this in the next 48 hours*
-It determines everything else's schedule and is currently unfixed while the docx
-defaults to a NeurIPS title. The decision inputs:
+### 8.3 Venue and deadline ✅ *(dates verified 2026-08-21; the choice is the author's)*
+
+**Checked, and the answer reorders this whole file: NeurIPS 2026 closed on
+6 May 2026**, abstracts 4 May. ICML 2026, COLM 2026 and the EMNLP 2026 ARR
+commitment are closed as well. The docx is named after a deadline three months
+past.
+
+What is actually reachable, in `docs/VENUE.md` with sources:
+
+| Route | Deadline | Archival | Note |
+|---|---|---|---|
+| NeurIPS 2026 evaluation workshop (TAE, IAEval) | **29 Aug 2026** — eight days | No | Takes the draft at its current length with no restructuring |
+| ICLR 2027 | 25 Sep 2026 (abstract 18 Sep) | Yes | 9 pages main text; the only archival main-conference deadline left this cycle |
+| ARR → NAACL/COLING 2027 | 12 Oct 2026 | Yes | Reviews detach from the venue decision |
+| NeurIPS 2027 Evaluations & Datasets | ~May 2027 *(unverified)* | Yes | The best-fitting track; the wait is the cost |
+
+The workshops and the archival routes do not conflict, which is the memo's
+recommendation: submit to the workshop now for reviewed exposure, and anchor the
+archival submission separately with an arXiv preprint at the workshop deadline
+to establish priority against the near-scoop named in §1 of the draft.
+
+**One correction to this file's own earlier text.** It called a workshop "a
+fallback with a real publication." It is not — the NeurIPS 2026 evaluation
+workshops are **non-archival**, and two of them say so on their own pages. The
+upside is that submitting forecloses nothing.
+
+Also worth knowing: the Datasets & Benchmarks track was renamed **Evaluations &
+Datasets** for 2026, and its FAQ states that negative results are welcome and no
+dataset is required. That is this paper's abstract restated as a call for papers.
+
+The original decision inputs, which still stand:
 
 - **This is a measurement/negative-result paper about evaluation practice.** It
   fits the *Datasets & Benchmarks* track better than the main track, and it fits
