@@ -293,3 +293,35 @@ a bounded null and an unsupported universal, and the write-up must keep it.
 A 14B model (PLAN §6's stated response to "7–8B too weak") and the κ = 0.29
 role-label validation (§4.17) are **future work, not prerequisites**. Neither
 would change what was measured here; both would extend where it applies.
+
+---
+
+## Postscript — the power analysis that was not run, 2026-08-20
+
+**Retrospective and labelled as such.** These numbers were computed after the
+fact, from the published prior `sd` ≈ 0.15 on `fraction`. They are recorded here
+because their *absence* is the mechanism behind this document's Amendment 2, and
+because every run proposed after today carries its MDE in the preregistration
+rather than in a postscript (`scripts/analysis/power_report.py`).
+
+| arm | *n* per arm | MDE at 80% power | effect read off it |
+|---|---|---|---|
+| ablation pilot baseline | **48** | **0.086** | **+0.055** |
+| fresh-seed re-run | 150 | 0.049 | +0.003 |
+| pooled three-agent arms | 599 | 0.024 | +0.002 |
+
+**The pilot's minimum detectable effect was larger than the effect it
+reported.** H2's failure to replicate was therefore not bad luck and not a
+seed-range artifact — the arm was never sized to resolve +0.055 in either
+direction, and a sizing line run before the grid would have said so. The
+fresh-seed rule caught it afterwards; power analysis would have caught it
+before, at no GPU cost at all.
+
+Detecting one satisfied constraint (0.05) at this spread takes **142 episodes
+per arm**. Every confirmatory arm in this document was specified below that.
+
+**H3, H4 and H5 are unaffected in direction and confirmed in status:** §160
+already called the secondary tests "underpowered by construction", and the MDE
+column now says by how much. What replaces them is not more episodes — resolving
+the 0.005 actually observed across team sizes would take ~14,000 per arm — but
+the equivalence bounds registered in `PREREG-equivalence.md`.
