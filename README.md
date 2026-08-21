@@ -110,6 +110,24 @@ The agent × component interaction was already null on the pilot — chi2 = 3.73
 
 So the result is the negative one, and it is worth stating in the form the evidence supports: **this task family rewards collaboration at no operating point measured — three tiers, two instruments, two seed sets, at 8B.** Everything that reproduced across seed sets is a null or a negative; everything that failed to reproduce was a positive measured against that 48-episode baseline.
 
+### The nulls are bounds, not absences
+
+Failing to reject H₀ is not evidence for H₀, and until now every claim above rested on exactly that. Equivalence testing (TOST, margin δ = 0.05 — one satisfied constraint, registered in [PREREG-equivalence](docs/PREREG-equivalence.md) before it was run) says what the data actually excludes:
+
+| claim | difference | **excludes effects larger than** | at δ = 0.05 |
+|---|---|---|---|
+| team (4 agents) − one agent, fresh `medium` | −0.003 | **0.032** | equivalent |
+| 4 agents − 3 agents | +0.002 | **0.025** | equivalent |
+| team − matched-budget solo (C5, truncation-corrected) | +0.003 | **0.032** | equivalent |
+| per-agent ablation drop | +0.003 | **0.026** | equivalent |
+| **fungibility Δ(frozen_replay) − Δ(live)** | −0.005 | **0.056** | **not equivalent** |
+
+**The first four are bounds tighter than one constraint** — the smallest difference this task can express. "Team size does nothing" is now a measurement rather than a failure to find one.
+
+**The fifth is a correction to this file.** Fungibility is estimated on the 48-episode pilot, where the bound is 0.056, outside the margin. So the honest sentence is **"we cannot exclude compensation of up to about 0.06"**, not "survivors do not compensate". That claim was overstated here and in §4.20 and is withdrawn to a bound rather than defended.
+
+**And the same arithmetic condemns the finding that was already withdrawn.** The +0.055 participation effect carried an equivalence bound of 0.095 and an a-priori minimum detectable effect of **0.086** at *n* = 48 — larger than the effect it was used to claim. Detecting one constraint at this task's spread takes **142 episodes per arm**; every arm below that was unable to see what it was testing for, by construction rather than by bad luck.
+
 **Phase 2 finds no role differentiation either.** 468 messages coded against an eight-action taxonomy: agents within an episode differ no more in what they do than shuffling the labels among them produces (*p* = 0.45), and no agent identity carries a stable tendency across episodes (*p* = 1.00). The one robust behavioural result is between conditions rather than within teams — **teams generate and lone agents audit**: propose as a share of propose+verify is 0.674 for teams against 0.403 for solo, *p* < 0.0001.
 
 That null was defended with an instrument check: the local 8B coder agreed with a stronger blind rater at **κ = 0.68 [0.50, 0.85]**. Both raters were Google models, and the log always flagged their agreement as an upper bound.

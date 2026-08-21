@@ -213,6 +213,40 @@ family at 8B. The only manipulation that reliably moves the score is giving a
 *single* agent four times the turns, which moves it **down**: 0.579 → 0.516,
 −0.063 at *p* = 0.012.
 
+### The nulls, as bounds
+
+A non-significant *p* is not evidence of no effect, and every claim in this
+paper is a null claim. We therefore report equivalence tests (TOST, Welch, two
+one-sided tests) against a margin fixed from the task rather than the data:
+δ = 0.05 on `fraction`, which is one satisfied constraint and the smallest
+difference the instrument can express. The margin and the predictions were
+registered before the tests were run (`docs/PREREG-equivalence.md`).
+
+| contrast | difference | 90% CI | **bound** | TOST *p* |
+|---|---|---|---|---|
+| 4 agents − 1 agent | −0.003 | [−0.032, +0.026] | **0.032** | 0.004 |
+| 4 agents − 3 agents | +0.002 | [−0.021, +0.025] | **0.025** | <0.001 |
+| team − matched-budget solo | +0.003 | [−0.026, +0.032] | **0.032** | 0.004 |
+| per-agent ablation drop | +0.003 | [−0.020, +0.026] | **0.026** | <0.001 |
+| fungibility, pilot *n* = 48 | −0.005 | [−0.056, +0.046] | 0.056 | 0.072 |
+
+`bound` is the smallest δ at which equivalence holds — the number we intend to
+be quoted, because it requires no prior agreement on our margin. **Effects
+larger than 0.032 are excluded** for the headline comparison: the flat result is
+a measurement, not an absence of one.
+
+**The last row does not clear the margin, and we report it as such.** Our
+fungibility estimate rests on the 48-episode pilot, so the correct statement is
+that we cannot exclude compensation of up to ≈0.06 — not that compensation is
+absent. Section 6's "blocking compensation does not increase the damage" is
+bounded by that number and is corrected here rather than defended.
+
+Multiplicity: the Phase 1 gate is a family of nine tests (three tiers × three
+metrics) and Phase 3 registers seven hypotheses. All *p*-values are reported
+raw, Holm-adjusted and BH-adjusted. No conclusion changes — correction can only
+enlarge a *p*-value and every result here is null — which is precisely why its
+absence would be indefensible.
+
 ---
 
 ## 6. What we can say about emergence, and what we cannot
