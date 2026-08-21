@@ -28,7 +28,18 @@
 #   collabengine pipeline --config configs/llamacpp/medium-ans.yaml #                         --phases baseline,solo,solo_budget,solo_long
 name: llama31-8b-q4-medium-ans
 seed_start: 0
-n_episodes: 24
+# 48, not the 24 this file carried until 2026-08-21. The pilot was first
+# measured at 24 and then extended to 48; PREREG-phase3 sizes the paper's pilot
+# column from seeds 0-47 and the paper quotes n = 48 throughout. The 24 was the
+# earlier of two measurements and reading it as the pilot's size understates
+# every pilot quantity by half its sample.
+#
+# It lives here rather than as a --episodes override on the command line
+# because `collabengine ablate` has no such flag: it reads n_episodes from the
+# config. A pilot whose baseline arm was 48 seeds and whose ablation grid was 24
+# would be two different corpora sharing a directory, which is the kind of
+# silent mismatch this project's instrument exists to catch.
+n_episodes: 48
 out_dir: runs
 
 max_concurrency: 7
