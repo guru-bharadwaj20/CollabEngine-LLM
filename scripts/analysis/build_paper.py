@@ -903,6 +903,83 @@ def build(out_path: Path, author: str, affiliation: str, email: str,
          "practice. Every artifact we removed made the gap smaller. Not once did "
          "one make it larger.")
 
+    # ================== 12. broader impact / ethics ========================
+    #
+    # A body section, not only a checklist answer. NeurIPS and ICML both ask for
+    # it explicitly and a reviewer looking for it will look here first.
+    heading(doc, 1, "12   Broader impact and ethics")
+    para(doc,
+         "**No human subjects and no personal data.** Every episode is model "
+         "output on synthetically generated instances; no dataset in this work "
+         "contains text written by a person, and nothing was scraped. The "
+         "generated task family was chosen partly for this reason and partly "
+         "for contamination: a model that has memorised a public benchmark is "
+         "being measured on recall, and the score does not say which.")
+    para(doc,
+         "**The risk this work addresses is over-claimed multi-agent gains.** "
+         "Multi-agent architectures cost several times the forward passes of a "
+         "single agent, and deployment decisions are being made on reported "
+         "margins that, by our measurement and by the concurrent work of Tran "
+         "and Kiela [1], may not survive matched compute. Wasted inference is "
+         "an energy cost and a financial one, and misplaced architectural "
+         "confidence propagates into systems that are harder to audit than a "
+         "single call. A negative result that is *correct* is the useful "
+         "artifact here.")
+    para(doc,
+         "**The risk this work creates is being over-read in the other "
+         "direction.** Our null is bounded to one task family, one scale, one "
+         "quantisation and one model family, and we state that wherever the "
+         "result appears. It is not evidence that multi-agent systems do not "
+         "work, and we would consider it a misuse of this paper to cite it for "
+         "that claim. Section 2 names two results — sampling-and-voting gains "
+         "that grow with task difficulty [18], and compound systems with "
+         "non-monotone returns [19] — that any such generalisation would have "
+         "to answer first.")
+    para(doc,
+         "**Dual use is not a meaningful concern for this contribution.** The "
+         "released artifact is a measurement harness and a diagnostic for "
+         "budget asymmetry between evaluation arms. Its plausible misuse is "
+         "constructing an evaluation that hides an asymmetry rather than "
+         "exposing one, which is available without it.")
+
+    # ================== 13. reproducibility statement ======================
+    heading(doc, 1, "13   Reproducibility statement")
+    para(doc,
+         "**What is released.** The harness, both task generators, both "
+         "graders, every configuration cited, the analysis scripts that produce "
+         "every number in this paper, and the transcript corpus. The paper "
+         "itself is assembled from the corpus by a script rather than by hand, "
+         "so a number in a table cannot drift from the episodes behind it — "
+         "the build fails if the corpus is absent rather than emitting a stale "
+         "figure.")
+    para(doc,
+         "**What is pinned.** A result here depends on four layers and we "
+         "record all four: the interpreter and its packages (a 52-package "
+         "lockfile), the serving build (llama.cpp b10369, 6e62ba538, CUDA "
+         "12.4), the weights (sha256 of every GGUF, all precision arms taken "
+         "from a single conversion), and the code (commit, including whether "
+         "the tree was dirty). A stamp carrying all four is written into every "
+         "run directory. Instances are deterministic in (seed, difficulty) and "
+         "every seed range is recorded, so any corpus can be re-scored offline "
+         "under a new metric without generating anything.")
+    para(doc,
+         "**What is not reproducible, stated rather than implied.** llama.cpp "
+         "is deterministic per slot but not across continuous-batching "
+         "arrangements, so regenerating a corpus reproduces the *instances* "
+         "exactly and the *generations* only in distribution. Everything "
+         "downstream of a transcript is deterministic and reproduces "
+         "bit-for-bit. A container that claimed more than this would be making "
+         "the same kind of unexamined claim the paper is about.")
+    para(doc,
+         "**Statistical reporting.** Every headline contrast carries an effect "
+         "size and a 95% bootstrap interval; every null claim carries an "
+         "equivalence bound with a margin registered before it was computed; "
+         "every family of hypotheses carries Holm and BH adjustments beside the "
+         "raw values; and every arm carries the minimum detectable effect its "
+         "sample size permits. Preregistrations, their amendments and their "
+         "postscripts are released with the code, including the ones that "
+         "record where we were wrong.")
+
     # ========================= references ==================================
     doc.add_page_break()
     heading(doc, 1, "References")
