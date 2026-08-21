@@ -48,6 +48,23 @@ measures, but applied it only to *assigned* roles, as an engineering tool.
 Nobody had pointed the causal instrument at the emergent phenomenon. That was
 the intended contribution.
 
+**Concurrent work reaches our conclusion by a different route, and we say so
+first.** Tran and Kiela (arXiv:2604.02460, April 2026) normalise a *global*
+thinking-token budget across arms on multi-hop reasoning and find that single
+agents match or outperform multi-agent systems once computation is equalised.
+We agree with them. We differ on mechanism, checkably: their single-agent arm
+*under*-spends — they report visible solo thought plateauing below the requested
+budget while the multi-agent arm surfaces more — where ours is forced to
+*over*-spend into one turn and is truncated for it. The distinction is not
+academic. **A global budget normalisation would have scored our own
+matched-budget arm as matched, and the artifact survived there**, at 2.04×
+generation and 34% truncation. We found no work, theirs included, that reports
+differential *final-answer* truncation between arms, or the per-turn budget
+separation that removes it. That mechanism and its diagnostics are what we
+claim. See §2 for the full comparison, and for the five widely-used multi-agent
+frameworks whose published solo baselines are matched on turns, modules or
+hyperparameters — but not one of them on generation.
+
 **The design correction that made it a real experiment.** A scalar performance
 drop when an agent is removed does not demonstrate specialization; it
 demonstrates participation. Remove any competent contributor from any team and
