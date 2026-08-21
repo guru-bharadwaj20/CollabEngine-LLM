@@ -18,6 +18,7 @@ from collabengine.backends.base import LLMBackend
 from collabengine.backends.mock import MockBackend, MockMode
 from collabengine.backends.openai_compat import OpenAICompatBackend
 from collabengine.orchestrator.team import SymmetryBreaking, TeamConfig
+from collabengine.tasks import get_family
 
 
 @dataclass(slots=True)
@@ -183,6 +184,10 @@ class ExperimentConfig:
         team_raw = dict(d.get("team") or {})
         if "symmetry" in team_raw:
             SymmetryBreaking(team_raw["symmetry"])  # fail fast on a typo
+        if "task" in team_raw:
+            # Same reason: a mistyped family would otherwise surface hours into
+            # a run, or not at all if it happened to name a real one.
+            get_family(team_raw["task"])
         team = TeamConfig.from_dict(team_raw)
 
         return cls(

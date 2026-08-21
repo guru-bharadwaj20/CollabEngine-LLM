@@ -15,65 +15,35 @@ from collections.abc import Sequence
 from collabengine.backends.base import ChatMessage, GenRequest, LLMBackend
 from collabengine.orchestrator.team import Agent, TeamConfig, build_team
 from collabengine.protocol import Message, Speaker
-from collabengine.tasks.generator import generate
-from collabengine.tasks.grader import grade
-from collabengine.tasks.render import (
-    parse_solution,
-    render_answer_format,
-    render_instance,
-)
-from collabengine.tasks.schema import Instance, Solution
+from collabengine.tasks import TaskFamily, get_family
+from collabengine.tasks.render import SOLO_BRIEF, TEAM_BRIEF
 from collabengine.transcripts.store import EpisodeRecord
 
-#: Templated on the agent count, which reads badly at `n=1`: the solo and
-#: `solo_budget` arms open with "You are one of 1 participants working together"
-#: and a reference to "the others". Left exactly as-is on purpose. The worry --
-#: that an agent told it has absent partners would defer or wait, biasing the
-#: gate toward the team -- was measured on the served `medium` corpus instead of
-#: assumed: across 72 solo agent messages, 0% name an absent agent and 0% defer
-#: or wait (RESEARCH-LOG 4.9). Rewording it now would change the solo brief and
-#: the C4 turn budget in the same run, which is the two-variables-at-once move
-#: that cost the `medium` write-up in 4.1c. Change it in a run where it is the
-#: only thing that changes, and regenerate every arm that uses it.
-TEAM_BRIEF = (
-    "You are one of {n} participants working together on the task below. "
-    "You share a single answer: whatever the group last submits is what gets "
-    "scored. You can see everything the others write.\n\n"
-    "You are {agent_id}. Prefix your messages with ({agent_id})."
-)
-
-
-#: The honest long-form single-agent brief, for `solo_long` (C5).
-#:
-#: `solo_budget` (C4) gave one agent the team's turn budget under TEAM_BRIEF and
-#: lost to the team at two of three tiers -- but it restated its own answer on
-#: 25-33% of consecutive turns, because the brief tells it the group's *last*
-#: message is what gets scored and it is the only member of the group
-#: (RESEARCH-LOG 4.12). That is the harness degrading the baseline, not the
-#: model, and it makes the C4 margin an upper bound rather than an estimate.
-#:
-#: This brief removes the three things that caused it: no phantom co-workers, no
-#: instruction that the last message is the answer of record, and an explicit
-#: licence to think without re-emitting the whole assignment every turn. It is
-#: otherwise the same task, the same answer format, and the same budget.
-SOLO_BRIEF = (
-    "You are working alone on the task below, across {rounds} turns.\n\n"
-    "Use the early turns to think: try an assignment, check it against the "
-    "requirements, and revise what does not hold. You do not need to restate "
-    "the full assignment every turn -- work on whatever part still needs it.\n\n"
-    "Your **final** turn is what gets scored, and it must contain the complete "
-    "answer in the format below."
-)
+#: Re-exported so that every existing import of these names still resolves. They
+#: are defined in `collabengine.tasks.render` because a brief belongs to a task
+#: family -- the code family needs its own pair, and the orchestrator has to be
+#: able to ask which pair is in force rather than know one of them by heart.
+__all__ = [
+    "SOLO_BRIEF",
+    "TEAM_BRIEF",
+    "build_context",
+    "build_system_prompt",
+    "extract_solution",
+    "latest_notes",
+    "plan_turn_order",
+    "run_episode",
+]
 
 
 def build_system_prompt(
     agent: Agent,
-    instance: Instance,
+    instance: object,
     n_agents: int,
     *,
     solo_long: bool = False,
     rounds: int | None = None,
     working_notes: bool = False,
+    family: TaskFamily | None = None,
 ) -> str:
     """The per-agent system prompt.
 
@@ -81,14 +51,17 @@ def build_system_prompt(
     breaking level, a vague disposition line. No agent is told what to do, what
     anyone else will do, or that the work can be divided.
 
-    `solo_long` swaps in SOLO_BRIEF, which is the C5 baseline and the only place
-    the wording differs. Everything else -- task, answer format, caps, seeds --
-    is held.
+    `solo_long` swaps in the family's solo brief, which is the C5 baseline and
+    the only place the wording differs. Everything else -- task, answer format,
+    caps, seeds -- is held.
     """
+    fam = family or get_family()
     if solo_long:
-        parts = [SOLO_BRIEF.format(rounds=rounds if rounds is not None else "several")]
+        parts = [
+            fam.solo_brief.format(rounds=rounds if rounds is not None else "several")
+        ]
     else:
-        parts = [TEAM_BRIEF.format(n=n_agents, agent_id=agent.agent_id)]
+        parts = [fam.team_brief.format(n=n_agents, agent_id=agent.agent_id)]
         if agent.scratch:
             parts.append(agent.scratch)
     # Appended to whichever brief is in force. The mechanism is symmetric across
@@ -96,8 +69,8 @@ def build_system_prompt(
     # one arm only would hand that arm a protocol the other cannot use.
     if working_notes:
         parts.append(NOTES_BRIEF)
-    parts.append(render_instance(instance))
-    parts.append(render_answer_format())
+    parts.append(fam.render_instance(instance))
+    parts.append(fam.render_answer_format())
     return "\n\n".join(parts)
 
 
@@ -179,7 +152,7 @@ async def run_episode(
     episode_seed: int,
     condition: str = "baseline",
     exclude: Sequence[str] = (),
-    instance: Instance | None = None,
+    instance: object | None = None,
 ) -> EpisodeRecord:
     """Run a team through one instance and grade the result.
 
@@ -189,8 +162,9 @@ async def run_episode(
     designed to block. Both numbers are wanted; their difference is the
     fungibility measure.
     """
+    family = get_family(config.task)
     if instance is None:
-        instance = generate(episode_seed, config.difficulty)
+        instance = family.generate(episode_seed, config.difficulty)
 
     roster = [a for a in build_team(config, episode_seed) if a.agent_id not in exclude]
     if not roster:
@@ -205,8 +179,8 @@ async def run_episode(
             turn=0,
             speaker=Speaker.SYSTEM,
             author="system",
-            content=render_instance(instance),
-            meta={"kind": "task_brief"},
+            content=family.render_instance(instance),
+            meta={"kind": "task_brief", "task": family.name},
         )
     ]
 
@@ -248,6 +222,7 @@ async def run_episode(
                             solo_long=(condition == "solo_long"),
                             rounds=config.rounds,
                             working_notes=config.working_notes,
+                            family=family,
                         ),
                     ),
                     *build_context(
@@ -260,6 +235,10 @@ async def run_episode(
                 seed=agent.seed,
                 meta={
                     "instance": instance.to_dict(),
+                    # The backend needs to know which family's dict that is
+                    # before it can read it -- the mock reconstructs the instance
+                    # to score itself against.
+                    "task": family.name,
                     "agent_id": agent.agent_id,
                     "agent_index": agent.index,
                     "turn_position": position,
@@ -292,7 +271,7 @@ async def run_episode(
             )
             turn += 1
 
-    solution = extract_solution(history)
+    solution = extract_solution(history, family=family)
     return EpisodeRecord(
         episode_id=f"{condition}:{config.difficulty}:{episode_seed}",
         condition=condition,
@@ -301,31 +280,35 @@ async def run_episode(
         agents=[a.agent_id for a in roster],
         messages=history,
         solution=solution,
-        grade=grade(instance, solution),
+        grade=family.grade(instance, solution),
         turn_order=turn_order,
         config=config.to_dict(),
         meta={
             "excluded": list(exclude),
             "backend": backend.name,
             "roster_size": len(roster),
+            "task": family.name,
         },
     )
 
 
-def extract_solution(history: Sequence[Message]) -> Solution:
+def extract_solution(
+    history: Sequence[Message], *, family: TaskFamily | None = None
+) -> object:
     """Take the team's answer as the last parseable proposal by any agent.
 
     Last-writer-wins rather than majority vote: the brief tells the team that
     whatever it last submits is what gets scored, so this matches the incentive
     the agents were actually given.
     """
+    fam = family or get_family()
     for m in reversed(history):
         if m.speaker is not Speaker.AGENT:
             continue
-        candidate = parse_solution(m.content)
+        candidate = fam.parse_solution(m.content)
         if not candidate.malformed:
             return candidate
-    return Solution(malformed=True)
+    return fam.malformed_solution()
 
 
 def _round_banner(round_index: int, total: int) -> str:

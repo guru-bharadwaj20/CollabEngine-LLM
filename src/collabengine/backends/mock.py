@@ -25,6 +25,9 @@ from dataclasses import dataclass
 from enum import Enum
 
 from collabengine.backends.base import GenRequest, GenResponse, LLMBackend
+from collabengine.tasks.code import generator as code_generator
+from collabengine.tasks.code import render as code_render
+from collabengine.tasks.code.schema import CODE_COMPONENTS, CodeInstance
 from collabengine.tasks.render import ANSWER_CLOSE, ANSWER_OPEN, parse_solution
 from collabengine.tasks.schema import ALL_COMPONENTS, Component, Instance, Solution
 
@@ -51,6 +54,21 @@ _ACTION_PHRASES: dict[Component, str] = {
     Component.SEARCH: "I'll enumerate which workers are actually eligible for each job.",
     Component.VERIFICATION: "Auditing the draft against the stated requirements now.",
     Component.SYNTHESIS: "Reconciling the cross-block pairings against the rest.",
+    Component.SYNTAX: "Writing out the module skeleton and the functions the spec names.",
+    Component.BASE: "Wiring the rules together in order and checking an ordinary input.",
+    Component.EDGE: "Working through the empty list and the boundary values.",
+    Component.VERIFY: "Reading the starter helpers against the spec to find the wrong one.",
+}
+
+#: Component -> the `render_module` knob it controls. The code family's four
+#: degradations are one-to-one with its four components by construction (see
+#: `tasks.code.generator.render_module`), which is what lets this backend
+#: express a genuinely specialized agent on it rather than an approximation.
+_CODE_KNOBS: dict[Component, str] = {
+    Component.SYNTAX: "define_helper",
+    Component.BASE: "correct_rules",
+    Component.EDGE: "empty_guard",
+    Component.VERIFY: "fix_bug",
 }
 
 
@@ -75,32 +93,46 @@ class MockBackend(LLMBackend):
         if instance_d is None:
             return GenResponse(text="(no instance in meta)", completion_tokens=6)
 
-        instance = Instance.from_dict(instance_d)
         agent_index = int(meta.get("agent_index", 0))
         turn_position = int(meta.get("turn_position", agent_index))
         turn = int(meta.get("turn", 0))
         agent_id = str(meta.get("agent_id", f"A{agent_index}"))
+        task = str(meta.get("task", "scheduling"))
 
         rng = random.Random(_stable_seed(request.seed, agent_id, turn, self.mode.value))
 
-        focus = self._focus_for(agent_index, turn_position)
-        prior = self._latest_solution(request)
-        merged = self._contribute(instance, prior, focus, rng)
+        if task == "code":
+            components = CODE_COMPONENTS
+            focus = self._focus_for(agent_index, turn_position, components)
+            text = self._compose_code(
+                CodeInstance.from_dict(instance_d), request, focus, agent_id, rng
+            )
+        else:
+            components = ALL_COMPONENTS
+            instance = Instance.from_dict(instance_d)
+            focus = self._focus_for(agent_index, turn_position, components)
+            prior = self._latest_solution(request)
+            merged = self._contribute(instance, prior, focus, rng)
+            text = self._compose(focus, merged, agent_id)
 
-        text = self._compose(focus, merged, agent_id)
         return GenResponse(
             text=text,
             prompt_tokens=sum(len(m.content) // 4 for m in request.messages),
             completion_tokens=len(text) // 4,
         )
 
-    def _focus_for(self, agent_index: int, turn_position: int) -> tuple[Component, ...]:
+    def _focus_for(
+        self,
+        agent_index: int,
+        turn_position: int,
+        components: tuple[Component, ...] = ALL_COMPONENTS,
+    ) -> tuple[Component, ...]:
         if self.mode is MockMode.SPECIALIZED:
-            return (ALL_COMPONENTS[agent_index % len(ALL_COMPONENTS)],)
+            return (components[agent_index % len(components)],)
         if self.mode is MockMode.POSITIONAL:
-            return (ALL_COMPONENTS[turn_position % len(ALL_COMPONENTS)],)
+            return (components[turn_position % len(components)],)
         if self.mode is MockMode.NULL:
-            return ALL_COMPONENTS
+            return components
         return ()
 
     def _latest_solution(self, request: GenRequest) -> Solution:
@@ -158,6 +190,67 @@ class MockBackend(LLMBackend):
             + "}"
         )
         return f"({agent_id}) {opener}\n{ANSWER_OPEN}{payload}{ANSWER_CLOSE}"
+
+    def _compose_code(
+        self,
+        instance: CodeInstance,
+        request: GenRequest,
+        focus: tuple[Component, ...],
+        agent_id: str,
+        rng: random.Random,
+    ) -> str:
+        """Emit a module, improved on this agent's focus and left alone elsewhere.
+
+        Prior state is recovered from the transcript rather than held on the
+        backend -- `infer_variant` reads the last submitted module back into the
+        four knobs -- for the same reason `_latest_solution` does it on the
+        allocation family: excise an agent's messages and its contribution has to
+        genuinely disappear from what everyone else sees, or frozen ablation
+        measures nothing.
+        """
+        if not focus:
+            return f"({agent_id}) I don't have anything useful to add here yet."
+
+        knobs = self._prior_knobs(instance, request)
+        for comp in CODE_COMPONENTS:
+            p = self.competence if comp in focus else self.off_focus_competence
+            if rng.random() < p:
+                knobs[_CODE_KNOBS[comp]] = True
+
+        module = code_generator.variant_source(instance, **knobs)
+        opener = " ".join(_ACTION_PHRASES[c] for c in focus)
+        return (
+            f"({agent_id}) {opener}\n"
+            f"{ANSWER_OPEN}\n{module}\n{ANSWER_CLOSE}"
+        )
+
+    def _prior_knobs(
+        self, instance: CodeInstance, request: GenRequest
+    ) -> dict[str, bool]:
+        """The four knobs as of the most recent module in the conversation.
+
+        Nothing there yet means nothing right yet: an agent's first turn starts
+        from the starter code's defects, which is what gives the episode
+        somewhere to improve from.
+
+        The system message is skipped rather than scanned. It carries the
+        starter code *and* the answer-format example, and the example defines a
+        `solve` with none of the planted bug in it -- reading that back would
+        credit the team with catching the bug on turn one, before anyone had
+        looked at it.
+        """
+        for msg in reversed(request.messages):
+            if msg.role == "system":
+                continue
+            candidate = code_render.parse_solution(msg.content)
+            if not candidate.malformed:
+                return code_generator.infer_variant(instance, candidate.code)
+        return {
+            "define_helper": False,
+            "correct_rules": False,
+            "empty_guard": False,
+            "fix_bug": False,
+        }
 
 
 # --------------------------------------------------------------------------

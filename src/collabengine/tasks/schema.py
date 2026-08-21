@@ -32,7 +32,30 @@ class Component(str, Enum):
     SYNTHESIS = "synthesis"
     """Constraints coupling two otherwise-disjoint job blocks."""
 
+    # -- Code-generation family (`collabengine.tasks.code`). Four members again,
+    # -- carrying the same four roles as the allocation set: produce, search the
+    # -- awkward corners, catch a planted error, hold the whole artifact
+    # -- together. They live in this enum rather than a parallel one so that
+    # -- `GradeResult` round-trips through JSONL unchanged for both families and
+    # -- a component name is unambiguous about which task wrote it.
 
+    SYNTAX = "syntax"
+    """The submission parses and defines every function the spec named."""
+
+    BASE = "base"
+    """Base-case hidden tests. The ordinary path through the specification."""
+
+    EDGE = "edge"
+    """Edge-case hidden tests: empty input, boundaries, values that filter away."""
+
+    VERIFY = "verify"
+    """Catching the bug planted in the starter code, rather than writing code."""
+
+
+#: The allocation family's component axis. Deliberately *not* every member of
+#: `Component`: analyses that iterate this tuple are analyses of the allocation
+#: corpus, and widening it would silently change what they average over. Each
+#: family names its own tuple -- see `collabengine.tasks.code.schema`.
 ALL_COMPONENTS: tuple[Component, ...] = (
     Component.ARITHMETIC,
     Component.SEARCH,
