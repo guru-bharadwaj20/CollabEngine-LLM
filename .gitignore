@@ -26,3 +26,11 @@ vendor/
 
 # A polluted corpus backup, kept out of git but not deleted (LOG 3.13).
 *.polluted.bak
+
+# A literal `%SystemDrive%` directory appears in the repository root when some
+# Windows process expands the variable against our working directory instead of
+# its own. It is a copy of ProgramData cache files, nothing of ours writes it,
+# and it is not the real ProgramData. Ignored rather than deleted because
+# whatever creates it may still be writing.
+%SystemDrive%/
+paper-anonymous.docx
