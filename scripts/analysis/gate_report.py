@@ -23,6 +23,12 @@ import statistics as st
 from collections import defaultdict
 from pathlib import Path
 
+from collabengine.analysis.inference import (
+    adjust,
+    mde,
+    smallest_equivalence_bound,
+    tost,
+)
 from collabengine.analysis.integrity import (
     audit,
     final_turn_truncated,
@@ -34,6 +40,23 @@ from collabengine.transcripts.store import TranscriptReader
 PERMUTATIONS = 20000
 BOOTSTRAPS = 10000
 SEED = 20260810
+
+#: The equivalence margin, fixed here rather than chosen per table.
+#:
+#: `fraction` is partial credit over roughly twenty gradeable constraints, so
+#: one constraint is about 0.05 and that is the smallest difference this task
+#: can express. A team-solo gap below it cannot correspond to a whole extra
+#: constraint satisfied, which is the unit anyone deploying this would care
+#: about. Registered in `docs/PREREG-equivalence.md` before it was run against
+#: the corpus, for the same reason the fresh-seed rule exists: a margin chosen
+#: after seeing the interval is not a margin.
+EQUIV_DELTA = 0.05
+
+#: Prior spread per episode on `fraction`, used only for the a-priori MDE
+#: column. 0.15 is the four-agent arm's realised sd, and it is the number whose
+#: absence produced the withdrawn participation finding (RESEARCH-LOG 4.22): at
+#: n = 48 it puts the MDE above the +0.055 that was being read off 48 episodes.
+SD_PRIOR = 0.15
 
 # (label, team corpus, solo corpus). Both arms of every point now live in the
 # same run directory.
@@ -176,12 +199,60 @@ def report(label: str, team_path: Path, solo_path: Path, rng: random.Random) -> 
     print(f"\n  largest |d| = {best:.2f}; metrics significant at 0.05: "
           f"{', '.join(sig) if sig else 'none'}")
 
+    _equivalence(solo, team, n_s, n_t)
+
     _sensitivity(team_path, solo_path, out, rng)
     for condition, tag, brief in _MATCHED_ARMS:
         _matched_budget(team_path, out, rng, condition, tag, brief)
     _brief_effect(team_path, rng)
     _budget_within_agent(team_path, solo_path, rng)
     return out
+
+
+def _equivalence(
+    solo: dict[str, list[float]], team: dict[str, list[float]], n_s: int, n_t: int
+) -> None:
+    """What the null above is actually evidence for.
+
+    The table before this one reports that the gap is not distinguishable from
+    zero. That is not the claim this project makes. The claim is that team size
+    *does nothing*, and a non-significant p-value is compatible with an effect
+    of any size the sample was too small to see -- which is precisely what
+    happened to the +0.055 that a 48-episode arm could never have resolved
+    (RESEARCH-LOG 4.22).
+
+    Two numbers fix that, and they answer different questions:
+
+      TOST at delta   does the data exclude effects bigger than one constraint?
+      bound           what is the smallest effect it *does* exclude?
+
+    The second is the one to quote. It requires no prior agreement on the
+    margin and it cannot be chosen after the fact, so "we exclude effects
+    larger than X" survives a reviewer who thinks our delta was generous.
+
+    `MDE` is printed beside them as the a-priori check: an arm whose minimum
+    detectable effect exceeds the bound it is claiming was never sized to make
+    the claim, and the report should say so before anyone quotes it.
+    """
+    print(f"\n  -- equivalence, delta = {EQUIV_DELTA:.3f} (PREREG-equivalence) --")
+    print(f"     {'metric':<11}{'gap':>9}{'90% CI':>20}{'TOST p':>9}"
+          f"{'bound':>9}{'verdict':>17}")
+    for metric in METRICS:
+        a, b = solo[metric], team[metric]
+        r = tost(a, b, EQUIV_DELTA)
+        bound = smallest_equivalence_bound(a, b)
+        verdict = "equivalent" if r.equivalent else "not equivalent"
+        print(f"     {metric:<11}{r.diff:>+9.3f}"
+              f"   [{r.ci_low:+.3f}, {r.ci_high:+.3f}]{r.p:>9.3f}"
+              f"{bound:>9.3f}{verdict:>17}")
+
+    smallest = min(n_s, n_t)
+    print(f"\n     a-priori MDE at n = {smallest} per arm, sd = {SD_PRIOR:.2f}: "
+          f"{mde(smallest, SD_PRIOR):.3f} (80% power, alpha = 0.05)")
+    print("     `bound` is the number to quote: effects larger than it are")
+    print("     excluded. `not equivalent` never means an effect was found --")
+    print("     it means this arm is too small to exclude one of that size,")
+    print("     which is a statement about the corpus, not about teams.")
 
 
 def _brief_effect(team_path: Path, rng: random.Random) -> None:
@@ -373,6 +444,45 @@ def headline_n(path: Path, condition: str) -> list[float]:
     return scores(path, condition)["fraction"]
 
 
+def _family(results: dict[str, dict]) -> None:
+    """The Phase 1 gate as one family of hypotheses, not nine separate ones.
+
+    `PREREG-xhard` registers the gate at three tiers on three metrics and reads
+    each at alpha = 0.05. Nine tests at 0.05 produce at least one significant
+    result 37% of the time under a true null, and this report has printed the
+    per-test values with no adjustment since it was written.
+
+    It changes no conclusion here -- every gap is null and correction can only
+    make a p-value larger. That is the reason to print it rather than a reason
+    not to: the correction costs nothing when the result is negative, and its
+    absence is the first thing a reviewer asks about a project that ran H1-H5.
+
+    The family is declared from the preregistration, above, and not from which
+    tests turned out interesting. A family assembled after the fact is not a
+    correction.
+    """
+    raw = {
+        f"{label}:{metric}": results[label][metric][4]
+        for label in results
+        for metric in METRICS
+    }
+    if len(raw) < 2:
+        return
+    print(f"\n{'=' * 74}\nMULTIPLE COMPARISONS "
+          f"(Phase 1 gate family, {len(raw)} tests)\n{'=' * 74}")
+    print(f"  {'hypothesis':<22}{'raw p':>9}{'Holm':>9}{'BH-FDR':>9}")
+    table = adjust(raw)
+    for key in sorted(raw, key=lambda k: raw[k]):
+        row = table[key]
+        print(f"  {key:<22}{row['raw']:>9.3f}{row['holm']:>9.3f}{row['bh']:>9.3f}")
+    surviving = [k for k, r in table.items() if r["holm"] < 0.05]
+    print(f"\n  significant after Holm: "
+          f"{', '.join(surviving) if surviving else 'none'}")
+    print("  Holm controls family-wise error and is the primary correction;")
+    print("  BH is printed beside it so the reading does not depend on which")
+    print("  is chosen. Both are reported, neither replaces the raw column.")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", help="report a single run directory instead of all")
@@ -394,6 +504,8 @@ def main() -> None:
         if got:
             results[label] = got
             paths[label] = Path(team_p)
+
+    _family(results)
 
     # The difficulty curve, which is the actual hypothesis: does the team-solo
     # gap grow with instance size? Printed rather than tested -- with two or
