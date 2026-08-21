@@ -2,8 +2,15 @@
 
 ### Measurement artifacts in single-agent versus multi-agent LLM comparisons
 
-**Draft — 2026-08-15.** Every number is reproducible from the released corpus via
+**Draft — 2026-08-21.** Every number is reproducible from the released corpus via
 `scripts/analysis/gate_report.py`; section references are to `docs/RESEARCH-LOG.md`.
+
+> **The title no longer matches the count and needs an author decision.** §5.1
+> adds a fourth artifact, and it is not a cap — it is an answer-format
+> convention. "Three Positives and a Cap" was accurate on 2026-08-15 and is not
+> now. The generalisation that covers all four is *symmetric by specification,
+> asymmetric in effect*, which is also recommendation 8. Left unchanged here
+> rather than retitled unilaterally; tracked in `Final Sweep.md`.
 
 ---
 
@@ -13,14 +20,17 @@ We set out to test whether emergent role differentiation in same-model LLM agent
 teams is causally real, using leave-one-out ablation rather than transcript
 reading. We could not run that test, and the reason is the contribution.
 
-Across three task difficulties, two serving instruments, and two disjoint seed
-sets, we obtained **three separate statistically significant results favouring
-multi-agent teams — and traced all three to measurement artifacts**. Two were the
+Across three task difficulties, two serving instruments, and three disjoint
+corpora, we obtained **four separate statistically significant results favouring
+multi-agent teams — and traced all four to measurement artifacts**. Two were the
 same artifact: a per-turn token cap that is symmetric by construction and
 asymmetric in effect, because a single agent must emit an entire solution in its
 final turn while a team commits one its shared transcript already holds. The
 third was a small-sample baseline: a four-agent reference estimated from 48
-episodes that a 3× larger sample did not reproduce.
+episodes that a 3× larger sample did not reproduce. The fourth appeared only
+when we regenerated the corpus from seeds: our answer-format parser scored 25
+single-agent episodes at zero and none of the team's, including one containing a
+complete correct solution written in prose rather than in the expected block.
 
 Removing all three, the effect of team size on this task family is flat. One
 agent scores 0.579, three agents 0.574, and four agents 0.576 across 899
@@ -266,6 +276,34 @@ absence would be indefensible.
 
 ---
 
+### 5.1 A fourth artifact, found by rebuilding the corpus
+
+Our corpus was regenerated from scratch on the same seeds after the original was
+lost, on weights re-fetched from a single conversion. This re-measures rather
+than reproduces: instances return identically from `(seed, difficulty)`,
+generations do not.
+
+Read as scored, the rebuilt gate reverses our headline — `fraction` +0.081,
+*d* = 0.43, *p* < 0.001 in the team's favour. **It is 25 unparseable
+single-agent answers, scored 0.000 and counted, against 0 in the team arm.**
+Restricted to episodes where both arms produced a parseable answer, the single
+agent leads by 0.025 and the null reproduces.
+
+The mechanism is the paper's own, in a fourth form. `TEAM_BRIEF` tells an agent
+that the group's last message is what gets scored, so a team's final turn is
+written *as* a submission; a single agent under `SOLO_BRIEF` has no such
+pressure and sometimes emits a complete, correct assignment in prose. One such
+episode contains all sixteen job assignments and scores zero. **The answer-format
+convention is identical across arms in specification and asymmetric in effect,
+exactly as the per-turn token cap is.**
+
+Our integrity filter excluded 1 of 149 and our truncation sensitivity row drops
+7. Neither is the 25, because both treat an unparseable answer as a *team*
+failure rather than an *instrument* failure. We report this as a defect in our
+own instrument rather than repairing it silently, and we note that it was found
+by the diagnostics we recommend in §8 — a shared convention checked for
+arm-asymmetric effect.
+
 ## 6. What we can say about emergence, and what we cannot
 
 Phase 2 coded 468 messages against an eight-action taxonomy. Agents within an
@@ -331,7 +369,14 @@ For anyone comparing single-agent and multi-agent LLM systems:
    us one extra run and overturned our headline. Without it we would have
    published a 2,100-episode ablation grid decomposing an effect that does not
    exist — and every cell would have been internally consistent.
-7. **Any per-turn resource limit lands asymmetrically when the arms use the
+7. **Count unparseable answers per arm, and never as a task failure.** Our
+   answer-format parser scored 25 single-agent episodes at zero against none in
+   the team arm, including at least one that contained a complete correct
+   solution in prose. A format convention is a shared limit like any other, and
+   an arm whose prompt makes a submission block natural is protected from it.
+   The generalisation is that **any convention identical in specification should
+   be checked for asymmetric effect**, not just resource limits.
+8. **Any per-turn resource limit lands asymmetrically when the arms use the
    resource differently.** This generalises past token caps to context windows,
    wall-clock budgets, and tool-call quotas.
 

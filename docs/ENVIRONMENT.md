@@ -21,7 +21,7 @@ Run it beside every corpus; it costs one full-file hash.
 conda create -n collabengine python=3.10.20
 pip install -r requirements.lock.txt
 pip install -e ".[dev,analysis]" --no-deps
-pytest -q          # 379 tests, seconds, no GPU
+pytest -q          # 439 tests, seconds, no GPU
 ```
 
 `requirements.lock.txt` is a full `pip freeze` of the environment that produced

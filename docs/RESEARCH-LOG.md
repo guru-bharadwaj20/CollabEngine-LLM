@@ -3443,3 +3443,41 @@ corpus that would settle it was deleted.
    happen in a run where it is the only thing that changes — §4.1c's rule.
 4. This is a Tier-1 finding for the paper's own thesis: the artifact class
    reproduces in a fourth form, found by the diagnostics the paper recommends.
+
+---
+
+## 9. State as of 2026-08-21
+
+The Final Sweep's fifteen Tier-1 items are addressed. What that does and does not
+mean, item by item, is in [`Final Sweep.md`](../Final%20Sweep.md); what is worth
+recording *here* is the split between what was measured and what was only built.
+
+**Measured.**
+
+- The corpus exists again (§4.24). 450 episodes on seeds 1000–1149, rebuilt from
+  a reassembled instrument after `runs/` was found empty.
+- The gate reproduces — **once the malformed asymmetry is handled**, and not
+  otherwise. That asymmetry is the fourth artifact.
+- Every null now carries an equivalence bound, and four of five clear the
+  registered margin. Fungibility does not, and is withdrawn to a bound.
+- The a-priori MDE for every arm this project has run. The 48-episode pilot's
+  was 0.086 against the +0.055 it reported.
+- The repository is public and a fresh clone passes its own suite.
+
+**Built, preregistered, and not run.** A second task family, two further model
+families, the 14B, and a three-rung precision ladder. Weights are on disk and
+checksummed; configs, serving geometry and `PREREG-14b.md` are written. **No
+episodes.** That is roughly 30–40 GPU-hours on a shared card, and it is the
+whole distance between "the apparatus exists" and "the question is answered".
+
+**The honest statement of where the study stands** has not changed and is now
+better supported: *this task family rewards collaboration at no operating point
+measured — three tiers, three instruments, three corpora, at 8B* — with the
+scope limit that everything after "8B" remains a single model family until those
+arms run.
+
+**Two open instrument questions, both from §4.24.** Whether an answer written in
+prose should be parsed is a design decision that changes the instrument, and
+belongs in a run where it is the only change. And `is_instrument_failure` treats
+an unparseable answer as a team failure, which is the criticism §4.1e already
+makes of the integrity filter in a different guise; it caught 1 of 25.
