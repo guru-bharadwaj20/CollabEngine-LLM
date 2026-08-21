@@ -167,14 +167,8 @@ serve_preset() {
 # sentinel this script writes, because the question worth asking on resume is
 # "are the episodes on disk", not "did a previous invocation think it finished".
 run_arm() {
-  local label=$1 config=$2 preset=$3 need=$4 name=$5 kind=$6 episodes=${7:-}
+  local label=$1 config=$2 preset=$3 need=$4 name=$5 kind=$6
   local dir="runs/${name}"
-  local ep_arg=()
-  # Only the pilot passes this. Its config carries n_episodes 24 because that is
-  # where it was first measured, and PREREG-phase3 sizes the paper's pilot
-  # column from seeds 0-47. Overriding on the command line keeps the config
-  # honest about what it originally ran.
-  [ -n "$episodes" ] && ep_arg=(--episodes "$episodes")
 
   if [ "$kind" = "grid" ] && [ -s "${dir}/ablation.jsonl" ]; then
     say "=== ${label}: skipped, ${dir}/ablation.jsonl already exists ==="
@@ -201,7 +195,7 @@ run_arm() {
   fi
 
   if ! $PY -u -m collabengine.cli pipeline --config "$config" \
-       "${ep_arg[@]}" --phases baseline,solo,solo_long 2>&1 | tee -a "$LOG"; then
+       --phases baseline,solo,solo_long 2>&1 | tee -a "$LOG"; then
     say "${label}: the headline arms failed; completed episodes are on disk"
     return 1
   fi
@@ -209,7 +203,7 @@ run_arm() {
 
   if [ "$kind" = "grid" ]; then
     if ! $PY -u -m collabengine.cli ablate --config "$config" \
-         "${ep_arg[@]}" --modes live --agents A1,A2,A3,A4 2>&1 | tee -a "$LOG"; then
+         --modes live --agents A1,A2,A3,A4 2>&1 | tee -a "$LOG"; then
       say "${label}: ablation failed; the gate above is still good"
       return 1
     fi
@@ -244,10 +238,13 @@ run_arm() {
 #
 # Seeds 0-47 rather than the config's own n_episodes 24: 24 is where the pilot
 # was first measured, 48 is what PREREG-phase3 sizes the paper's pilot column
-# from, and the paper quotes n = 48.
+# from, and the paper quotes n = 48. That now lives in the config itself:
+# `collabengine ablate` has no --episodes flag, so an override passed only to
+# `pipeline` produced a 48-seed baseline arm and a 24-seed ablation grid --
+# two corpora sharing a directory. The config is the single source of truth.
 say "=== P/7 pilot corpus (seeds 0-47) -- the paper does not build without it ==="
 COMPLETE_AT=48 run_arm "P/7 pilot (medium-ans)" configs/llamacpp/medium-ans.yaml \
-        q4 15000 llama31-8b-q4-medium-ans grid 48 \
+        q4 15000 llama31-8b-q4-medium-ans grid \
   || say "the pilot failed; build_paper.py will still raise on runs/...-ans"
 
 # ---------------------------------------------------------------------------
