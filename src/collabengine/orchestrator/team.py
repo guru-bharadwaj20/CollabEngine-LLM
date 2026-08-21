@@ -95,6 +95,14 @@ class TeamConfig:
     and the whole emergence result collapses into a protocol artifact (confound
     C2). Randomizing is what lets the analysis tell those apart."""
     difficulty: str = "medium"
+    task: str = "scheduling"
+    """Which task family the episode runs on. See `collabengine.tasks`.
+
+    Sits beside `difficulty` because the two are selected the same way and mean
+    nothing apart: `medium` names a different instance size in each family, so a
+    tier recorded without its family is not a reproducible operating point. The
+    default is the allocation family, which is what every corpus generated
+    before the second family existed was run under."""
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -109,6 +117,7 @@ class TeamConfig:
             "symmetry": self.symmetry.value,
             "randomize_turn_order": self.randomize_turn_order,
             "difficulty": self.difficulty,
+            "task": self.task,
             "extra": dict(self.extra),
         }
 
@@ -129,6 +138,7 @@ class TeamConfig:
             symmetry=SymmetryBreaking(d.get("symmetry", "name_seed")),
             randomize_turn_order=bool(d.get("randomize_turn_order", True)),
             difficulty=d.get("difficulty", "medium"),
+            task=d.get("task") or "scheduling",
             extra=dict(d.get("extra", {})),
         )
 

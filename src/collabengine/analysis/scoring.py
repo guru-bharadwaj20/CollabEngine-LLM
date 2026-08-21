@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from collabengine.tasks.generator import generate
+from collabengine.tasks import get_family
 from collabengine.tasks.grader import GradeResult
 from collabengine.tasks.schema import ALL_COMPONENTS, Component, Instance
 from collabengine.transcripts.store import EpisodeRecord
@@ -67,8 +67,29 @@ def strict_components(
     return out
 
 
+def strict_from_fractions(grade: GradeResult) -> dict[Component, float]:
+    """All-or-nothing, read off the component fractions themselves.
+
+    The family-agnostic reading, and the one the code family uses: its per-
+    component scores are already "what fraction of this component's hidden tests
+    passed", so a component is strictly satisfied exactly when that fraction is
+    1.0. No instance is needed, because the grader has already done the counting.
+
+    The allocation family cannot use this, and the difference is not cosmetic:
+    its `verification` component is scored as errors caught against errors
+    planted, so demanding 1.0 there would change a published metric. Hence two
+    functions rather than one with a flag.
+    """
+    return {c: float(v >= 1.0) for c, v in grade.per_component.items()}
+
+
 def is_feasible(grade: GradeResult) -> bool:
-    """Whether every constraint in the instance holds."""
+    """Whether every checked condition in the instance holds.
+
+    Family-agnostic already: `satisfied` is a flat map of condition id to bool
+    in both families -- constraint ids in one, test ids plus `parses`/`defines:`
+    in the other.
+    """
     return bool(grade.satisfied) and all(grade.satisfied.values())
 
 
@@ -79,11 +100,23 @@ def rescore(record: EpisodeRecord) -> Rescored:
     stored: generation is deterministic in exactly those two, which is the
     property that makes re-analysis free. No model call is involved, so a whole
     corpus can be re-read under a new metric without touching the GPU.
+
+    **Which family generates it is read from the record, not assumed.** This
+    function used to call the allocation generator unconditionally. Against a
+    code-family record that reconstructed the wrong instance entirely and then
+    looked up allocation constraint ids in a code grade -- which raised, but only
+    because the id spaces happen not to overlap. Had they overlapped it would
+    have returned a plausible number for the wrong instance, which is the class
+    of silent corruption this project has lost three corpora to.
     """
-    instance = generate(record.instance_seed, record.difficulty)
+    family = get_family(record.config.get("task"))
+    instance = family.generate(record.instance_seed, record.difficulty)
     grade = record.grade
 
-    strict = strict_components(instance, grade)
+    if family.name == "scheduling":
+        strict = strict_components(instance, grade)
+    else:
+        strict = strict_from_fractions(grade)
     feasible = float(is_feasible(grade))
 
     return Rescored(
@@ -99,6 +132,6 @@ def rescore(record: EpisodeRecord) -> Rescored:
             # carries the same value. Kept in the same shape so callers can loop
             # over metrics uniformly; it contributes no interaction by
             # construction, which is itself worth being able to see.
-            FEASIBLE: {c: feasible for c in ALL_COMPONENTS},
+            FEASIBLE: {c: feasible for c in family.components},
         },
     )

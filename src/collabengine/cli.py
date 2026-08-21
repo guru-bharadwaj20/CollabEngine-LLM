@@ -53,7 +53,7 @@ from collabengine.config import ExperimentConfig
 from collabengine.orchestrator import run_episode
 from collabengine.orchestrator.team import TeamConfig, build_team
 from collabengine.runner import RunPlan, run_plan
-from collabengine.tasks.generator import PRESETS
+from collabengine.tasks import presets_for
 from collabengine.tasks.schema import ALL_COMPONENTS, Component
 from collabengine.transcripts.store import EpisodeRecord, TranscriptReader
 
@@ -229,7 +229,11 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     print(f"backend: {backend.name}", file=sys.stderr)
 
     n_agents = config.team.n_agents
-    difficulties = sorted(PRESETS, key=lambda d: PRESETS[d].n_jobs)
+    # From the task family, not from one family's preset table: `medium` names
+    # a different instance size in each, and a sweep that walked the allocation
+    # tiers while running the code family would be labelled with tiers it never
+    # visited.
+    difficulties = list(presets_for(config.team.task))
     if args.difficulties:
         wanted = {d.strip() for d in args.difficulties.split(",")}
         difficulties = [d for d in difficulties if d in wanted]
@@ -830,7 +834,7 @@ async def _choose_difficulty(config: ExperimentConfig, backend, episodes: int):
     # caps the batch at that number however much room the card has -- eight
     # cells of six episodes fills a batch that six alone leaves five-sixths
     # empty. The cells are independent, so there is nothing to serialize for.
-    difficulties = sorted(PRESETS, key=lambda d: PRESETS[d].n_jobs)
+    difficulties = list(presets_for(config.team.task))
     cells: list[tuple[str, int]] = [(d, n) for d in difficulties for n in (1, 0)]
 
     async def score(difficulty: str, solo: int) -> list[float]:

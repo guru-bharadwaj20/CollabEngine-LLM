@@ -22,7 +22,7 @@ not a 14B result. Partial states are described in the notes, never in the mark.
 
 | # | Item | Status | Where it stands |
 |---|---|---|---|
-| 1.1 | Second task family | ❌ | One synthetic scheduling generator; no second domain exists in `src/collabengine/tasks/` |
+| 1.1 | Second task family | ✅ *(built; corpus pending)* | `tasks/code/` — generated Python implementation tasks, hidden test suite, four independent components, sandboxed grading. 24 tests; runs end to end on the mock **and on the served 8B**. Found and fixed a silent-corruption defect in `rescore`. **The 150-episode arms have not been generated** — that is GPU time, not code |
 | 1.2 | Second model family | ❌ | Configs exist for Qwen3-8B (`configs/hf-local/`, `configs/vllm/`); every *reported* number is Llama-3.1-8B Q4_K_M, and the bf16 Qwen corpora were deleted (LOG §7) |
 | 1.3 | Run the 14B | ❌ | `scripts/ops/fetch_14b.py` exists and Appendix C says "not yet used for a measurement" |
 | 1.4 | Precision/quantization control | ❌ | No arm holds task, tier and seeds fixed while varying precision |

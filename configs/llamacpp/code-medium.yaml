@@ -1,0 +1,63 @@
+# The second task family, at the operating point the first one is measured at.
+#
+# Final Sweep 1.1. One synthetic scheduling task was the study's single biggest
+# scope weakness: if the cap-asymmetry artifact shows up here too, in an
+# unrelated domain with an unrelated grader, it stops being a bug in one harness
+# and becomes a class of measurement error.
+#
+# **Everything that can be held fixed is held fixed.** Same served instrument,
+# same weights, same quantisation, same slot geometry, same seeds, same rounds,
+# same per-turn cap, same answer budget. `team.task` is the only line that
+# differs from medium-h3b.yaml in any way that touches the model. Changing the
+# task and anything else in one run is RESEARCH-LOG 4.1c's mistake.
+#
+# Why code generation rather than math or multi-hop QA: the paper's mechanism is
+# that a solo agent must emit an entire artifact inside its final turn while a
+# team commits one its transcript already holds. Code maximises that asymmetry --
+# a whole module has to appear in one message. Math suppresses it, because the
+# answer is short. This is the most adversarial venue available for the claim,
+# and therefore the most convincing one.
+#
+# Instances are generated, not scraped. An 8B that has seen MBPP is being
+# measured on recall, and the score does not say which.
+#
+#   python scripts/ops/preflight.py --config configs/llamacpp/code-medium.yaml
+#   python -m collabengine.cli pipeline --config configs/llamacpp/code-medium.yaml \
+#       --phases baseline,solo,solo_long
+#
+# Fresh seeds 1000-1149, disjoint from anything used to calibrate the family, and
+# verified collision-free at every tier (tests/test_code_task.py).
+name: llama31-8b-q4-code-medium
+seed_start: 1000
+n_episodes: 150
+out_dir: runs
+
+max_concurrency: 7
+
+backend:
+  kind: openai
+  model: models/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf
+  base_url: http://127.0.0.1:8000/v1
+  max_concurrency: 7
+  timeout_s: 900
+  max_retries: 4
+  verify_model: true
+  max_model_len: 15360
+  enable_thinking: false
+
+team:
+  task: code
+  n_agents: 4
+  rounds: 3
+  difficulty: medium
+  symmetry: name_seed
+  randomize_turn_order: true
+  max_tokens: 1024
+  # The answer-bearing turn keeps its own budget, and on this family that is not
+  # a refinement but the precondition for measuring anything: a complete module
+  # is longer than a scheduling answer, so a shared 1024 would truncate the solo
+  # arm's submission almost every episode and reproduce the artifact rather than
+  # test for it. Held at the scheduling family's value so the two are comparable.
+  answer_max_tokens: 3072
+  temperature: 0.8
+  top_p: 0.95

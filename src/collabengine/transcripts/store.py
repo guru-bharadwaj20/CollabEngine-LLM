@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any
 
 from collabengine.protocol import Message
+from collabengine.tasks import get_family
 from collabengine.tasks.grader import GradeResult
-from collabengine.tasks.schema import Solution
 
 
 @dataclass(slots=True)
@@ -35,7 +35,10 @@ class EpisodeRecord:
     difficulty: str
     agents: list[str]
     messages: list[Message]
-    solution: Solution
+    solution: Any
+    """The task family's solution type. Which one is recorded in
+    `config["task"]`; records written before the second family existed carry no
+    such key and are read as the allocation family, which is what they are."""
     grade: GradeResult
     turn_order: list[list[str]] = field(default_factory=list)
     """Speaking order per round. Needed for the position-vs-identity test."""
@@ -66,7 +69,9 @@ class EpisodeRecord:
             difficulty=d["difficulty"],
             agents=list(d["agents"]),
             messages=[Message.from_dict(m) for m in d["messages"]],
-            solution=Solution.from_dict(d["solution"]),
+            solution=get_family(
+                dict(d.get("config") or {}).get("task")
+            ).solution_from_dict(d["solution"]),
             grade=GradeResult.from_dict(d["grade"]),
             turn_order=[list(r) for r in d.get("turn_order", [])],
             config=dict(d.get("config", {})),

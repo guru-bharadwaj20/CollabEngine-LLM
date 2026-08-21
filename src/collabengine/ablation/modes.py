@@ -15,10 +15,19 @@ from collabengine.orchestrator.episode import (
 )
 from collabengine.orchestrator.team import TeamConfig, build_team
 from collabengine.protocol import Message, Speaker
-from collabengine.tasks.generator import generate
-from collabengine.tasks.grader import grade
-from collabengine.tasks.schema import Instance
+from collabengine.tasks import TaskFamily, get_family
 from collabengine.transcripts.store import EpisodeRecord
+
+
+def _family_of(record: EpisodeRecord) -> TaskFamily:
+    """Which task family a recorded episode was run under.
+
+    Read off the resolved config stored beside the transcript rather than passed
+    in, because every caller here already has the record and none of them has
+    the run's config. Records written before the second family existed have no
+    `task` key and resolve to the allocation family, which is what they are.
+    """
+    return get_family(dict(record.config or {}).get("task"))
 
 
 class AblationMode(str, Enum):
@@ -35,7 +44,7 @@ async def live_ablation(
     config: TeamConfig,
     episode_seed: int,
     agent_id: str,
-    instance: Instance | None = None,
+    instance: object | None = None,
 ) -> EpisodeRecord:
     """Re-run the episode with the agent removed from the roster.
 
@@ -56,7 +65,7 @@ def frozen_excise(
     record: EpisodeRecord,
     agent_id: str,
     *,
-    instance: Instance | None = None,
+    instance: object | None = None,
 ) -> EpisodeRecord:
     """Delete an agent's messages from a recorded episode and re-grade.
 
@@ -69,11 +78,12 @@ def frozen_excise(
     to the absence, so this is a lower bound on what the team would have managed.
     Read it alongside the live number, never instead of it.
     """
-    inst = instance or generate(record.instance_seed, record.difficulty)
+    family = _family_of(record)
+    inst = instance or family.generate(record.instance_seed, record.difficulty)
     kept = [
         m for m in record.messages if not (m.is_ablatable() and m.author == agent_id)
     ]
-    solution = extract_solution(kept)
+    solution = extract_solution(kept, family=family)
 
     return EpisodeRecord(
         episode_id=f"{AblationMode.FROZEN_EXCISE.value}:{agent_id}:{record.episode_id}",
@@ -83,7 +93,7 @@ def frozen_excise(
         agents=[a for a in record.agents if a != agent_id],
         messages=kept,
         solution=solution,
-        grade=grade(inst, solution),
+        grade=family.grade(inst, solution),
         turn_order=record.turn_order,
         config=dict(record.config),
         meta={
@@ -101,7 +111,7 @@ def random_message_control(
     agent_id: str,
     *,
     seed: int = 0,
-    instance: Instance | None = None,
+    instance: object | None = None,
 ) -> EpisodeRecord:
     """Excise a volume-matched random subset of messages instead of one agent's.
 
@@ -112,7 +122,8 @@ def random_message_control(
     Messages are drawn from agents *other* than the nominal target so the control
     never accidentally reproduces the treatment.
     """
-    inst = instance or generate(record.instance_seed, record.difficulty)
+    family = _family_of(record)
+    inst = instance or family.generate(record.instance_seed, record.difficulty)
     n_remove = sum(
         1 for m in record.messages if m.is_ablatable() and m.author == agent_id
     )
@@ -126,7 +137,7 @@ def random_message_control(
     drop = set(rng.sample(pool, min(n_remove, len(pool))))
 
     kept = [m for i, m in enumerate(record.messages) if i not in drop]
-    solution = extract_solution(kept)
+    solution = extract_solution(kept, family=family)
 
     return EpisodeRecord(
         episode_id=f"{AblationMode.RANDOM_MESSAGE.value}:{agent_id}:{record.episode_id}",
@@ -136,7 +147,7 @@ def random_message_control(
         agents=list(record.agents),
         messages=kept,
         solution=solution,
-        grade=grade(inst, solution),
+        grade=family.grade(inst, solution),
         turn_order=record.turn_order,
         config=dict(record.config),
         meta={
@@ -154,7 +165,7 @@ async def capacity_control(
     backend: LLMBackend,
     config: TeamConfig,
     episode_seed: int,
-    instance: Instance | None = None,
+    instance: object | None = None,
 ) -> EpisodeRecord:
     """Run a team that never had the extra agent in the first place.
 
@@ -179,7 +190,7 @@ async def frozen_replay(
     record: EpisodeRecord,
     config: TeamConfig,
     agent_id: str,
-    instance: Instance | None = None,
+    instance: object | None = None,
 ) -> EpisodeRecord:
     """Regenerate the surviving agents' turns against the excised context.
 
@@ -193,7 +204,8 @@ async def frozen_replay(
     where the transcript actually diverges. On a long episode that saves most of
     the model calls.
     """
-    inst = instance or generate(record.instance_seed, record.difficulty)
+    family = _family_of(record)
+    inst = instance or family.generate(record.instance_seed, record.difficulty)
     roster = {a.agent_id: a for a in build_team(config, record.instance_seed)}
 
     divergence = _first_divergence(record, agent_id)
@@ -216,7 +228,9 @@ async def frozen_replay(
             messages=[
                 ChatMessage(
                     role="system",
-                    content=build_system_prompt(agent, inst, len(record.agents) - 1),
+                    content=build_system_prompt(
+                        agent, inst, len(record.agents) - 1, family=family
+                    ),
                 ),
                 *build_context(agent, history),
             ],
@@ -226,6 +240,7 @@ async def frozen_replay(
             seed=agent.seed,
             meta={
                 "instance": inst.to_dict(),
+                "task": family.name,
                 "agent_id": agent.agent_id,
                 "agent_index": agent.index,
                 "turn_position": int(msg.meta.get("position", 0)),
@@ -245,7 +260,7 @@ async def frozen_replay(
             )
         )
 
-    solution = extract_solution(history)
+    solution = extract_solution(history, family=family)
     return EpisodeRecord(
         episode_id=f"{AblationMode.FROZEN_REPLAY.value}:{agent_id}:{record.episode_id}",
         condition=f"{AblationMode.FROZEN_REPLAY.value}:{agent_id}",
@@ -254,7 +269,7 @@ async def frozen_replay(
         agents=[a for a in record.agents if a != agent_id],
         messages=history,
         solution=solution,
-        grade=grade(inst, solution),
+        grade=family.grade(inst, solution),
         turn_order=record.turn_order,
         config=config.to_dict(),
         meta={
