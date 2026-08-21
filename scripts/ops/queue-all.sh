@@ -8,6 +8,8 @@
 #
 #   stage                        item        cost        what it answers
 #   ---------------------------------------------------------------------
+#   P  pilot corpus            1.15        1 h         restores the paper's pilot column
+#   F  figure corpora (x5)     1.15        3-4 h       restores figures 1-5
 #   0  tier-2 (judge + sweep)    7.3, 7.4    3-4 nights  is the artifact a curve?
 #   1  14B grid                  1.3         6-8 h       is 8B too weak to collaborate?
 #   2  code task family          1.1         5-7 h       is it one harness or a class?
@@ -246,6 +248,48 @@ say "=== P/7 pilot corpus (seeds 0-47) -- the paper does not build without it ==
 COMPLETE_AT=48 run_arm "P/7 pilot (medium-ans)" configs/llamacpp/medium-ans.yaml \
         q4 15000 llama31-8b-q4-medium-ans grid \
   || say "the pilot failed; build_paper.py will still raise on runs/...-ans"
+
+# ---------------------------------------------------------------------------
+# Stage F. The five corpora the paper's figures are drawn from.
+# ---------------------------------------------------------------------------
+# The pilot restored the numbers. The figures need five more, and finding that
+# out one corpus at a time is how this stage came to exist.
+#
+# `paper_figures.py` reads a three-tier by two-instrument grid: medium, hard and
+# xhard on the capped instrument (`OLD`) and the same three on the answer-budget
+# one (`ANS`). Figure 1 is the mechanism figure -- it is the paper's evidence
+# that the artifact grows with instance size -- and it is drawn from the
+# difference between those two rows. None of it survived, for the same reason
+# the pilot did not: runs/ is gitignored and no corpus was ever released.
+#
+# **So the paper rests on six corpora and the rebuild restored one.** That is
+# section 1.0.a at its full size rather than the half of it the pilot showed.
+# Recorded here because the count matters: a reproducibility claim that is true
+# of one sixth of the inputs is not a reproducibility claim.
+#
+# Cheap, which is the one piece of good news: 24 episodes x 3 arms each, 360
+# episodes for all five, and every one of them fits the same 18,432-token slot,
+# so a single q4 server at four slots serves the lot without a restart. The
+# capped tiers reach it as 17,408 + 1,024 and the answer-budget tiers as
+# 15,360 + 3,072 -- different splits of the same budget, which is the whole
+# point of the comparison.
+#
+# `pipeline` only. The figures read baseline.jsonl; nothing here needs an
+# ablation grid.
+say "=== F/7 the five corpora the paper's figures are drawn from ==="
+for spec in \
+  "medium|llama31-8b-q4-medium" \
+  "hard|llama31-8b-q4-hard" \
+  "xhard|llama31-8b-q4-xhard" \
+  "hard-ans|llama31-8b-q4-hard-ans" \
+  "xhard-ans|llama31-8b-q4-xhard-ans"
+do
+  cfg=${spec%|*}; dir=${spec#*|}
+  COMPLETE_AT=72 run_arm "F/7 figures: ${cfg}" "configs/llamacpp/${cfg}.yaml" \
+          q4 15000 "$dir" gate \
+    || FIG_FAILED="${FIG_FAILED:-} ${cfg}"
+done
+[ -n "${FIG_FAILED:-}" ] && say "figure corpora unfinished:${FIG_FAILED}"
 
 # ---------------------------------------------------------------------------
 # Stage 0. Tier 2: the 14B judge check, then the dose-response sweep.
