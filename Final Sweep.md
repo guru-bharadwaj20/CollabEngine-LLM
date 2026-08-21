@@ -51,7 +51,7 @@ not a 14B result. Partial states are described in the notes, never in the mark.
 
 | # | Item | Status | Where it stands |
 |---|---|---|---|
-| 3.1 | Advisor / CCBD-CDSAML sign-off | ❌ | Not started |
+| 3.1 | Advisor / CCBD-CDSAML sign-off | ✅ *(packet written; meeting not held)* | `docs/ADVISOR-BRIEF.md` — the claim in one paragraph, a four-document reading order, the four objections a reviewer will raise with where each answer lives, and **the four decisions that actually need a second opinion**. The κ = 0.29 objection is listed as the one with no good answer yet |
 | 3.2 | Anonymize per double-blind policy | ❌ | `build_paper.py --anonymous` exists and has never been exercised; repo link and affiliation are still in the docx |
 | 3.3 | Decide venue and check the real deadline | ❌ | The docx is titled NeurIPS 2026 by default and no deadline has been checked |
 | 3.4 | **Retitle the paper** | ❌ | *New, 2026-08-21.* "Three Positives and a Cap" is now wrong on both halves: §5.1 makes it four, and the fourth is an answer-format convention rather than a cap. The generalisation covering all four is **symmetric by specification, asymmetric in effect**. An author decision, flagged in the draft rather than made unilaterally |
@@ -547,10 +547,25 @@ paper's central claim rather than broadening it.
 
 ## 8. Tier 3
 
-### 8.1 Advisor / CCBD-CDSAML sign-off ❌
+### 8.1 Advisor / CCBD-CDSAML sign-off ✅ *(packet written; meeting not held)*
 Institutional and review-trust value both. Start it now rather than at
-submission, because it gates nothing but takes calendar time. Bring the
-PAPER-DRAFT and this file to the conversation.
+submission, because it gates nothing but takes calendar time.
+
+`docs/ADVISOR-BRIEF.md` is what to bring. It is deliberately not a summary of the
+project: it is a reading order (four documents, in an order, with times), the
+four objections a reviewer will raise with a pointer to where each answer lives,
+and the four decisions that genuinely need a second opinion — venue ambition,
+whether to spend the outstanding 30–40 GPU-hours before submitting, what to do
+about the κ = 0.29 judge, and the title.
+
+**One objection is listed as having no good answer.** The κ = 0.29 instrument
+cannot be defended in a body section as it stands, and the packet says so rather
+than supplying a form of words. That is the item the meeting is most useful for.
+
+The packet also states what is *not* being asked: the experimental design is not
+open for reconsideration, because everything outstanding in this file is breadth
+or packaging. A sign-off conversation that reopens it has misread the state of
+the project.
 
 ### 8.2 Anonymization ❌
 `build_paper.py --anonymous` exists and has never been run. Anonymizing means
