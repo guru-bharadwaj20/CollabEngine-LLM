@@ -179,10 +179,46 @@ def _shade_none(cell):
         tcPr.remove(el)
 
 
+#: Header patterns that mean "this column is a p-value" and "this column is an
+#: effect size or an interval". Matched case-insensitively against the header
+#: text with markup stripped.
+_P_COLUMN = ("p", "p-value", "perm p", "tost p", "holm", "bh", "bh-fdr")
+_EFFECT_COLUMN = ("d", "ci", "interval", "gap", "diff", "bound", "effect",
+                  "difference", "mde", "sd", "delta")
+
+
+def _is_p_column(header: str) -> bool:
+    h = header.strip().strip("*_`").lower()
+    return h in _P_COLUMN or h.startswith("p ") or h.endswith(" p")
+
+
+def _is_effect_column(header: str) -> bool:
+    h = header.strip().strip("*_`").lower()
+    return any(tok in h for tok in _EFFECT_COLUMN)
+
+
 def table(doc, caption: str, headers: list[str], rows: list[list[str]],
           number: int, widths: list[float] | None = None, size=9.0,
           align_right_from: int = 1):
-    """Caption above; booktabs rules; no vertical rules anywhere."""
+    """Caption above; booktabs rules; no vertical rules anywhere.
+
+    **A p-value never appears in this paper without an effect size beside it.**
+    Enforced here rather than left to discipline: a table that reports only
+    significance invites the reader to treat "not significant" as "no effect",
+    which is the exact error this paper spends section 6 correcting. The rule
+    is a lint, not a habit, because habits are what produced the two tables
+    that had drifted to p-only before this check existed.
+
+    Raises at build time, naming the caption, so an offending table cannot be
+    quietly rendered.
+    """
+    if any(_is_p_column(h) for h in headers) and not any(
+        _is_effect_column(h) for h in headers
+    ):
+        raise AssertionError(
+            f"table {number} ({caption[:60]!r}) reports a p-value with no effect "
+            f"size or interval column; headers were {headers}"
+        )
     cap = para(doc, "", size=9.0, align=WD_ALIGN_PARAGRAPH.LEFT,
                space_before=6.0, space_after=4.0, lead=10.5, keep_with_next=True)
     r = cap.add_run(f"Table {number}: ")
@@ -709,21 +745,26 @@ def build(out_path: Path, author: str, affiliation: str, email: str,
           "the central table. everything that failed to reproduce across "
           "independent seed sets is a positive measured against the 48-episode "
           "four-agent reference; everything that reproduced is a null or a "
-          "negative. the asymmetry is the result.",
-          ["quantity", "pilot", "fresh", "*p*"],
-          [["**failed to reproduce**", "", "", ""],
-           ["four-agent reference", "0.631", "0.576", "0.031"],
-           ["gate: team − 1 agent", "+0.045", "−0.003", "0.868"],
-           ["C5: team − matched-budget agent", "+0.126", "+0.060 → **+0.003** corrected", "0.869"],
-           ["participation: per-agent ablation drop", "+0.055", "**+0.002**", "0.834"],
-           ["**reproduced**", "", "", ""],
-           ["1 agent × 3 rounds", "0.585", "0.579", "0.856"],
-           ["3 agents (pooled ablated)", "0.575", "0.574", "0.909"],
-           ["budget penalty, 3 vs 12 rounds, one agent", "−0.081", "**−0.063**", "**0.011**"],
-           ["generation asymmetry, 1 agent ÷ team", "1.87×", "2.04×", "—"],
-           ["agent × component interaction", "*p* = 0.928", "not re-run (no main effect)", "—"],
-           ["fungibility Δ(frozen) − Δ(live)", "−0.005", "—", "—"]],
-          number=3, widths=[2.35, 0.85, 1.65, 0.55], size=8.5)
+          "negative. the asymmetry is the result. `bound` is the smallest "
+          "equivalence margin the fresh-seed data supports (TOST, α = 0.05): "
+          "effects larger than it are excluded, so the nulls here are "
+          "measurements rather than absences. fungibility is the one row whose "
+          "bound exceeds our registered margin of 0.05, and it is the one claim "
+          "we withdraw to a bound.",
+          ["quantity", "pilot", "fresh", "*p*", "bound"],
+          [["**failed to reproduce**", "", "", "", ""],
+           ["four-agent reference", "0.631", "0.576", "0.031", "—"],
+           ["gate: team − 1 agent", "+0.045", "−0.003", "0.868", "**0.032**"],
+           ["C5: team − matched-budget agent", "+0.126", "+0.060 → **+0.003** corrected", "0.869", "**0.032**"],
+           ["participation: per-agent ablation drop", "+0.055", "**+0.002**", "0.834", "**0.026**"],
+           ["**reproduced**", "", "", "", ""],
+           ["1 agent × 3 rounds", "0.585", "0.579", "0.856", "—"],
+           ["3 agents (pooled ablated)", "0.575", "0.574", "0.909", "0.025"],
+           ["budget penalty, 3 vs 12 rounds, one agent", "−0.081", "**−0.063**", "**0.011**", "—"],
+           ["generation asymmetry, 1 agent ÷ team", "1.87×", "2.04×", "—", "—"],
+           ["agent × component interaction", "*p* = 0.928", "not re-run (no main effect)", "—", "—"],
+           ["fungibility Δ(frozen) − Δ(live)", "−0.005", "—", "—", "0.056"]],
+          number=3, widths=[2.10, 0.80, 1.50, 0.50, 0.55], size=8.5)
 
     heading(doc, 2, "6.2   Team size does nothing; more turns hurt")
     figure(doc, fig_dir / "fig4_teamsize.png",
