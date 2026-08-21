@@ -1255,13 +1255,25 @@ def check_register(doc) -> None:
     not first person ("a capital I"). In academic prose that is first person
     essentially always, so the false positive is accepted rather than weakened
     into a heuristic that lets the real thing through.
+
+    **Bibliography entries are exempt, and only they.** A reference entry is
+    data, not prose: `I` in it is an author's initial (`I. Mordatch`) or part of
+    a quoted title (`'Who am I, and who else is here?'`), never the author of
+    this paper speaking. The first real build of the paper fired three times,
+    all of them here. The exemption is by shape -- a paragraph beginning `[12]`
+    -- rather than by position after the `References` heading, because the
+    appendix follows that heading too and the appendix is prose that must stay
+    checked.
     """
     import re
+
+    #: A rendered bibliography entry: `[12]  A. Author. Title...`
+    _REF_ENTRY = re.compile(r"^\[\d+\]\s")
 
     problems: list[str] = []
     for par in doc.paragraphs:
         text = par.text.strip()
-        if not text or text == "References":
+        if not text or text == "References" or _REF_ENTRY.match(text):
             continue
         for pattern, what in _LOG_REGISTER:
             if re.search(pattern, text):
