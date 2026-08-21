@@ -36,7 +36,7 @@ max_concurrency: 7
 
 backend:
   kind: openai
-  model: Meta-Llama-3.1-8B-Instruct-Q4_K_M
+  model: models/Meta-Llama-3.1-8B-Instruct.Q4_K_M.gguf
   base_url: http://127.0.0.1:8000/v1
   max_concurrency: 7
   timeout_s: 900
