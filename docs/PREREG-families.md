@@ -151,3 +151,49 @@ interaction is absent. §4.22's lesson, again: the 48-episode pilot's MDE was
   §4.24 already found it scoring 25 well-formed-but-unconventional solo answers
   at zero. Qwen and Mistral have no reason to share Llama's habits, and a
   parser that penalises them is a measurement of the parser.
+
+---
+
+## Postscript — outcome, 2026-08-22
+
+Two of the four arms generated. Mistral was withdrawn on an instrument
+incompatibility (see the amendment above); f16 was cut by decision when analysis
+rather than generation became the binding constraint.
+
+| arm | n (team/solo) | team | solo | gap | equiv bound | malformed solo / team |
+|---|---|---|---|---|---|---|
+| Llama Q4 (headline) | 150/149 | 0.6063 | 0.5250 | +0.0813 | 0.118 | 16.8% / 0.0% |
+| Llama Q8_0 | 150/149 | 0.6074 | 0.5538 | +0.0535 | 0.089 | 12.1% / 0.7% |
+| **Qwen2.5-7B** | 150/150 | 0.6107 | 0.6166 | **-0.0059** | **0.0288** | **0.0% / 0.0%** |
+
+**F1 confirmed.** On Qwen the solo-vs-team null replicates, and the equivalence
+bound of **0.0288** is the tightest in the study. The null is not a Llama quirk.
+
+**F2 is untested, not supported.** The registered quantity is the *interaction* —
+the change in the team-minus-solo gap across precision — and one rung cannot
+produce a difference of differences. Q4 to Q8 moves the gap by **-0.028**, i.e.
+the gap shrank at higher precision, which is the opposite direction from the
+concern in PAPER-DRAFT §9. **That is a single observation and is reported as
+untested.** Treating it as reassurance would be exactly the post-hoc reading this
+document exists to prevent.
+
+**§6's named failure mode fired, and on the arm it was named for.** This
+document predicted that the likeliest way an arm goes uninterpretable is the
+answer-format parser, because it was written against Llama's output conventions
+and Qwen has no reason to share them. The measurement inverts the prediction and
+is more interesting for it:
+
+- Llama Q4: **16.8%** of solo answers unparseable, against **0.0%** of team.
+- Llama Q8: **12.1%** against **0.7%**.
+- Qwen: **0.0% against 0.0%.**
+
+The parser does not penalise Qwen at all. It penalises *Llama*, and only in the
+single-agent arm. On Llama Q4, excluding malformed answers moves the gap from
++0.0813 to **-0.0245** — the single agent finishes ahead.
+
+**So the fourth artifact is a model-by-instrument interaction, not a property of
+answer parsing.** That is a new finding and it strengthens the class claim while
+narrowing this instance of it: a symmetric-by-specification convention lands
+asymmetrically, and *which* arm absorbs it depends on the model family. A fixed
+bias could be subtracted. This cannot, and a single-model study cannot see it at
+all.

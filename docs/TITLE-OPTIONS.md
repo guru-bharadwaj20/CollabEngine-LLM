@@ -169,3 +169,53 @@ over-claiming past §8.
 `build_paper.py` has been changed. When it is made, the title appears in
 `docs/PAPER-DRAFT.md` line 1, the note beneath it flagging the mismatch comes
 out, and `Final Sweep.md` item 3.4 closes.
+
+---
+
+## Recommendation, 2026-08-22 — revisited after the results
+
+The measurements changed what the title has to survive, so the pick is restated
+here rather than left as written before the data existed.
+
+**What changed.** The code family showed that the *token cap* does not transfer
+(0% truncation there) while the *class* does — the artifact reappeared as an
+answer-format convention instead. And the parser artifact turned out to be
+**Llama-specific**: 16.8% of Llama's solo answers unparseable against 0.0% of
+Qwen's. So the count of artifacts is now unstable across task families and model
+families both. **Any title built on a number, or on the word "cap", will be
+wrong again within one experiment.**
+
+### The pick
+
+> # Symmetric by Specification, Asymmetric in Effect
+> ### Measurement artifacts in single-agent versus multi-agent LLM comparisons
+
+**Why this one survives where the others do not:**
+
+1. **It cannot go stale.** It names the mechanism class, not an instance count.
+   "Three Positives and a Cap" broke twice in a week — first when §5.1 made it
+   four, then when the fourth turned out not to be a cap.
+2. **It is already the paper's own thesis sentence**, verbatim, in the abstract,
+   §5.1 and §7. The title should be the claim, not a label stuck on top of it.
+3. **It claims a property of instruments, not a verdict on multi-agent systems.**
+   That is the line §8 draws and the line two concurrent papers make it important
+   to hold: Tran & Kiela and Ringelmann (arXiv:2606.02646) both already argue
+   multi-agent does not help. This paper's distinct claim is *why the literature
+   keeps reporting that it does*.
+4. **It generalises exactly as far as the evidence does.** The cap sweep, the
+   code family and the Llama/Qwen split are three instances of one class and
+   nothing more.
+
+**Fallback** remains the plain descriptive option E, if a reviewer or an advisor
+finds the phrase too abstract for a first encounter.
+
+**Rejected, and now more firmly than before:**
+
+- *"Four Positives and a Convention"* — rebuilds the exact fault that broke the
+  current title, and the count is now known to be task- and model-dependent.
+- Anything containing *"cap"* — falsified as a general mechanism by the code
+  family's 0% truncation.
+- Anything asserting multi-agent systems do not work — over-claims past §8, and
+  walks directly into two concurrent papers that own that conclusion.
+
+**Still the author's call.** Nothing in the build has been retitled.

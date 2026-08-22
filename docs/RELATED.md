@@ -3,7 +3,9 @@
 Raw material for two things: the paper's Related Work section (Tier 1.9), and the
 Tier 2.1 audit of a public multi-agent system for the same artifact. Every entry
 below was verified against the arXiv abstract page or the publisher record on
-2026-08-20 — title, authors, year and identifier are checked, not recalled.
+2026-08-20, and the four entries added on 2026-08-22 against both the arXiv
+abstract page and the arXiv API record on that date — title, authors, year and
+identifier are checked, not recalled.
 Anything that could not be verified is listed at the bottom under **Dropped**
 rather than included.
 
@@ -12,9 +14,9 @@ argument — that a per-turn generation cap is symmetric in specification and
 asymmetric in effect, because a solo agent must emit the whole answer in its
 final turn while a team commits one its transcript already holds.
 
-**Read the scooping check first.** There is a 2026 paper that reaches a
-neighbouring conclusion by a different route, and the paper cannot be written as
-if it does not exist.
+**Read the scooping check first.** There are *two* 2026 papers that reach a
+neighbouring conclusion by different routes, and the paper cannot be written as
+if either does not exist.
 
 ---
 
@@ -99,6 +101,25 @@ a single-agent baseline; the question is what the baseline was allowed to spend.
   discipline exists in this literature — it is just aimed at variance, not at
   budget parity.
 
+- **When Parallelism Pays Off: Cohesion-Aware Task Partitioning for Multi-Agent
+  Coding** (Yang, Nie, Chandra, Gannutin, Lin, Chaudhuri; arXiv:2606.00953,
+  submitted 31 May 2026) — models multi-agent coding as a graph-partitioning
+  problem trading parallel speed against inter-agent dependency cost; Co-Coder
+  builds a static dependency graph, isolates hub files, partitions by community
+  detection, and schedules dependency-aware. Across 28 real-world projects it
+  reports up to 14.0% higher pass rates, up to 2.10× wall-clock speedup and up to
+  35% lower API cost, with gains concentrated in dependency-heavy codebases.
+  **Baseline matched on: nothing in generation terms.** The comparison is against
+  sequential and parallel baselines at whatever budget each consumes, and cost is
+  reported as an outcome rather than held fixed. The entry earns its place for
+  the *conditional*: it is the only framework paper in this cluster that states
+  in advance when parallelism should be expected to fail, and it locates that
+  condition in the task's dependency structure. This paper locates a different
+  condition — the harness — in a task family where partitioning is not a
+  variable. The two are orthogonal, and a system meeting Co-Coder's cohesion
+  criterion can still post an artifactual gain if its arms are not
+  generation-matched.
+
 - **Why Do Multi-Agent LLM Systems Fail?** (Cemri, Pan, Yang, Agrawal, Chopra,
   Tiwari, Keutzer, Parameswaran, Klein, Ramchandran, Zaharia, Gonzalez, Stoica;
   NeurIPS 2025 Datasets and Benchmarks Track, arXiv:2503.13657) — a 14-mode
@@ -146,6 +167,28 @@ where the re-evaluations have already started arriving.
   turns given to one agent moved `fraction` **down** by 0.063 (*p* = 0.012). Two
   independent findings that additional self-directed turns are not free.
 
+- **The Illusion of Diminishing Returns: Measuring Long Horizon Execution in
+  LLMs** (Sinha, Arun, Goel, Staab, Geiping; ICLR 2026, arXiv:2509.09677,
+  submitted 11 September 2025, revised 13 March 2026) — separates *reasoning*
+  from *execution* on long-horizon tasks and reports that accuracy degrades with
+  task length through a **self-conditioning effect**: a model makes more mistakes
+  once its own prior errors are present in context. They distinguish this from
+  long-context degradation, and report that it is not fixed by supplying the
+  context differently, that larger models execute longer error-free sequences at
+  comparable single-turn accuracy, and that thinking mitigates it. **This supplies
+  the mechanism the paper currently lacks for its one reliable effect.** Giving a
+  single agent more turns moves `fraction` down by 0.063 (*p* = 0.012) on
+  scheduling, and §3 reports that without an explanation. Self-conditioning
+  predicts it directly: extra solo turns lengthen the run of the agent's own
+  output it must condition on, and a partially-wrong schedule sitting in context
+  is exactly the prior error their effect operates on. State the connection as a
+  hypothesis and label it as one — this project did not test whether the degraded
+  `solo_long` turns condition on their own earlier errors. The test is cheap and
+  concrete: strip the agent's prior turns from its context and re-run the arm. It
+  also implies an asymmetry worth naming, which their paper does not cover: a
+  team member conditions on a shared transcript carrying *other* agents' errors,
+  not only its own.
+
 - **Should we be going MAD? A Look at Multi-Agent Debate Strategies for LLMs**
   (Smit, Duckworth, Grinsztajn, Barrett, Pretorius; arXiv:2311.17371, 2023) —
   debate "does not reliably outperform other proposed prompting strategies, such
@@ -183,6 +226,12 @@ where the re-evaluations have already started arriving.
   image of this paper's measured 2.04× solo-to-team generation ratio — they find
   the team spending more, this paper finds the solo agent forced to spend more
   in one turn. Both are the same underlying fact: turn count is not token count.
+
+- **The Ringelmann Effect in Multi-Agent LLM Systems: A Scaling Law for Effective
+  Team Size** (Bertalanič, Fortuna; arXiv:2606.02646, submitted 31 May 2026;
+  41 pages, 9 figures, 20 tables) — the same authors' follow-up to *The Cost of
+  Consensus*, and the second near-scoop. **Treated in full in §7**; listed here
+  only so this cluster is not read as complete without it.
 
 - **Statistical Scouting Finds Debate-Safe but Not Debate-Useful Cases: A
   Matched-Ceiling Study of Open-Weight LLM Reasoning Protocols** (Hu, Shen,
@@ -429,6 +478,25 @@ uncited. Ordered by how directly each maps onto the paper's own move.
   evidence that "control the resource before crediting the architecture" is a
   live and general problem, not a quirk of one scheduling task.
 
+- **Towards a Science of Collective AI: LLM-based Multi-Agent Systems Need a
+  Transition from Blind Trial-and-Error to Rigorous Science** (Fan, Liu, Dang,
+  Li, Wang, Liu, Duan, Ding, Yao, Wu, Shi, Leung, Cheng, Wei, Yang, Qian, Liu,
+  Sun; arXiv:2602.05289, submitted 5 February 2026) — a position paper arguing
+  that LLM multi-agent research proceeds by trial and error because it lacks two
+  things: a structured taxonomy of design factors, and unified evaluation
+  metrics. It proposes a **collaboration gain metric** separating benefit
+  attributable to collaboration from benefit attributable to increased resource,
+  alongside a factor library organising the design space. **The field-level
+  statement of this paper's local finding, and it comes from the group behind
+  ChatDev and MetaGPT rather than from a critic** — which is why it is the right
+  citation for "the need is now conceded inside the multi-agent community." Their
+  metric is also the right abstraction for what the per-turn cap breaks: it
+  assumes the resource can be held equal across arms, and this paper demonstrates
+  that a resource specified identically for both arms is not thereby equal. A
+  collaboration gain computed on a per-episode budget will still score this
+  project's C5 arm as matched. The metric needs per-turn accounting to compute
+  what it claims to compute, and supplying that mechanism is this paper's part.
+
 - **Baselines Before Architecture: Evaluating Coding Agents for Autonomous
   Penetration Testing** (Dhakal, Neupane, Chaudhary; arXiv:2607.13085, 2026) —
   published autonomous-pentest systems change both harness and backbone at once,
@@ -455,6 +523,7 @@ arm it belongs to.
 | **AutoGen / Magentic-One** — AutoGenBench | Benchmark runner with repetition and isolation controls | Instrumentation exists; released *logs* do not, as far as could be verified. Would require re-running |
 | **AlpacaEval `results/`** — [`github.com/tatsu-lab/alpaca_eval`](https://github.com/tatsu-lab/alpaca_eval) | 228 model entries, each with `model_outputs.json`. `Together-MoA` and `SelfMoA_gemma-2-9b-it-SimPO` hold 805 records each against their own single-model baselines on a matched task set | **Added 2026-08-21, and now the best candidate.** The only source found with two arms on one task set and raw final generations released. ~7 MB over plain HTTPS, no clone, no auth. Yields the verbosity ratio only — no `finish_reason`, no token counts — so it bounds artifact 2 and says nothing about truncation. Detail in `docs/AUDIT-TARGETS.md` |
 | **Tran & Kiela** (arXiv:2604.02460) | No public code, data or transcript release could be verified from the abstract page | Cannot be audited from the outside as of 2026-08-20; worth an email |
+| **Bertalanič & Fortuna, Ringelmann** (arXiv:2606.02646) | 44 configurations across Qwen, Llama, Ministral and Gemini, with 20 tables; **whether transcripts or generation lengths are released was not verified — the abstract page was checked on 2026-08-22, the 41-page PDF and any linked repository were not** | **Unverified, and the highest-value target to resolve.** They have a single-agent arm and a multi-agent arm on one task set at 7–8B, which is the two-arm structure the audit needs and which MAST-Data lacks. If per-arm final-answer lengths are recoverable, this is a direct test of whether the artifact is live in their setup. Read the PDF's release statement before ranking it |
 
 **What the audit is looking for, stated so it is falsifiable:** in any released
 multi-agent corpus, the distribution of final-turn generation length in the
@@ -467,11 +536,18 @@ that is a publishable negative for the audit too.
 
 ## 7. Scooping check
 
-**Result: not scooped, but the paper has a close neighbour that it must cite and
-explicitly distinguish itself from, and one more that reports the same ratio at
-the same model scale.**
+**Result: not scooped, but the paper has *two* close neighbours that it must cite
+and explicitly distinguish itself from, and one more that reports the same ratio
+at the same model scale.**
 
-### The neighbour
+The two neighbours arrive at "multi-agent does not help" by different routes and
+neither by this one. Tran & Kiela get there by normalising compute; Bertalanič &
+Fortuna get there by measuring coordination overhead. This paper gets there by
+showing that a shared limit lands asymmetrically and manufactures an *apparent*
+advantage that was never real. All three should be led with, not defended
+against.
+
+### The first neighbour
 
 **Single-Agent LLMs Outperform Multi-Agent Systems on Multi-Hop Reasoning Under
 Equal Thinking Token Budgets** (Dat Tran, Douwe Kiela; arXiv:2604.02460,
@@ -527,7 +603,77 @@ with agreement — the confound is real and now independently reported — and c
 the mechanism, the diagnostics, and the truncation counts, which are this paper's
 and are not in Tran & Kiela.
 
-### The second-closest
+### The second neighbour
+
+**The Ringelmann Effect in Multi-Agent LLM Systems: A Scaling Law for Effective
+Team Size** (Blaž Bertalanič, Carolina Fortuna; arXiv:2606.02646, submitted
+31 May 2026, 41 pages). Verified on the arXiv abstract page and against the arXiv
+API record on 2026-08-22; title and author list are as printed here. From the
+abstract: a two-parameter scaling law for effective team size, fitted across 44
+configurations spanning open-weight models (Qwen, Llama, Ministral) and a
+frontier API (Gemini), sorting multi-agent scaling into three regimes — a hard
+ceiling, sublinear improvement, or linear gains. Two findings carry: 30 debating
+agents on MMLU-Hard produce no more answer diversity than a single agent, and the
+benefit attributed to debate comes from re-evaluation rather than from peer
+influence. They conclude that only architectural heterogeneity escapes the limit.
+
+**This reaches this paper's conclusion, and it must be cited alongside Tran &
+Kiela in the introduction rather than in Related Work.** "Thirty agents yield no
+more diversity than one" and "team size does not move the score across 899
+episodes" are the same finding at different scales, on different tasks, with
+different instruments. The overlap is real and should be stated as agreement
+first.
+
+**The separation is the mechanism, and it is genuinely different:**
+
+1. **Their gap is real; this paper's is apparent.** Bertalanič & Fortuna measure
+   coordination overhead *reducing* what a team achieves — a real performance
+   loss with a real cause, and their scaling law quantifies how it grows with
+   team size. This paper measures an instrument that *inflates* what a team
+   appears to achieve: the per-turn cap is symmetric by specification and
+   asymmetric in effect, so the team's score was never the team's. Removing their
+   overhead would raise a team's true score; removing this paper's artifact
+   lowers the team's *measured* score to where it always belonged. Both end at
+   "multi-agent does not help," from opposite sides of the measurement.
+
+2. **They explain a small gain; this paper explains a spurious one.** Their
+   result is compatible with a team genuinely outperforming a solo agent at small
+   *n* before overhead bites. This paper's four significant pro-team results were
+   not small-*n* wins eroded by overhead — all four traced to artifacts, and the
+   flat curve (0.579 / 0.574 / 0.576 across one, three and four agents) has no
+   regime structure to fit a scaling law to. The two accounts are compatible, not
+   competing: an artifact can manufacture an advantage in the same system where
+   coordination overhead is eroding a real one, and neither result rules the
+   other out.
+
+3. **Dose-response versus scaling law.** Both papers offer a quantitative curve,
+   and they are curves in different variables. Their law is over *team size*;
+   this paper's is over *budget* — the artifact's magnitude tracks the generation
+   the cap denies the solo arm, measured at 2.04× generation and 34% truncation
+   against the team's 8%, and it disappears when a separate `answer_max_tokens`
+   budget is given to the parsed turn. Their law does not predict that curve and
+   this paper's does not predict theirs.
+
+4. **They do not report the confound.** Their instrument is diversity and
+   accuracy against team size; final-answer truncation, per-turn budget
+   asymmetry, and the differential effect on the solo arm are not measured. If
+   the arms in their 44 configurations were not generation-matched per turn, this
+   paper's artifact is live inside their setup too — which is a reason to cite
+   them as convergent evidence and also a concrete audit target (§6).
+
+**Do not overstate the separation.** Their central claim and this paper's land in
+the same place, and a reader who takes "multi-agent does not help" as the
+headline will correctly see this as the second paper to say it. The novelty
+claim is narrower and must be stated narrowly: the per-turn mechanism, the
+truncation counts, the dose-response over budget, and the three diagnostics.
+
+**Note also that both neighbours in this section share authors with the entry
+below** — Bertalanič and Fortuna wrote *The Cost of Consensus* as well. Three of
+the closest prior results come from two groups, which is worth saying in the
+paper: this is a small and fast-moving literature, and independence between the
+citations should not be assumed.
+
+### The third-closest
 
 **The Cost of Consensus** (Bertalanič, Fortuna; arXiv:2605.00914, 2026) reports
 that debate "consumes 2.1–3.4× more tokens (up to 28,631 tokens per problem) than
@@ -559,10 +705,12 @@ the mechanism behind a reported multi-agent gain. Searches covered token/turn
 budget asymmetry, `max_tokens` truncation artifacts in agent evaluation,
 matched-compute multi-agent comparisons, and evaluation-artifact framings of
 multi-agent results. The prior work normalises *total* compute
-(Tran & Kiela), compares *cost* at fixed accuracy (Bertalanič & Fortuna;
-Smit et al.), or criticises *baseline strength and benchmark coverage*
-(Zhang et al.). None of them locates the failure in where inside an episode a
-symmetric limit binds. **That mechanism, and the three diagnostics, remain
+(Tran & Kiela), compares *cost* at fixed accuracy (Bertalanič & Fortuna 2605.00914;
+Smit et al.), models *coordination overhead against team size* (Bertalanič &
+Fortuna 2606.02646), criticises *baseline strength and benchmark coverage*
+(Zhang et al.), or asks for a *collaboration gain metric* without specifying how
+the resource is to be equalised (Fan et al.). None of them locates the failure in
+where inside an episode a symmetric limit binds. **That mechanism, and the three diagnostics, remain
 this paper's.**
 
 ---

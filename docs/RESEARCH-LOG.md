@@ -3492,6 +3492,87 @@ author's.
 
 ---
 
+### 4.26 The curve, the second task family, and a fourth artifact that turns out to be Llama's
+
+**2026-08-22.** Four arms measured in one day against three preregistrations
+written before any of them were scored. Two registered predictions failed.
+
+**The dose-response curve confirms the mechanism, hard.** Five caps, 200
+episodes each. The apparent team advantage runs +0.390, +0.100, +0.069, +0.026,
++0.043 as the answer budget goes 512 to 6144. The registered contrast wanted
+>= +0.10 and got **+0.347**. At a tight cap this instrument manufactures a team
+advantage larger than any real gain in the frameworks surveyed in RELATED.md,
+and the same instrument at a generous cap shows nothing. The artifact is a
+function of the cap, not a constant, which is what makes the diagnostic
+predictive rather than merely descriptive.
+
+One defect worth not smoothing: the solo/team verbosity ratio is not monotone in
+the cap (3.31, 4.08, 3.84, 4.89, 6.75). The advantage is monotone; the ratio is
+not. The figure has to show that.
+
+**The code family falsified the clause it was registered to test, and that is
+the better outcome.** C1 predicted the artifact would transfer as truncation:
+ratio > 1.5 and a truncation gap of at least 10 points. The ratio transferred
+(**1.78** on the answer turn). The truncation did not: **0.0% in both arms**. At
+3,072 tokens nothing is cut on this task, so the mechanism behind three of the
+four scheduling artifacts is simply absent here.
+
+And yet the arm still shows **+0.0783** favouring the team. All of it is the
+fourth artifact. Excluding unparseable answers the gap is **-0.0004** across 148
+and 132 episodes. So the class transfers and the member does not, which is a
+sharper claim than a clean replication would have given: what generalises is
+*symmetric-by-specification, asymmetric-in-effect*, not *the token cap*.
+
+**The power clause earned its place.** Section 4 registered that a materially
+larger realised sd meant reporting a bound rather than a null. Realised sd is
+0.29 to 0.37 against the assumed 0.15, MDE 0.094 to 0.121 against a registered
+margin of 0.05. So C2 is reported as a bound of 0.0585 and not as equivalence.
+Written afterwards that is an excuse; written beforehand it is a fact about how
+coarse a hidden-test-suite score is next to a fraction-of-constraints score.
+
+**C3 reversed.** solo_long beat solo by **+0.053** on code, against -0.063 on
+scheduling. Its malformed rate is half solo's, so part of the reversal is parser
+rather than reasoning. Not decomposed, not asserted.
+
+**The finding I did not expect: the fourth artifact belongs to Llama.**
+
+| arm | gap | malformed solo / team |
+|---|---|---|
+| Llama Q4 | +0.0813 | 16.8% / 0.0% |
+| Llama Q8_0 | +0.0535 | 12.1% / 0.7% |
+| Qwen2.5-7B | **-0.0059** | **0.0% / 0.0%** |
+
+PREREG-families section 6 named the parser as the likeliest way an arm would go
+uninterpretable, reasoning that it was written against Llama's conventions and
+Qwen had no reason to share them. The measurement inverts that: the parser does
+not penalise Qwen **at all**. It penalises Llama, and only in the single-agent
+arm. On Llama Q4, dropping malformed answers moves the gate from +0.0813 to
+**-0.0245** and the single agent finishes ahead.
+
+So section 4.24's artifact is not a property of answer parsing. It is an
+interaction between one parser's conventions and one model family's habits. That
+is worse for the field than a fixed bias, because a constant can be subtracted
+and this cannot, and because a single-model study cannot see it at all.
+
+**F1 confirmed on the way past:** Qwen's equivalence bound is **0.0288**, the
+tightest in the study. The null is not a Llama quirk even though the artifact is.
+
+**F2 is untested.** The interaction needs the f16 rung, cut when analysis rather
+than generation became the constraint. Q4 to Q8 moves the gap by -0.028, i.e.
+the wrong direction for PAPER-DRAFT section 9's worry, but one rung is not a
+difference of differences and it is recorded as untested rather than as
+reassurance.
+
+**Two other things this day produced.** Mistral was withdrawn: its chat template
+forbids a system role and requires alternating roles, so this study's briefs are
+not expressible in it, and running it would have confounded family with prompt
+assembly. And the literature check found a **second near-scoop** alongside Tran
+and Kiela, reaching the no-multi-agent-advantage conclusion by a third route.
+Both are in RELATED.md. Neither claims the artifact mechanism, which is what is
+left that is ours.
+
+---
+
 ## 9. State as of 2026-08-21
 
 The Final Sweep's fifteen Tier-1 items are addressed. What that does and does not
