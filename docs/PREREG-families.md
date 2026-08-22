@@ -13,6 +13,32 @@ averaged.** One of the four has already generated:
 | llama Q8_0 | not started | no |
 | llama f16 | not started | no |
 
+> **Amendment, 2026-08-22 16:16 — the mistral arm is withdrawn, and not for a
+> reason that a rerun fixes.** Preflight refused it four minutes after this
+> document was written: `Mistral-7B-Instruct-v0.3`'s chat template raises
+> `Conversation roles must alternate user/assistant/...` and supports no
+> `system` role. `orchestrator/episode.py` sends a system message and, in the
+> team arm, consecutive turns from the same role — so the study's brief
+> structure is not expressible in that template at all.
+>
+> **Running it anyway would have confounded family with prompt assembly.** The
+> fix is either to serve Mistral under a template it was not trained on, or to
+> rewrite message assembly for one family only. Both change the instrument in
+> exactly the arm meant to isolate the model, which is §4.1c's mistake with a
+> different label. The arm is dropped rather than repaired.
+>
+> **What is lost is small and should be stated as such.** F1 asks whether the
+> null is a Llama quirk; qwen answers it with a second family, and mistral was
+> always the more redundant of the two. What is gained is a real limitation:
+> **the study's multi-agent brief is not portable across chat templates**, which
+> constrains how any harness built this way can be run across model families —
+> and is worth a sentence in the paper's limitations rather than a silent gap in
+> a table.
+>
+> The preflight did its job: it cost one probe request instead of a card-night,
+> and `queue-tier1.sh` moved to the next arm rather than stopping, because the
+> arms answer unrelated questions.
+
 Nothing in any of the four has been scored. `queue-tier1.sh` prints
 `GATE IS READABLE` and computes nothing, so no mean, gate or truncation count
 from these arms has been seen by anyone. The qwen arm is therefore registered
