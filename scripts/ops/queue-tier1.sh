@@ -19,8 +19,8 @@
 #   3  mistral gate       3 h     moderate     the same question, second family;
 #                                              largely redundant with stage 2
 #   4  llama Q8_0 gate    4 h     low          no reviewer has asked this
-#   5  llama f16 gate     7.5 h   low          as above, and three times longer
-#   6  14B grid          15 h     conditional  longest item, and confounded
+#   5  llama f16 gate     7.5 h   low          REMOVED 2026-08-22, see below
+#   6  14B grid          15 h     conditional  REMOVED 2026-08-22, see below
 #
 # **Why the most valuable item is first rather than the shortest.** Ordering
 # purely by ETA would put the two 7B gates ahead of the code family and finish
@@ -30,6 +30,12 @@
 # having four gates and no second task family. Everything after stage 1 is
 # ascending ETA, so the cheap arms still land early and the two long ones cannot
 # block anything.
+#
+# **Stages 5 and 6 were removed on 2026-08-22 before either ran**, by decision
+# rather than failure; the reasoning is at the call sites near the bottom of
+# this file. Stages 1-4 all completed. The paragraph below is why the 14B sat
+# last in the first place, and is why it is the one to restore first if the
+# analysis finishes early.
 #
 # **Stage 6 is last on merit, not only on length.** The 14B changes scale and
 # model family in the same step -- Qwen2.5-14B against Llama-3.1-8B -- so it
@@ -208,11 +214,38 @@ run_arm "3/6 mistral 7B gate (1.2)" configs/llamacpp/medium-mistral.yaml \
 run_arm "4/6 llama Q8_0 gate (1.4)" configs/llamacpp/medium-q8.yaml \
         q8       18500 llama31-8b-q8-medium         gate || FAILED+=("llama Q8_0")
 
-run_arm "5/6 llama f16 gate (1.4)"  configs/llamacpp/medium-f16.yaml \
-        f16      21000 llama31-8b-f16-medium        gate || FAILED+=("llama f16")
-
-run_arm "6/6 14B grid (1.3)"        configs/llamacpp/medium-14b.yaml \
-        qwen-14b 20500 qwen25-14b-q4-medium         grid || FAILED+=("14B grid")
+# --- stages 5 and 6 removed 2026-08-22 21:00, by decision rather than failure -
+#
+# The card stopped being the bottleneck. Five corpora were on disk and unscored
+# -- the cap sweep, the code family, qwen, Q8_0 and the six restored corpora --
+# and a sixth and seventh would not have moved the paper closer to a submission
+# with seven days left. Analysis and writing became the constraint some hours
+# before this line was written.
+#
+# What was dropped, and what it would have bought:
+#
+#   f16 gate    8 h   Whether the null survives at full precision. No reviewer
+#                     has raised it and the paper already scopes itself to
+#                     4-bit. The weakest item on the whole list.
+#   14B grid   15 h   Whether 8B is simply too weak to collaborate. A real
+#                     objection -- and this arm answers it confoundedly, because
+#                     it moves scale and model family in the same step
+#                     (Qwen2.5-14B against Llama-3.1-8B). PREREG-14b.md
+#                     registers that confound. Fifteen hours plus a write-up for
+#                     an answer that arrives with an asterisk was the wrong
+#                     trade against the deadline.
+#
+# **Neither is abandoned.** Both configs, both sets of weights and both
+# preregistrations are intact, and `run_arm` resumes from disk, so restoring
+# either is uncommenting one call. If the analysis lands early, the 14B is the
+# one to bring back -- it is the only one of the two that can change what the
+# paper claims rather than widen it.
+#
+# run_arm "5/6 llama f16 gate (1.4)"  configs/llamacpp/medium-f16.yaml \
+#         f16      21000 llama31-8b-f16-medium        gate || FAILED+=("llama f16")
+#
+# run_arm "6/6 14B grid (1.3)"        configs/llamacpp/medium-14b.yaml \
+#         qwen-14b 20500 qwen25-14b-q4-medium         grid || FAILED+=("14B grid")
 
 # ---------------------------------------------------------------------------
 say ""
