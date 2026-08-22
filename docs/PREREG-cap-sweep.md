@@ -200,3 +200,41 @@ floor is the number a reader should trust least if it arrives unregistered.
 
 *Amendments below this line, dated, with the reason. Nothing above it is edited
 after registration.*
+
+---
+
+## Postscript — outcome, 2026-08-22
+
+All five rungs generated, 1,000 episodes, zero failures.
+
+| cap | answer chars solo/team | apparent team advantage | 95% CI | equivalence bound |
+|---|---|---|---|---|
+| 512 | 3.31 | **+0.390** | [+0.323, +0.456] | 0.446 |
+| 1024 | 4.08 | +0.100 | [+0.045, +0.156] | 0.147 |
+| 2048 | 3.84 | +0.069 | [+0.018, +0.123] | 0.115 |
+| 3072 | 4.89 | +0.026 | [-0.011, +0.064] | 0.057 |
+| 6144 | 6.75 | +0.043 | [-0.003, +0.091] | 0.082 |
+
+**Registered contrast: largest advantage at cap <= 1024 minus largest at cap
+>= 3072, threshold >= +0.10. Measured +0.347. Confirmed.**
+
+The three short-cap rungs each have an interval excluding zero; the two long-cap
+rungs do not. The registered pattern holds in full.
+
+**What the curve licenses that the on/off comparison did not.** The artifact is
+not a constant to subtract. It is a function of the cap, and at cap 512 it
+manufactures **+0.390** — an effect larger than any real multi-agent gain
+reported in the frameworks surveyed in `RELATED.md`. A reviewer asking "how much
+of a published advantage could this explain" now has an answer with a shape
+rather than an anecdote.
+
+**One honest defect in the curve.** The verbosity ratio is *not* monotone in the
+cap: 3.31, 4.08, 3.84, 4.89, 6.75, with the 1024 rung out of order. The
+*advantage* is monotone in the cap; the *ratio* is not. Any figure plotting
+advantage against ratio has to show this rather than smooth it, and the
+mechanism claim is properly stated as "advantage falls as the cap rises", with
+the ratio as evidence for why rather than as the x-axis.
+
+**Not registered and not claimed.** These rungs are `baseline` and `solo` only,
+so they say nothing about ablation, differentiation or fungibility. The sweep
+ran on one task family and one model.

@@ -127,3 +127,43 @@ Stated in advance so it cannot be argued afterwards:
   exactly this for code tasks.
 - A malformed rate above 30% in either arm, which would make the parser rather
   than the model the dominant term.
+
+---
+
+## Postscript — outcome, 2026-08-22
+
+Scored the day it was registered, in the order this document fixes: the §6
+interpretability gates and the §4 power check first, C1 second, C2 third.
+
+| clause | registered | measured | verdict |
+|---|---|---|---|
+| §6 floor | team > 0.15 | 0.7275 | interpretable |
+| §6 parser | malformed < 30% | solo 12.0%, team 1.3% | interpretable |
+| §4 power | sd 0.15, MDE 0.049 | **sd 0.29–0.37, MDE 0.094–0.121** | **underpowered** |
+| C1a | ratio > 1.5 | **1.78** | confirmed |
+| C1b | truncation gap >= 10 pp | **0 pp** | **falsified** |
+| C2 | equivalent at 0.05 | *p* = 0.0801, bound 0.0585 | **bound, not null** |
+| C3 | solo_long negative | **+0.053** | **falsified** |
+
+**C1b is the outcome this document named as most informative, and it happened.**
+The verbosity asymmetry transfers — the single agent still writes 1.78x more in
+its answer turn — but at a 3,072-token budget nothing is truncated in either
+arm. The cap did not bite on this task, so the mechanism that produced three of
+the four scheduling artifacts is absent here.
+
+**And yet the arm still shows a +0.0783 apparent team advantage, all of it the
+fourth artifact.** Excluding unparseable answers the gap is **-0.0004**. The
+class transfers; the member does not. That is a more interesting result than a
+clean replication would have been, and it is not the result this document
+predicted.
+
+**The power clause did its job.** §4 said in advance that a materially larger
+realised `sd` would mean reporting a bound rather than a null. The realised sd
+is 2 to 2.5x the assumed value, the MDE is above the registered margin, and the
+bound is what is reported. Written after the fact this would be an excuse;
+written before, it is a finding about how coarse a hidden-test-suite score is
+compared with a fraction-of-constraints score.
+
+**C3's reversal is unexplained and left that way.** `solo_long` has half the
+malformed rate of `solo` (6.0% against 12.0%), so some of +0.053 is parser
+rather than reasoning. The decomposition has not been run and is not asserted.

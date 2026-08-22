@@ -178,3 +178,57 @@ All fetched 2026-08-21.
 - [EMNLP 2026 Call for Main Conference Papers](https://2026.emnlp.org/calls/main_conference_papers/)
 - [COLM 2026 Key Dates](https://colmweb.org/dates.html)
 - [AI Workshop Tracker — NeurIPS 2026 workshop deadlines](https://aiworkshoptracker.com/conference/neurips/)
+
+---
+
+## Recommendation, 2026-08-22 — after the results landed
+
+**Updated because the evidence changed.** Three things happened after this memo
+was written: the cap sweep confirmed its registered contrast at **+0.347**, the
+code family produced a mixed result that is *more* interesting than a clean
+replication, and a **second near-scoop** appeared (Ringelmann, arXiv:2606.02646)
+alongside Tran & Kiela.
+
+### The pick: TAE workshop on 29 August, and ICLR 2027 on 25 September
+
+Both. They do not conflict, because the NeurIPS 2026 evaluation workshops are
+non-archival.
+
+**1. TAE (`Can We Trust AI Evaluation?`), 29 Aug 2026 — seven days.**
+The paper as it stands is on-topic by construction: it is an evaluation-validity
+result about a widely-used comparison. Submitting costs nothing archival and buys
+reviewed exposure plus a timestamp against two concurrent papers. The results in
+`RESULTS.md` are sufficient for the workshop length without the 14B or f16.
+
+**2. ICLR 2027, abstract 18 Sep / paper 25 Sep 2026 — the archival target.**
+Five weeks is enough to write the sweep and the code family properly, and — if
+wanted — to restore the 14B, which resumes from disk. 9 pages of main text, which
+the current draft exceeds by ~0.5 and which §5.3's pre-decided remedy fixes.
+
+**Not NeurIPS 2027 Evaluations & Datasets, despite the fit.** It is the
+best-fitting venue and roughly nine months out. With two concurrent papers
+already published on the neighbouring conclusion, a nine-month wait risks a third
+arriving on the *mechanism* itself. Post the arXiv preprint at the workshop
+deadline to establish priority, then submit archivally at ICLR.
+
+### Why the two near-scoops argue for going sooner, not later
+
+Tran & Kiela normalise a global compute budget; Ringelmann model coordination
+overhead. Both conclude multi-agent does not help. Neither explains **why the
+published literature keeps reporting that it does** — and that question is now
+open in a way it was not in July. This paper answers it: a per-turn cap,
+symmetric by specification, manufactures apparent advantage, and the curve says
+how much. That contribution is *more* valuable because of the scoops and *more*
+perishable for the same reason.
+
+### What must be true before submitting anywhere
+
+| | |
+|---|---|
+| Page limit | body is 9.5 against a 9-page limit; §5.3's remedy is pre-decided |
+| Title | `TITLE-OPTIONS.md`, author's call |
+| Results written up | `RESULTS.md` is the raw material; the prose is not drafted |
+| Corpus release | still unreleased, and the paper claims otherwise — §1.0.a |
+
+**The last row is the one that is also a correctness issue**, and it grew today:
+the study now rests on eleven corpora rather than six.
