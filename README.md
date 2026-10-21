@@ -1,34 +1,157 @@
 # CollabEngine-LLM
 
-**A framework for giving LLM agents no roles at all, then testing causally whether the division of labour they invent is functionally real.**
+**Give LLM agents no roles at all, then test causally whether the division of labour they invent is functionally real.**
 
-Several instances of the *same* open model share a task and a channel. Nobody is told to plan, criticise, or verify. If roles appear, the question is whether they are functionally real or a pattern being read into transcripts — and that is settled by ablation, not by reading.
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-439_·_no_GPU-brightgreen)](tests)
+[![Serving](https://img.shields.io/badge/serving-llama.cpp_·_vLLM_·_transformers-30A2FF)](configs)
+[![Pre-registered](https://img.shields.io/badge/pre--registered-7_documents-8A2BE2)](docs)
+[![Result](https://img.shields.io/badge/result-bounded_null-lightgrey)](docs/PAPER-DRAFT.md)
+[![Version](https://img.shields.io/badge/version-0.1.0-orange)](pyproject.toml)
 
-[Research design and phases](docs/PLAN.md) · [Full engineering and research log](docs/RESEARCH-LOG.md) · [What remains before submission](Final%20Sweep.md)
+Several instances of the *same* open model share a task and a channel. Nobody is
+told to plan, criticise or verify. If roles appear, the question is whether they
+are functionally real or a pattern being read into transcripts — and that is
+settled by ablation, not by reading.
+
+> **The claim under test.** Emergent role differentiation in same-model LLM agent
+> teams is behaviourally observable and statistically stable — but its
+> transcript-derived labels predict causal contribution only weakly.
+
+**The answer, at 8B on this task family: team size does nothing.** One agent
+scores 0.579, three agents 0.574, four agents 0.576 across 899 fresh-seed
+episodes, and equivalence tests exclude effects larger than one satisfied
+constraint. Every positive result along the way turned out to be an instrument
+artifact — and `collabengine audit` packages the diagnostic that found them.
 
 ---
 
-## The claim under test
+## Contents
 
-> Emergent role differentiation in same-model LLM agent teams is behaviourally observable and statistically stable — but its transcript-derived labels predict causal contribution only weakly.
-
-Either direction of that result is publishable, which is the mark of a well-posed experiment.
-
-**Two things separate this from prior work.**
-
-**Specialisation is a claim about *differential* contribution.** A scalar drop when you remove an agent proves only *participation* — remove any competent contributor from any team and output falls. The real signature is an **agent × task-component interaction**: ablating the emergent "critic" must damage criticism-loaded components more than planning-loaded ones. The analysis double-centres the ablation matrix to strip both main effects and reports what survives.
-
-**One model, many contexts, is the control.** Identical weights across every agent means observed differentiation cannot come from model heterogeneity. Prior observational work on unassigned roles used several different LLMs, leaving that confound open.
+| Section | |
+|---|---|
+| [What it does](#what-it-does) | The framework, by area |
+| [Architecture](#architecture) | Tasks, episodes, backends, ablation, analysis |
+| [How an episode runs](#how-an-episode-runs) | Shared channel, reshuffled order, one answer |
+| [Results](#results) | The gate, the matched budget, the ablation grid, the bounds |
+| [Quick start](#quick-start) | Install, self-test, run, audit |
+| [Project status](#project-status) | Phases, artifacts found, and what is left |
+| [Design decisions](#design-decisions) | Three confounds, and the instrument rule |
+| [Repository layout](#repository-layout) | Where things live |
+| [Documentation](#documentation) | Which file answers which question |
+| [Team](#team) | Who built it |
 
 ---
 
-## Current result: Phase 1 does not clear its own gate
+## What it does
 
-![Phase 1 gate](docs/figures/gate.png)
+| Area | Capabilities |
+|---|---|
+| **Tasks** | Constraint-satisfaction instances satisfiable by construction, graded per component; a second code task family |
+| **Episodes** | N copies of one model on a shared channel, speaking order reshuffled every round, symmetry breakers (name, seed, scratchpad) swept |
+| **Arms** | Team, solo, matched-budget solo under a group brief (C4) and a single-agent brief (C5), fixed-order control |
+| **Ablation** | `live`, `frozen_replay` and `frozen_excise`, plus capacity and random-message controls, with a propagation index |
+| **Analysis** | Double-centred interaction strength, diagonal dominance, fungibility, mixed-effects tests with episode as a random effect |
+| **Inference** | Holm and Benjamini–Hochberg across the registered family; TOST equivalence with a pre-registered margin |
+| **Observation** | Eight-action discourse coding by local or frontier judges, Cohen's κ, convergent validity |
+| **Backends** | `mock` (no GPU), in-process `transformers` with token-budget batching, OpenAI-compatible client for vLLM or llama.cpp |
+| **Audit** | `collabengine audit` — the verbosity, truncation and parse-failure accounting, for anyone's transcripts |
 
-Llama-3.1-8B-Instruct (Q4_K_M, served by llama.cpp) on constraint-satisfaction instances, **24 episodes per arm**, identical instances across arms, both arms from the same run.
+---
 
-**The gate has been measured twice: once on an instrument that truncated one arm's answer, and once on an instrument that does not.**
+## Architecture
+
+```mermaid
+graph TB
+    subgraph tasks["tasks/"]
+        GEN["instance generator<br/>(seed, difficulty) → instance"]
+        GRADE["per-component grading<br/>fraction · strict · components"]
+    end
+
+    subgraph run["orchestrator/ + runner/"]
+        EP["episode loop<br/>shared channel, reshuffled order"]
+        ARMS["arms: team · solo · C4 · C5 · fixed-order"]
+        RUN["bounded-concurrency runner<br/>resumable"]
+    end
+
+    subgraph backends["backends/"]
+        MOCK["mock"]
+        HF["hf_local<br/>token-budget batching"]
+        OAI["openai_compat<br/>llama.cpp · vLLM, preflight"]
+    end
+
+    subgraph abl["ablation/"]
+        LIVE["live"]
+        FR["frozen_replay"]
+        FX["frozen_excise"]
+    end
+
+    subgraph ana["analysis/"]
+        INT["interaction · dominance · fungibility"]
+        MIX["mixed effects · Holm/BH · TOST"]
+        COD["coding · κ · convergent"]
+        INTEG["integrity<br/>instrument vs team failures"]
+    end
+
+    TR[("transcripts/<br/>sharded JSONL")]
+
+    GEN --> EP
+    ARMS --> EP
+    RUN --> EP
+    EP <--> MOCK
+    EP <--> HF
+    EP <--> OAI
+    EP --> TR
+    TR --> LIVE
+    TR --> FR
+    TR --> FX
+    LIVE --> GRADE
+    FR --> GRADE
+    FX --> GRADE
+    GRADE --> INT --> MIX
+    TR --> COD
+    TR --> INTEG
+```
+
+Orchestration is **hand-written on purpose**: every mainstream agent framework
+ships role scaffolding in its prompt templates, which would silently plant the
+structure this project claims to observe emerging.
+
+---
+
+## How an episode runs
+
+```mermaid
+sequenceDiagram
+    participant T as Task
+    participant O as Orchestrator
+    participant A as Agents 1–4 (same weights)
+    participant B as Backend
+    participant G as Grader
+
+    T->>O: instance (seed, difficulty)
+    loop each round
+        O->>O: reshuffle speaking order
+        loop each agent in that order
+            O->>B: shared channel + agent's own context
+            B-->>A: turn (max_tokens 1024)
+        end
+    end
+    O->>B: final turn (answer_max_tokens 3072)
+    B-->>O: answer block
+    O->>G: parse and grade per component
+    G-->>O: fraction · strict · component scores
+    Note over O,G: ablation re-runs the same instance with one agent removed: live, frozen_replay or frozen_excise
+```
+
+---
+
+## Results
+
+### The Phase 1 gate does not clear
+
+Llama-3.1-8B-Instruct (Q4_K_M, llama.cpp) on constraint-satisfaction instances,
+24 episodes per arm, identical instances across arms.
 
 | | as scored, old instrument | *d* | **answer budget** | perm *p* | solo `cut@end` |
 |---|---|---|---|---|---|
@@ -36,258 +159,117 @@ Llama-3.1-8B-Instruct (Q4_K_M, served by llama.cpp) on constraint-satisfaction i
 | **hard** | **+0.249** | **+1.09** | **−0.026** | **0.500** | 10 → **1** |
 | **xhard** | **+0.188** | +0.75 | **+0.069** | **0.263** | 15 → **1** |
 
-**Both significant Phase 1 results were the token cap.** The gate is now non-significant at every operating point measured, largest |*d*| = 0.35, and at `hard` the gap is negative.
+![Phase 1 gate](docs/figures/gate.png)
 
-**The two arms did not use `max_tokens` the same way.** A solo episode is three turns and the last one carries the entire answer. A team episode is twelve and the last one commits an answer the transcript already contains. The same per-turn cap therefore landed on solo's answer and on the team's *summary* of one — identical, and not symmetric.
-
-The fix is not a larger cap everywhere, which would change the whole instrument. It is a separate budget for the one turn that gets parsed: `answer_max_tokens = 3072` on the final agent turn, `max_tokens` unchanged at 1024 elsewhere, and `max_model_len` cut so the slot geometry does not move. Then:
-
-| `hard` | solo mean | team mean | answer turn cut | malformed |
-|---|---|---|---|---|
-| old instrument | 0.342 | 0.591 | 10 / 1 | 11 / 0 |
-| **answer budget** | **0.581** | 0.555 | **1 / 1** | **1 / 1** |
-
-**The team's mean barely moved. Solo's rose by +0.239 — the whole of the original gap.** Nothing about the models or the task changed; the measurement had been reading its own cap.
-
-**The preregistered sensitivity analysis got this right from biased data.** It said the `hard` gap was +0.024 at *p* = 0.64 while the headline said +0.249 at *p* < 0.0001 — and the purpose-built instrument now says −0.026 at *p* = 0.500, on all 24 episodes rather than the 14 that survived filtering. A post-hoc filter is still post-hoc; this one was right.
+**Both significant Phase 1 results were the token cap.** A solo episode is three
+turns and the last one carries the entire answer; a team episode is twelve and
+the last one commits an answer the transcript already contains. The same
+per-turn cap landed on solo's answer and on the team's *summary* of one. A
+separate budget for the one turn that gets parsed — `answer_max_tokens = 3072`,
+`max_tokens` unchanged — moved solo's `hard` mean by +0.239, the whole of the
+original gap.
 
 ![Difficulty curve](docs/figures/curve.png)
 
-**The artifact grows with instance size, which is the shape the hypothesis predicts.** Harder instances need longer answers, so solo's one answer turn hits the cap more often while the team's summary turn does not. Answer-turn cuts run **7 / 10 / 15** across the three tiers for solo against **0 / 1 / 2** for the team; solo's per-turn truncation reaches 58% at `xhard` against the team's 22%. The controlled gaps show no trend at all: −0.023, +0.024, −0.056.
+The artifact grows with instance size, which is the shape the hypothesis
+predicts: **a difficulty curve read without this control is indistinguishable
+from the effect it was built to detect.** Every artifact removed has made the gap
+smaller, never once the other way.
 
-The preregistered hypothesis was a team advantage growing with instance size. The uncontrolled data showed exactly that, significantly, twice. **A difficulty curve read without this control is indistinguishable from the effect it was built to detect** — the artifact and the hypothesis have the same shape, because both scale with how much answer the instance needs.
+### Matched budget does not rescue the team
 
-The integrity filter that was supposed to catch this caught **1 of the 10** at `hard` — it excludes a malformed episode only when *every* turn was truncated, and solo's last turn is the only one that matters. Worse, at `xhard` it finally engaged on 7 solo episodes, which is why the old headline gap *falls* from +0.249 to +0.188 while the underlying artifact is at its largest. A partial correction applied unevenly across the independent variable is worse than none: the residual stops being a constant offset.
+The team spends ~2× the output tokens across 4× the forward passes, so two
+matched-budget arms give one agent the team's whole turn budget:
 
-The generalisable form: **an instrument limit applied identically to both arms is not a fair limit if the arms use the resource differently.**
-
-So the gate fails, and the reason to believe it is stronger than before: **every artifact removed has made the gap smaller, never once the other way.** On the bf16 instrument, recovering censored episodes at `hard` moved it +0.040 → +0.032. Controlling the answer-turn cap moved it −0.090, −0.225 and −0.244 at the three tiers. Rebuilding the instrument so the truncation does not happen moved `hard` from +0.249 to −0.026. Seven corrections, one direction.
-
-**What changed on 2026-08-13 is the kind of claim this rests on.** The rows above were a complete-case analysis: drop the truncated episodes and see what survives. That brackets rather than settles, because truncation is post-treatment — and it cost most of the solo arm at the hard end, with usable *n* falling 22 → 17 → 9. The answer-budget instrument makes that filter nearly idle rather than load-bearing: answer-turn truncation in the solo arm falls from 7 / 10 / 15 of 24 to 3 of 48, 1 of 24 and 1 of 24. It does not fall to zero — the first 24 `medium` episodes had none, and extending to 48 turned up three more, so the honest statement is *"reduced roughly five-fold"*, not *"eliminated"*. Full accounting in [RESEARCH-LOG §4.9–4.11](docs/RESEARCH-LOG.md) for the artifact and [§4.14–4.16](docs/RESEARCH-LOG.md) for the re-measurement.
-
-### The matched-budget control, and why it does not rescue the team either
-
-The gate compares 4 agents × 3 rounds against 1 agent × 3 rounds — which is not a matched comparison. The team spends roughly **2× the output tokens across 4× the forward passes**, so "four agents beat one" has never been separable from "more tokens beat fewer". The `solo_budget` arm gives one agent the team's whole turn budget (1 × 12 rounds, same per-turn cap) to separate them.
-
-Two matched-budget arms now exist, differing only in the brief the single agent receives:
-
-- **C4 `solo_budget`** — `TEAM_BRIEF`, the prompt written for a group. Told it has co-workers and that the group's last message is what gets scored, it restated its whole answer on 25–33% of consecutive turns.
-- **C5 `solo_long`** — `SOLO_BRIEF`, written for one agent. No phantom co-workers, no last-message-is-the-answer instruction, explicit licence not to restate.
-
-| team − 1 agent, `fraction` | under C4 `TEAM_BRIEF` | under **C5 `SOLO_BRIEF`** | the brief alone |
+| team − 1 agent, `fraction` | C4 `TEAM_BRIEF` | **C5 `SOLO_BRIEF`** | the brief alone |
 |---|---|---|---|
 | **medium** | +0.161 (*p* = **0.009**) | **+0.142 (*p* = 0.002)** | +0.019 (*p* = 0.762) |
 | **hard** | +0.102 (*p* = **0.038**) | +0.016 (*p* = 0.719) | +0.085 (*p* = 0.094) |
 | **xhard** | +0.150 (*p* = **0.022**) | +0.080 (*p* = 0.161) | +0.070 (*p* = 0.319) |
 
-**Under the brief written for a group, the team beats one agent at matched budget at three tiers out of three. Under a brief written for one agent, at one out of three.** Same corpus, same instrument, same budget, same model — the arms differ only in wording.
+A single-agent baseline needs a single-agent brief; a prompt that says "the
+others" measures the harness, not the model, in the direction that flatters the
+team. Re-measured on fresh seeds, the C5 contrast at `medium` falls to **+0.003**
+once answer-turn truncation is dropped — the third positive result to turn out
+to be the token cap.
 
-**This confirms the earlier reading at two tiers and contradicts it at one.** [§4.12](docs/RESEARCH-LOG.md) called the C4 margin an upper bound because the harness was degrading the baseline. At `hard` and `xhard` that was right. At `medium` it was wrong: the brief was fixed, the transcripts got measurably cleaner — truncation 40% → 22%, answer cuts 6 → 2, malformed 5 → 2 — and the score did not move.
+### The ablation grid: three consistent nulls
 
-> **A pattern at *n* = 24, not three results.** No individual brief contrast is significant. What keeps it from being dismissed: the direction is the same at both tiers where it is large, and the mechanism was predicted before C5 existed rather than found by inspection after. What keeps it from being asserted: `medium` shows nothing, and *n* = 24 cannot separate +0.07 from zero. **The n = 48 extension at `medium` and `hard` was run for exactly this reason, and it dissolved the pattern**: the brief contrast fell to +0.041 (*p* = 0.377) and +0.036 (*p* = 0.368), about +0.04 at both tiers, and the two-tier disagreement was *n* = 24 noise ([§4.16b–c](docs/RESEARCH-LOG.md)). Neither arm was preregistered — [PREREG-xhard](docs/PREREG-xhard.md) says so.
-
-**The design rule this produces is worth more than the effect size.** A single-agent baseline needs a single-agent brief. Running `n=1` through a prompt that says "you are one of 1 participants" and "the others" measures the harness, not the model — and it does so in the direction that flatters the team.
-
-[PLAN.md](docs/PLAN.md) made this a stop condition, so the ablation grid was held back: an agent × component interaction measured where the team contributes nothing would be measuring the noise floor.
-
-**The stop condition was cleared, the grid was piloted — and the pilot did not replicate.** The sequence is the result, so it is given in order.
-
-On the pilot corpus (seeds 0–47), removing one of four agents at `medium` cost **+0.055 [+0.023, +0.087]** over 192 live-ablation episodes ([§4.19](docs/RESEARCH-LOG.md)). Re-run on fresh seeds 1000–1149 with all four agents and 599 usable episodes, the same quantity is **+0.003 [−0.015, +0.021]** — no agent individually distinguishable from zero, one of them negative ([§4.22](docs/RESEARCH-LOG.md)).
-
-**The cause is identified rather than suspected.** The three-agent ablated arms reproduce across the two seed sets to within **0.002 over 791 episodes** (*p* = 0.905). Only the four-agent baseline moved, 0.631 → 0.577. The participation effect was the gap between a 48-episode baseline that drew high and ablated arms that had not moved at all.
-
-The agent × component interaction was already null on the pilot — chi2 = 3.73, *p* = 0.928, with a residual matrix holding *less* structure than a true null would produce. It is now null against a zero main effect, which is the weaker and more coherent statement.
-
-**So the result is three consistent nulls** — no participation, no specialization, no compensation. Fungibility, Δ(frozen_replay) − Δ(live), is **−0.005**: blocking compensation does not increase the damage either ([§4.20](docs/RESEARCH-LOG.md)). These are not three findings but one: a flat interaction and zero fungibility are what a zero main effect predicts. **At `medium`, on this model, removing one of four agents costs nothing measurable.**
-
-**The ablation grid is halted** at its own preregistered branch rule — H1, H1e, H3, H4, H5 and the remaining control arms are all expressed as drops from a baseline that H2 has shown will not carry them ([PREREG-phase3](docs/PREREG-phase3.md) Amendment 2). Two instrument defects found along the way are recorded rather than fixed-and-forgotten: `frozen_excise` is unusable here because agents restate (propagation 0.589, §4.18), and the capacity control only ever matches one of the four live cells it is quoted against (§4.20).
-
-**What caught this was the fresh-seed rule**, and it is worth being plain about what it caught: a headline finding, in a project that had already survived seven corrections, produced entirely by a 48-episode reference on an arm with `sd` ≈ 0.15.
-
-**`medium` itself was selected on that same corpus, so it was re-measured too** ([§4.23](docs/RESEARCH-LOG.md)). The gate goes +0.045 → **−0.003** (*p* = 0.865). C5 — the contrast that made `medium` the operating point — goes +0.126 → +0.060, and **+0.003 once answer-turn truncation is dropped**, because `solo_long` carries 34% truncation and 20 cut answers against the team's 8% and 4. That is the **third** positive result in this project to turn out to be the token cap, after `hard` at *d* = 1.09 (§4.10) and `medium` at §4.14.
-
-**On fresh seeds, one agent scores 0.579, three agents 0.574, four agents 0.576** — a spread of 0.005 across 899 episodes. Team size does nothing here. The only arm that differs is the one given *more turns*, and it differs downward: the same agent at 12 rounds instead of 3 scores 0.516, **−0.063 at *p* = 0.012**.
-
-So the result is the negative one, and it is worth stating in the form the evidence supports: **this task family rewards collaboration at no operating point measured — three tiers, two instruments, two seed sets, at 8B.** Everything that reproduced across seed sets is a null or a negative; everything that failed to reproduce was a positive measured against that 48-episode baseline.
+On the pilot corpus, removing one of four agents cost **+0.055** over 192
+episodes. On fresh seeds 1000–1149, with 599 usable episodes, it is **+0.003
+[−0.015, +0.021]**. The three-agent arms reproduce to within 0.002 over 791
+episodes; only a 48-episode baseline that drew high had moved. No participation,
+no specialisation (interaction χ² = 3.73, *p* = 0.928), no compensation. The grid
+was halted at its own pre-registered branch rule.
 
 ### The nulls are bounds, not absences
 
-Failing to reject H₀ is not evidence for H₀, and until now every claim above rested on exactly that. Equivalence testing (TOST, margin δ = 0.05 — one satisfied constraint, registered in [PREREG-equivalence](docs/PREREG-equivalence.md) before it was run) says what the data actually excludes:
+TOST at a margin of δ = 0.05 — one satisfied constraint, registered before it
+was run:
 
 | claim | difference | **excludes effects larger than** | at δ = 0.05 |
-|---|---|---|---|
+|---|---:|---:|---|
 | team (4 agents) − one agent, fresh `medium` | −0.003 | **0.032** | equivalent |
 | 4 agents − 3 agents | +0.002 | **0.025** | equivalent |
 | team − matched-budget solo (C5, truncation-corrected) | +0.003 | **0.032** | equivalent |
 | per-agent ablation drop | +0.003 | **0.026** | equivalent |
-| **fungibility Δ(frozen_replay) − Δ(live)** | −0.005 | **0.056** | **not equivalent** |
+| fungibility Δ(frozen_replay) − Δ(live) | −0.005 | **0.056** | **not equivalent** |
 
-**The first four are bounds tighter than one constraint** — the smallest difference this task can express. "Team size does nothing" is now a measurement rather than a failure to find one.
+"Team size does nothing" is a measurement, not a failure to find one. Fungibility
+is withdrawn to a bound: compensation of up to about 0.06 cannot be excluded.
 
-**The fifth is a correction to this file.** Fungibility is estimated on the 48-episode pilot, where the bound is 0.056, outside the margin. So the honest sentence is **"we cannot exclude compensation of up to about 0.06"**, not "survivors do not compensate". That claim was overstated here and in §4.20 and is withdrawn to a bound rather than defended.
+### A fourth artifact: the answer parser
 
-**And the same arithmetic condemns the finding that was already withdrawn.** The +0.055 participation effect carried an equivalence bound of 0.095 and an a-priori minimum detectable effect of **0.086** at *n* = 48 — larger than the effect it was used to claim. Detecting one constraint at this task's spread takes **142 episodes per arm**; every arm below that was unable to see what it was testing for, by construction rather than by bad luck.
+A rebuilt corpus showed a +0.081 team gap at *p* < 0.001. It is **25
+unparseable solo answers scored 0.000, against 0 in the team arm**; among
+well-formed episodes the single agent leads by 0.025. Qwen2.5-7B shows 0.0%
+malformed in both arms, so this is a model-by-parser interaction. Recorded, not
+fixed: changing the parser changes the instrument.
 
-### A fourth artifact, found by rebuilding the corpus from nothing
+### Phase 2 finds no role differentiation either
 
-The corpus behind every number above was deleted — `runs/` is gitignored, so nothing on disk or in git could regenerate it. It was rebuilt: same served build, same seeds 1000–1149, weights re-fetched from a single conversion so the precision ladder would be a ladder. **This re-measures rather than reproduces** — instances return identically from `(seed, difficulty)`, generations do not.
-
-Read naively, the rebuilt gate contradicts the headline:
-
-| | solo | team | gap | *d* | perm *p* |
-|---|---|---|---|---|---|
-| `fraction`, as scored | 0.525 | 0.606 | **+0.081** | +0.43 | **<0.001** |
-| `strict` | 0.183 | 0.187 | +0.003 | +0.02 | 0.849 |
-
-**It is 25 unparseable solo answers, each scored 0.000 and counted, against 0 in the team arm.**
-
-| | episodes | malformed | mean |
-|---|---|---|---|
-| solo | 149 | **25 (16.8%)** | 0.525 |
-| team | 150 | **0** | 0.606 |
-| **solo, well-formed only** | 124 | — | **0.631** |
-| **team, well-formed only** | 150 | — | 0.606 |
-
-Among episodes where both arms produced a parseable answer, **the single agent leads by 0.025**. The null reproduces; the naive reading does not.
-
-One episode is the whole argument. `solo:medium:1013` stopped normally and emitted a complete sixteen-job assignment — `J1 -> W2`, `J2 -> W4`, all of them — in prose rather than in the required block. **A solved instance, scored as a total loss.** The team arm is structurally protected: `TEAM_BRIEF` tells the agent the group's last message is what gets scored, so its final turn is written *as* a submission.
-
-This is the same class as the other three: **a convention identical in specification that lands on one arm only, in the direction that flatters the team.** First the per-turn token cap, then the matched-budget arm's truncation, now the answer-format parser. The integrity filter excluded **1** of 149 and the truncation sensitivity row drops **7** — neither is the 25, because both treat an unparseable answer as a team failure rather than an instrument failure. Full account in [RESEARCH-LOG §4.24](docs/RESEARCH-LOG.md).
-
-It is recorded rather than fixed. Changing the parser changes the instrument, and that belongs in a run where it is the only thing that changes.
-
-**Phase 2 finds no role differentiation either.** 468 messages coded against an eight-action taxonomy: agents within an episode differ no more in what they do than shuffling the labels among them produces (*p* = 0.45), and no agent identity carries a stable tendency across episodes (*p* = 1.00). The one robust behavioural result is between conditions rather than within teams — **teams generate and lone agents audit**: propose as a share of propose+verify is 0.674 for teams against 0.403 for solo, *p* < 0.0001.
-
-That null was defended with an instrument check: the local 8B coder agreed with a stronger blind rater at **κ = 0.68 [0.50, 0.85]**. Both raters were Google models, and the log always flagged their agreement as an upper bound.
-
-**A human rater puts the current judge at κ = 0.072 [−0.03, 0.19], 8/40 agreement.** I coded 40 messages by reading them, before any judge label for that corpus existed; the judge then coded the same 40 through the pipeline's own path. It assigned `organize` to 17 of 40 — a label defined as *"divides up the work"*, on a task that **is** dividing work among workers, so it reads the content rather than the discourse act. That is a defect in the taxonomy, not only in the judge. Dropping those 17 leaves κ = 0.111; remapping them charitably makes it negative.
-
-This does not overturn the Phase 2 null, which was coded by a different judge (Qwen3-8B) that did not show this failure. It does mean two things: model-vs-model κ is structurally blind to two models sharing a misreading, and Phase 2's judge can now **never** be validated against a human, because the corpus it coded was deleted. See [RESEARCH-LOG §4.13](docs/RESEARCH-LOG.md).
-
-**Three claims were withdrawn along the way** and are documented rather than quietly dropped — a `medium` comparison whose team arm had two thirds of its turns empty, a variance effect present in one team arm but not the other two, and a *d* = 0.92 feasibility result that evaporated when three OOM-dropped episodes were regenerated (the episodes the card could not finish were longer and scored 0/3, so losing them flattered the team). See [RESEARCH-LOG §4.1](docs/RESEARCH-LOG.md).
-
-The variance claim is worth one more line, because it came back. On the served `medium` corpus solo's spread is 0.281 against the team's 0.107 at *p* = 0.040 — the retracted finding, apparently replicated on a new model, a new instrument and equal arms. Controlling for answer-turn truncation returns *p* = 0.430. Solo's excess variance was its four zeros, and its four zeros were the cap.
+468 messages coded against an eight-action taxonomy: agents within an episode
+differ no more than shuffled labels (*p* = 0.45), and no identity carries a
+stable tendency (*p* = 1.00). The one robust behavioural result is between
+conditions — **teams generate and lone agents audit** (propose share 0.674 vs
+0.403, *p* < 0.0001). A human rater puts the current judge at **κ = 0.072**,
+exposing an `organize` label that reads task content rather than the discourse
+act; model-vs-model κ is blind to two models sharing a misreading.
 
 ---
 
-## Install
+## Quick start
+
+> No GPU is needed for anything in steps 1–2 or step 4. The mock backend runs the
+> whole pipeline end to end.
 
 ```bash
-pip install -r requirements.lock.txt      # the exact stack the corpus came from
+# 1 — install the exact stack the corpus came from
+pip install -r requirements.lock.txt
 pip install -e ".[dev,analysis]" --no-deps
-pytest -q          # 439 tests, seconds, no GPU
-```
+pytest -q                                   # 439 tests, seconds
 
-`pyproject.toml` keeps `>=` floors, which is right for a library and wrong for a result; [`requirements.lock.txt`](requirements.lock.txt) is what a reproduction should install. The serving build, the weight checksums and what is deliberately *not* pinned are in [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md); `scripts/ops/env_stamp.py` writes all of it into `env.json` beside every run. A container is in [`Dockerfile`](Dockerfile) — it reproduces the analysis exactly and the generation approximately, and says so in its own header.
-
-Python 3.10+. `dev` brings the test suite, `analysis` brings pandas and statsmodels for the mixed-effects test; the module that needs them imports lazily and says so if they are missing.
-
-**No GPU is required for any of the above.** The mock backend runs the whole pipeline end to end, which is what makes the validation below free. Real runs additionally want `torch` with CUDA and `transformers`, deliberately undeclared so a laptop checkout stays small.
-
-## Validate the instrument before trusting it
-
-```bash
+# 2 — validate the instrument before trusting it
 collabengine selftest
+
+# 3 — run against a real model (one 24 GB card)
+collabengine pipeline --config configs/hf-local/hard.yaml --auto-difficulty
+collabengine analyze  --config configs/hf-local/hard.yaml
+#     or the served 4-bit instrument the results come from
+scripts/ops/serve.sh --detach
+python scripts/ops/preflight.py --config configs/llamacpp/xhard.yaml
+scripts/experiments/served-run.sh
+python scripts/analysis/gate_report.py      # every gate number in this README
+
+# 4 — audit someone else's transcripts
+collabengine audit path/to/transcripts.jsonl --threshold 2.0 --json
 ```
 
 ![Instrument validation](docs/figures/selftest.png)
 
-Three worlds whose answer is known in advance — genuinely specialised agents, wholly undifferentiated ones, and agents whose behaviour tracks turn slot rather than identity. Dominance separates the specialised world from the other two but *cannot* separate positional from null, because both put ownership at chance by construction, and chance is `1/n_agents`, not zero. Interaction strength is what distinguishes those two.
-
-A pipeline that reports specialisation in the null world is manufacturing its result. Catching that here costs seconds; catching it after a rented GPU run costs the study.
-
-## Run against a real model
-
-```bash
-collabengine pipeline --config configs/hf-local/hard.yaml --auto-difficulty
-collabengine analyze  --config configs/hf-local/hard.yaml
-```
-
-`pipeline` calibrates, picks the operating point, then runs baseline, the symmetry sweep, the fixed-order control and the ablation grid in one process — weights load once, the phases share a work queue so the batcher never drains, and no phase waits on a human to read a table. The individual steps (`calibrate`, `baseline`, `ablate`) still exist on their own. Runs resume, and resume is covered by a test asserting planned and recorded episode ids match, because they once did not and every restart silently re-ran the entire grid.
-
-The whole study fits on one 24 GB card — an RTX 4500 Ada here, serving one model to every agent. Two backends exist: an in-process `transformers` path that supplies its own token-budget batching (vLLM has no supported Windows build), and an OpenAI-compatible client pointed at a local server. **The results above come from the served path**; `configs/vllm/qwen3-8b.yaml` reaches vLLM on WSL2 or a rented Linux box with only `backend.kind` changed.
-
-**The in-process path cannot run the largest tier, and the reason is not a tuning knob.** A bf16 prefill materialises a logits distribution for every prompt position over a 151,936-entry vocabulary, at 1–1.5 MB per prompt token on top of 15.3 GiB of resident weights; `xhard` prompts start near 5,200 tokens. The tier runs instead against a llama.cpp server holding a 4-bit GGUF, where prefill is chunked into `-ub`-sized micro-batches and logits are materialised only for the sampled position — the vocabulary size stops mattering, which is the actual fix. Weights drop to ~4.6 GiB and the whole difficulty curve moves onto that instrument together, because a curve with one point measured elsewhere measures the instrument. See [`docs/LLAMACPP-SETUP.md`](docs/LLAMACPP-SETUP.md) for the memory arithmetic and [PREREG Amendment 2](docs/PREREG-xhard.md) for what the change costs.
-
-```bash
-scripts/ops/serve.sh --detach                                         # llama-server
-python scripts/ops/preflight.py --config configs/llamacpp/xhard.yaml  # a minute
-scripts/experiments/served-run.sh    # all three tiers, preflight-gated, resumable
-scripts/experiments/budget-run.sh    # the C4 matched-budget arm (costs a team arm each)
-python scripts/analysis/gate_report.py   # every gate number in this README
-```
-
-`preflight` is not a formality. Three corpora in this project were lost to conditions that were true before the first episode ran and detectable in seconds — an undersized slot, a server holding different weights, a card already full. It checks all three in about a minute. It is also where §3.12 lives: its slot check silently did nothing for every served run until the day it was found asking `/v1/props` of a server that serves `/props`.
-
-Preflight is not ceremony. Three corpora here were lost to conditions true before the first episode ran: a context ceiling nothing checked, and — new to a served backend — a server quietly holding weights other than the ones the config names, which breaks the identical-weights control while leaving every score plausible.
-
-### The one performance fact worth knowing up front
-
-![Throughput sweep](docs/figures/throughput.png)
-
-**Windows does not raise OOM as allocations approach the card — it pages to host memory over PCIe and keeps reporting 100% GPU utilisation.** The batch-48 collapse above is invisible in `nvidia-smi` and looks exactly like a healthy run; the tells are power draw well under the cap and sustained PCIe traffic under a pure decode workload.
-
-The remedy is a hard cap rather than a better budget. `memory_fraction` calls `set_per_process_memory_fraction`, converting silent paging into an ordinary OOM the batcher recovers from by halving. Tuning `max_batch_tokens` only makes paging less likely — three successive budgets here all looked plausible and all paged. Batches are bounded by **tokens, not request count**, and the budget must include `max_tokens`, since generation extends every sequence in the chunk.
-
-The remaining inefficiency is structural: a chunk runs until its longest member stops, so ~40% of decode steps generate padding for finished sequences. Continuous batching is the fix and the main reason to prefer vLLM (~3–5× here) where a build exists.
-
-> On a shared machine, check *free VRAM* rather than your own processes before starting — `scripts/ops/queue-judge.sh` does this and waits. Two 15 GiB models on one 24 GB card do not fail, they page. ([§3.9](docs/RESEARCH-LOG.md))
-
-### The observational half
-
-```bash
-collabengine code     --config configs/hf-local/hard.yaml --judge self --judge-name local8b
-collabengine code     --config configs/hf-local/hard.yaml --judge gemini --judge-name gemini3 \
-                      --judge-model gemini-3-flash-preview --condition baseline --limit 1
-collabengine kappa    runs/<name>/codes.local8b.jsonl runs/<name>/codes.gemini3.jsonl
-collabengine converge --config configs/hf-local/hard.yaml --codes runs/<name>/codes.local8b.jsonl
-```
-
-[PLAN.md](docs/PLAN.md) specifies a frontier API judge, because a local 7–8B is not a reliable coder. Frontier judges are supported (`--judge anthropic`, `--judge gemini`), and a judge only ever reads finished transcripts — using one to *produce* agent turns would destroy the one-model control the design rests on.
-
-Without a paid key the free tiers do not stretch to a corpus: Gemini's free quota is metered **per day**, at 20 requests per model — fewer than one episode. So the free path codes everything locally (replies are ~8 tokens; batched on the same card it is minutes) and spends the daily frontier quota on a *subsample*, reporting Cohen's κ between the two. That does not make the local judge as good as a paid one; it measures how good it is, which is what κ is for. A value far below the 0.78 of the prior-art paper means Phase 4's correlation is not trustworthy on those labels — a result, not a hidden weakness.
-
-Coding checkpoints per episode and **aborts** after consecutive judge failures rather than continuing, because a dead judge labels every remaining message `other`, and a file of `other` is indistinguishable from real data once written.
-
----
-
-## What the analysis reports
-
-| Quantity | What it answers |
-|---|---|
-| **Interaction strength** | RMS of the double-centred drops. Zero when ablation is purely additive — no specialisation, only participation. |
-| **Diagonal dominance** | Of all the agents you could remove, does the one the transcript calls a component's owner hurt it most? Scored against chance, `1/n_agents`. |
-| **Per-mode drops and fungibility** | `Δ(frozen_replay) − Δ(live)`. Near zero means the contribution was irreplaceable; large means the role was real but anyone could have filled it. |
-| **Mixed-effects interaction** | Whether the interaction survives significance testing with episode as a random effect. |
-
-The random effect is not decoration. The same instance is played by the un-ablated team and every ablated variant, so a hard instance drags all its rows down together; treating them as independent shrinks the standard errors and manufactures significance. The test is joint across all interaction coefficients — with four agents and four components there are nine, so scanning for the smallest *p* would find one under 0.05 essentially every time under a true null.
-
-## Three confounds, handled in the design
-
-**Compensation.** Remove an agent and the survivors reorganise to absorb its function, masking the specialisation you are measuring. Ablation runs three ways: `live` (compensation allowed), `frozen_replay` (regenerate surviving turns on the recorded schedule), and `frozen_excise` (delete the messages, re-read the answer, zero model calls).
-
-> **Measured caveat.** Excision was *expected* to give the largest drop, since it blocks compensation entirely. It gives nearly the smallest — ~0.002 against live drops of 0.03–0.23. Agents restate the whole working answer every turn, so a contribution is copied into everyone else's messages as soon as it is made. `ablation.propagation_index()` detects this and decides which frozen mode to trust.
-
-**Position vs. identity.** Roles may attach to turn order rather than agent identity — protocol, not specialisation. Speaking order is reshuffled every round, which drives a purely positional world to chance while leaving identity-bound roles untouched. Under a *fixed* order that same world scores 0.50 against a 0.25 baseline: enough to be mistaken for the real thing.
-
-**Symmetry breaking is the independent variable.** Identical model, prompt and context produce identical output, and nothing can specialise. What breaks the tie — name, seed, private scratchpad — is swept rather than fixed and forgotten. The question is whether *minimal* asymmetry amplifies into stable roles.
-
-> **Caveat under in-process batching.** `generate` samples from one global RNG per batch, so per-agent seeds do not produce independent streams the way vLLM's per-request seeds do. Rows still sample independently, but `name_only` and `name_seed` stop being distinguishable on this backend. Reproducing one episode bit-for-bit needs `max_batch_size: 1`; the analysis is unaffected, since transcripts are re-read rather than regenerated.
-
----
-
-## `collabengine audit` — run the diagnostic on someone else's transcripts
-
-Everything above is about one harness. The artifact it found is not.
-
-Any comparison that gives a team and a solo baseline the same per-turn token cap, the same turn count, and the same answer format inherits the same failure mode: the cap is identical in specification and unequal in effect, because it binds as a function of how much an arm writes — and how much an arm writes is usually the behaviour under study. Here that produced a spurious team advantage three times over, and a fourth time through the answer parser, where 25 of 149 solo episodes scored 0.000 on text the model had actually produced against 0 of 150 team episodes ([RESEARCH-LOG §4.24](docs/RESEARCH-LOG.md)).
-
-`audit` is that accounting, packaged for transcripts this project did not generate. It needs no config, no GPU, and no part of this corpus.
-
-```bash
-collabengine audit path/to/transcripts.jsonl
-collabengine audit path/to/transcripts.jsonl --threshold 2.0 --json
-```
+`selftest` runs three worlds whose answer is known in advance — specialised,
+undifferentiated, and positional. A pipeline that reports specialisation in the
+null world is manufacturing its result; catching that costs seconds.
 
 ```
 arm                   eps  turns   chars/ep   tok/ep   trunc  cut@end  malformed
@@ -296,61 +278,125 @@ solo                   12    144     24,000    6,000       3        3          3
 team                   12    144     12,000    3,000       0        0          0
 
 verbosity ratio: 2.00x  (solo over team, generated characters per episode)
-FLAG: above the 1.50x threshold. If both arms ran under the same per-turn
-generation cap, that cap did not fall on them equally -- it binds on solo first,
-and the truncation and parse failures that follow are charged to solo's score
-rather than to the instrument.
+FLAG: above the 1.50x threshold.
 ```
 
-It reports, per arm: generated characters per episode (and tokens where the corpus carries them), the ratio between arms, truncated turns, **answer-turn cuts** — episodes whose final, answer-bearing turn hit the cap — and unparseable answers. The flag fires above a ratio threshold of 1.5 by default, chosen because it sits below the 1.87 at which the artifact was measured to distort a headline here.
-
-**The input schema is small and documented in [docs/AUDIT-SCHEMA.md](docs/AUDIT-SCHEMA.md).** Three required fields — an `arm` label, a list of `turns`, and each turn's generated `text` — get you the verbosity ratio. `finish_reason`, `tokens` and `answer_parsed` each buy one further quantity. JSONL, JSON, or a directory of either.
-
-**A missing field is never read as a zero.** An arm that does not record `finish_reason` on every generated turn gets `n/a` in the truncation columns and a line naming what could not be computed, rather than a clean-looking `0`. Reporting the least instrumented system as the cleanest one is the exact mistake this tool exists to catch.
-
-**A clean audit is a result.** When the arms generate within the threshold of each other the report says so explicitly, bounded by its own sensitivity, and exits 0 — the same exit code as a flagged corpus. The tool reports whether the audit ran, not what it found; making a finding an error would give anyone auditing their own system a reason not to run it.
+`audit` needs three fields — `arm`, `turns`, each turn's `text`
+([AUDIT-SCHEMA.md](docs/AUDIT-SCHEMA.md)). A missing field is never read as a zero,
+and a clean audit exits 0 just like a flagged one.
 
 ---
 
-## Layout
+## Project status
 
-```
-src/collabengine/     the package — the whole experiment runs out of here
-configs/              one file per operating point, grouped by backend
-  hf-local/           in-process `transformers` on CUDA (Qwen3-8B, bf16)
-  llamacpp/           served 4-bit GGUF (Llama-3.1-8B) — where the results come from
-  vllm/               the same experiment against WSL2 or a rented Linux box
-  mock.yaml           no GPU, no server, whole pipeline end to end
-scripts/
-  experiments/        generate a corpus — the scripts that cost GPU hours
-  ops/                serve, guard, wait for the card, preflight before spending it
-  analysis/           read a corpus and report — `gate_report.py`, `figures.py`
-docs/
-  PLAN.md             the research design and its phases
-  RESEARCH-LOG.md     the full record, including everything that failed
-  PREREG-*.md         predictions registered before the episodes existed
-  LLAMACPP-SETUP.md   serving arithmetic for the 4-bit instrument
-  figures/            the PNGs above, regenerated by `scripts/analysis/figures.py`
-  data/               hand-coded label samples and the codebook sweep output
-tests/                439 tests, seconds, no GPU
-Final Sweep.md        every gap between this corpus and a submission, with status
-```
+**The science is done and the result is the bounded negative one**
+([PAPER-DRAFT.md](docs/PAPER-DRAFT.md)). What is left is breadth and packaging,
+tracked item by item in [Final Sweep.md](Final%20Sweep.md).
 
-Inside the package:
-
-| Path | What |
+| Item | Status |
 |---|---|
-| `tasks/` | Instance generation (satisfiable by construction), per-component grading, prompt rendering |
-| `orchestrator/` | Episode loop, team composition, turn scheduling |
-| `backends/` | `mock` (no GPU), `hf_local` (in-process CUDA, token-budget batching), `openai_compat` (vLLM or llama.cpp, with preflight and context-overflow labelling), plus the `anthropic` / `gemini` judges |
-| `ablation/` | Live, frozen-replay, frozen-excise, plus capacity and random-message controls |
-| `analysis/` | `interaction`, `mixed`, `coding`, `convergent`, `integrity` (instrument failures vs team failures), `scoring` (three metrics, re-scorable offline) |
-| `runner/` | Bounded-concurrency execution with resume |
-| `transcripts/` | JSONL episode records, sharded for parallel writers |
-| `scripts/analysis/figures.py` | Regenerates every figure above from the corpus |
-| `scripts/ops/preflight.py` | Refuses a served run whose slot is too small or whose server holds the wrong weights, before the night is spent |
-| `docs/RESEARCH-LOG.md` | Full record: every failure, pivot and measurement, with what each cost |
-| `docs/PREREG-xhard.md` | A preregistered prediction, its two amendments, and why the tier had to change instrument to run at all |
-| `docs/LLAMACPP-SETUP.md` | Serving arithmetic: KV per token, the `--parallel` trap, and why `-ub` is the fix |
+| Phase 1 gate — team vs solo across three tiers | ✅ measured, non-significant on the answer-budget instrument |
+| Matched-budget controls (C4, C5) | ✅ measured; the brief effect dissolved at *n* = 48 |
+| Phase 3 ablation grid | ✅ piloted, re-measured on fresh seeds, halted at its pre-registered branch rule |
+| Phase 2 observational coding | ✅ null; judge validated against a human, taxonomy defect recorded |
+| Second task family (code) | ✅ 1,050 episodes; the fourth artifact transfers, the gap does not (−0.0004) |
+| Second model family | ✅ Qwen2.5-7B, 450 episodes, bound 0.0288; Mistral withdrawn — its chat template cannot express the briefs |
+| Multiple comparisons · TOST | ✅ Holm + BH and equivalence bounds, printed by `gate_report.py` |
+| Precision control | ⚠️ Q8_0 measured; the registered interaction needs a second rung |
+| 14B run | ❌ built and pre-registered, cut by decision on 2026-08-22 |
 
-**Orchestration is hand-written on purpose.** Every mainstream agent framework ships role scaffolding in its prompt templates, which would silently plant the structure this project claims to observe emerging.
+**Withdrawn claims are documented, not dropped** — a `medium` comparison with
+two thirds of its turns empty, a variance effect present in one arm, and a
+*d* = 0.92 feasibility result that evaporated when three OOM-dropped episodes
+were regenerated ([RESEARCH-LOG §4.1](docs/RESEARCH-LOG.md)).
+
+---
+
+## Design decisions
+
+**Specialisation is a claim about differential contribution.** Removing any
+competent agent lowers output, which proves only participation. The signature
+is an **agent × task-component interaction**, so the ablation matrix is
+double-centred to strip both main effects.
+
+**One model, many contexts, is the control.** Identical weights across every
+agent mean observed differentiation cannot come from model heterogeneity — the
+confound prior observational work left open.
+
+**Compensation is measured three ways.** `live` lets survivors reorganise,
+`frozen_replay` regenerates them on the recorded schedule, `frozen_excise`
+deletes messages with zero model calls. Agents restate the whole working answer
+every turn, so excision gives nearly the smallest drop; `propagation_index()`
+decides which frozen mode to trust.
+
+**Position is not identity.** Speaking order is reshuffled every round; under a
+fixed order a purely positional world scores 0.50 against a 0.25 baseline —
+enough to be mistaken for the real thing.
+
+**An identical limit is not a fair limit if the arms use it differently.** The
+per-turn cap, the matched-budget truncation and the answer parser were each
+identical in specification and unequal in effect, always in the direction that
+flatters the team. That rule is what `audit` checks.
+
+**Preflight before spending the card.** Three corpora were lost to conditions
+detectable in seconds — an undersized slot, a server holding different weights,
+a full card. `preflight.py` checks all three. On Windows, `memory_fraction`
+turns silent PCIe paging into an ordinary OOM the batcher recovers from.
+
+**The in-process path cannot run `xhard`.** A bf16 prefill materialises logits
+over a 151,936-entry vocabulary at every prompt position; the tier runs on a
+4-bit llama.cpp server instead, and the whole difficulty curve moved with it
+([LLAMACPP-SETUP.md](docs/LLAMACPP-SETUP.md)).
+
+---
+
+## Repository layout
+
+```
+.
+├── src/collabengine/
+│   ├── tasks/          instance generation, per-component grading, prompt rendering
+│   ├── orchestrator/   episode loop, team composition, turn scheduling
+│   ├── backends/       mock, hf_local, openai_compat, plus anthropic / gemini judges
+│   ├── ablation/       live, frozen_replay, frozen_excise, capacity and random-message controls
+│   ├── analysis/       interaction, mixed effects, inference, coding, convergent, integrity, scoring
+│   ├── runner/         bounded-concurrency execution with resume
+│   └── transcripts/    JSONL episode records, sharded for parallel writers
+├── configs/            hf-local (Qwen3-8B bf16), llamacpp (Llama-3.1-8B Q4), vllm, mock.yaml
+├── scripts/
+│   ├── experiments/    the scripts that cost GPU hours
+│   ├── ops/            serve, guard, wait for the card, preflight
+│   └── analysis/       gate_report.py, figures.py
+├── tests/              439 tests, seconds, no GPU
+└── docs/               plan, research log, pre-registrations, results, paper draft, figures
+```
+
+---
+
+## Documentation
+
+| Question | File |
+|---|---|
+| *What is the research design?* | [docs/PLAN.md](docs/PLAN.md) |
+| *What happened, including every failure?* | [docs/RESEARCH-LOG.md](docs/RESEARCH-LOG.md) |
+| *What was predicted before the episodes existed?* | [docs/PREREG-xhard.md](docs/PREREG-xhard.md) · [PREREG-phase3.md](docs/PREREG-phase3.md) · [PREREG-equivalence.md](docs/PREREG-equivalence.md) · [PREREG-families.md](docs/PREREG-families.md) · [PREREG-code.md](docs/PREREG-code.md) |
+| *What are the results, in paper form?* | [docs/RESULTS.md](docs/RESULTS.md) · [docs/PAPER-DRAFT.md](docs/PAPER-DRAFT.md) |
+| *What stands between this and a submission?* | [Final Sweep.md](Final%20Sweep.md) |
+| *How do I audit my own transcripts?* | [docs/AUDIT-SCHEMA.md](docs/AUDIT-SCHEMA.md) · [AUDIT-TARGETS.md](docs/AUDIT-TARGETS.md) |
+| *How is the 4-bit instrument served?* | [docs/LLAMACPP-SETUP.md](docs/LLAMACPP-SETUP.md) · [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) |
+| *How does it relate to prior work?* | [docs/RELATED.md](docs/RELATED.md) |
+| *Engineering detail* | [Technical_Details.md](Technical_Details.md) |
+
+---
+
+## Team
+
+| Member | Focus |
+|---|---|
+| **Guru R Bharadwaj** | Design, framework, experiments, analysis and write-up |
+
+---
+
+## License
+
+No license file is included; all rights reserved.
