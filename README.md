@@ -1,5 +1,13 @@
 # CollabEngine-LLM
 
+<p align="center">
+  <a href="CollabEngine-LLM%20Demo.mp4">
+    <img src="docs/CollabEngine-LLM%20Demo%20thumbnail.png" alt="Watch the CollabEngine-LLM demo video" width="720">
+  </a>
+  <br>
+  <sub>▶ <b><a href="CollabEngine-LLM%20Demo.mp4">Watch the CollabEngine-LLM demo</a></b> (74 s): the six phases, 191 commits, the suite on a fresh clone, then twelve live commands on the mock backend and a real corpus slice</sub>
+</p>
+
 **Give LLM agents no roles at all, then test causally whether the division of labour they invent is functionally real.**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](pyproject.toml)
