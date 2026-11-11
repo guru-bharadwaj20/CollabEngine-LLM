@@ -407,4 +407,4 @@ over a 151,936-entry vocabulary at every prompt position; the tier runs on a
 
 ## License
 
-No license file is included; all rights reserved.
+Copyright (c) 2026 Guru R Bharadwaj. All Rights Reserved. No use, copying, modification or distribution is permitted without written permission. See [LICENSE](LICENSE).
